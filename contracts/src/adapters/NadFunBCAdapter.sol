@@ -64,7 +64,7 @@ contract NadFunBCAdapter is IAdapter {
             uint256 balBefore = IERC20(token).balanceOf(to);
             BC_ROUTER.buy{value: amountIn}(
                 INadFunRouter.BuyParams({
-                    amountOutMin: 0,
+                    amountOutMin: 1,
                     token: token,
                     to: to,
                     deadline: block.timestamp + 300
@@ -78,7 +78,7 @@ contract NadFunBCAdapter is IAdapter {
             BC_ROUTER.sell(
                 INadFunRouter.SellParams({
                     amountIn: amountIn,
-                    amountOutMin: 0,
+                    amountOutMin: 1,
                     token: token,
                     to: address(this),
                     deadline: block.timestamp + 300

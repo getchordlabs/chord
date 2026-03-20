@@ -59,7 +59,7 @@ contract NadFunDEXAdapter is IAdapter {
             IWMON(WMON).withdraw(amountIn);
             amountOut = DEX_ROUTER.buy{value: amountIn}(
                 INadFunDexRouter.BuyParams({
-                    amountOutMin: 0,
+                    amountOutMin: 1,
                     token: token,
                     to: to,
                     deadline: block.timestamp + 300
@@ -71,7 +71,7 @@ contract NadFunDEXAdapter is IAdapter {
             amountOut = DEX_ROUTER.sell(
                 INadFunDexRouter.SellParams({
                     amountIn: amountIn,
-                    amountOutMin: 0,
+                    amountOutMin: 1,
                     token: token,
                     to: address(this),
                     deadline: block.timestamp + 300

@@ -1,0 +1,21 @@
+#!/bin/bash
+# Swap 0.1 MON → CHOG via NadFunDEXAdapter (graduated token)
+# CHOG: 0x350035555e10d9afaf1566aaebfced5ba6c27777 (graduated = true)
+# extraData = abi.encode(token, isBuy=true)
+ADAPTER=0x7A957a719096D6a9EB5994c485D1B9570Ae01b4F
+TOKEN=0x350035555e10d9afaf1566aaebfced5ba6c27777
+
+cast send 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a \
+  --value 0.1ether \
+  --legacy \
+  --gas-limit 2000000 \
+  --rpc-url https://monad-mainnet.g.alchemy.com/v2/REDACTED \
+  --private-key $DEPLOYER_PRIVATE_KEY \
+  "swap(address,address,uint256,uint256,uint256,(address,address,address,uint256,bytes),address)" \
+  0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A \
+  $TOKEN \
+  100000000000000000 \
+  0 \
+  99999999999 \
+  "($ADAPTER,0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A,$TOKEN,100000000000000000,0x000000000000000000000000350035555e10d9afaf1566aaebfced5ba6c277770000000000000000000000000000000000000000000000000000000000000001)" \
+  0x0000000000000000000000000000000000000000
