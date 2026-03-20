@@ -1,0 +1,32 @@
+#!/bin/bash
+# Swap USDC → MON via KuruAdapter → Kuru Router
+# isBuy=true (buying base=MON with quote=USDC), baseIsNative=true
+ADAPTER=0x3D3C7C44CF1657e72B574f768B40A022B863e464
+USDC_AMOUNT=22191
+
+# Step 1: Approve USDC
+cast send 0x754704Bc059F8C67012fEd69BC8A327a5aafb603 \
+  "approve(address,uint256)" \
+  0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a \
+  $USDC_AMOUNT \
+  --legacy \
+  --rpc-url https://monad-mainnet.g.alchemy.com/v2/REDACTED \
+  --private-key $DEPLOYER_PRIVATE_KEY
+
+echo "=== Approved. Swapping... ==="
+
+# Step 2: Swap USDC → MON
+# extraData = abi.encode(market, isBuy=true, baseIsNative=true)
+cast send 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a \
+  --legacy \
+  --gas-limit 2000000 \
+  --rpc-url https://monad-mainnet.g.alchemy.com/v2/REDACTED \
+  --private-key $DEPLOYER_PRIVATE_KEY \
+  "swap(address,address,uint256,uint256,uint256,(address,address,address,uint256,bytes),address)" \
+  0x754704Bc059F8C67012fEd69BC8A327a5aafb603 \
+  0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A \
+  $USDC_AMOUNT \
+  0 \
+  99999999999 \
+  "($ADAPTER,0x754704Bc059F8C67012fEd69BC8A327a5aafb603,0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A,$USDC_AMOUNT,0x000000000000000000000000065c9d28e428a0db40191a54d33d5b7c71a9c39400000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001)" \
+  0x0000000000000000000000000000000000000000
