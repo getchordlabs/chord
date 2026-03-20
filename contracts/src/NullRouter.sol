@@ -12,6 +12,31 @@ import {IAdapter} from "./interfaces/IAdapter.sol";
 import {TransferLib} from "./libraries/TransferLib.sol";
 import {SwapMath} from "./libraries/SwapMath.sol";
 
+interface IPermit2 {
+    struct PermitTransferFrom {
+        TokenPermissions permitted;
+        uint256 nonce;
+        uint256 deadline;
+    }
+
+    struct TokenPermissions {
+        address token;
+        uint256 amount;
+    }
+
+    struct SignatureTransferDetails {
+        address to;
+        uint256 requestedAmount;
+    }
+
+    function permitTransferFrom(
+        PermitTransferFrom calldata permit,
+        SignatureTransferDetails calldata transferDetails,
+        address owner,
+        bytes calldata signature
+    ) external;
+}
+
 /// @title NullRouter
 /// @notice Entry point for all NullTerminal swaps. Handles token pulls, fee deduction, and dust sweeping.
 /// @dev UUPS upgradeable. Users approve tokens to this contract.
@@ -28,6 +53,9 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
 
     /// @notice Adapter registry (whitelist)
     IAdapterRegistry public registry;
+
+    /// @notice Permit2 contract (canonical address on all EVM chains)
+    IPermit2 public permit2;
 
     // ============================================================
     // Errors
@@ -160,6 +188,38 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     }
 
     // ============================================================
+    // Permit2 Swap (gasless approval)
+    // ============================================================
+
+    /// @notice Swap with Permit2 signature (no prior approval needed)
+    function swapPermit2(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 deadline,
+        RouteStep calldata route,
+        address referrer,
+        uint256 nonce,
+        uint256 permitDeadline,
+        bytes calldata signature
+    ) external nonReentrant returns (uint256 amountOut) {
+        _checkDeadline(deadline);
+        if (amountIn == 0) revert ZeroAmount();
+
+        // Pull via Permit2
+        _pullTokensPermit2(tokenIn, msg.sender, amountIn, nonce, permitDeadline, signature);
+
+        amountOut = _executeSingle(route);
+        amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer);
+
+        _sweepDust(tokenIn);
+        _sweepDust(tokenOut);
+
+        emit Swap(msg.sender, tokenIn, tokenOut, amountIn, amountOut, _lastFeeAmount, referrer);
+    }
+
+    // ============================================================
     // Internal: Token Handling
     // ============================================================
 
@@ -175,6 +235,32 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
             // ERC20: transferFrom
             TransferLib.safeTransferFrom(token, from, address(this), amount);
         }
+    }
+
+    function _pullTokensPermit2(
+        address token,
+        address from,
+        uint256 amount,
+        uint256 nonce,
+        uint256 permitDeadline,
+        bytes calldata signature
+    ) internal {
+        permit2.permitTransferFrom(
+            IPermit2.PermitTransferFrom({
+                permitted: IPermit2.TokenPermissions({
+                    token: token,
+                    amount: amount
+                }),
+                nonce: nonce,
+                deadline: permitDeadline
+            }),
+            IPermit2.SignatureTransferDetails({
+                to: address(this),
+                requestedAmount: amount
+            }),
+            from,
+            signature
+        );
     }
 
     function _settleOutput(
@@ -280,6 +366,10 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
 
     function setRegistry(address newRegistry) external onlyOwner {
         registry = IAdapterRegistry(newRegistry);
+    }
+
+    function setPermit2(address newPermit2) external onlyOwner {
+        permit2 = IPermit2(newPermit2);
     }
 
     /// @dev Emergency: rescue stuck tokens (should never happen)
