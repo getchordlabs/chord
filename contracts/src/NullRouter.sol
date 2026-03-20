@@ -8,7 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {INullRouter} from "./interfaces/INullRouter.sol";
 import {IAdapterRegistry} from "./interfaces/IAdapterRegistry.sol";
 import {IFeeCollector} from "./interfaces/IFeeCollector.sol";
-import {NullExecutor} from "./NullExecutor.sol";
+import {IAdapter} from "./interfaces/IAdapter.sol";
 import {TransferLib} from "./libraries/TransferLib.sol";
 import {SwapMath} from "./libraries/SwapMath.sol";
 
@@ -20,8 +20,8 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     /// @notice WMON address on Monad
     address public wmon;
 
-    /// @notice Executor contract (called via delegatecall)
-    NullExecutor public executor;
+    /// @notice Executor contract (deprecated — kept for storage layout compatibility)
+    address public executor;
 
     /// @notice Fee collector contract
     IFeeCollector public feeCollector;
@@ -58,7 +58,7 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         // ReentrancyGuard uses transient storage in OZ v5 — no init needed
 
         wmon = wmon_;
-        executor = NullExecutor(executor_);
+        executor = executor_;
         feeCollector = IFeeCollector(feeCollector_);
         registry = IAdapterRegistry(registry_);
     }
@@ -217,35 +217,53 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     }
 
     // ============================================================
-    // Internal: Execution (delegatecall to NullExecutor)
+    // Internal: Execution (direct adapter calls — no delegatecall)
     // ============================================================
 
     function _executeSingle(RouteStep calldata route) internal returns (uint256) {
-        (bool success, bytes memory result) = address(executor).delegatecall(
-            abi.encodeCall(NullExecutor.executeSingle, (route, registry))
+        _validateAdapter(route.adapter);
+
+        // Transfer tokens to adapter
+        TransferLib.safeTransfer(route.tokenIn, route.adapter, route.amountIn);
+
+        // Execute swap via adapter
+        return IAdapter(route.adapter).swap(
+            route.tokenIn,
+            route.tokenOut,
+            route.amountIn,
+            address(this),
+            route.extraData
         );
-        require(success, "EXECUTOR_FAILED");
-        return abi.decode(result, (uint256));
     }
 
     function _executeSplit(
         address tokenIn,
         address tokenOut,
         RouteStep[] calldata routes
-    ) internal returns (uint256) {
-        (bool success, bytes memory result) = address(executor).delegatecall(
-            abi.encodeCall(NullExecutor.executeSplit, (tokenIn, tokenOut, routes, registry))
-        );
-        require(success, "EXECUTOR_FAILED");
-        return abi.decode(result, (uint256));
+    ) internal returns (uint256 totalOut) {
+        for (uint256 i = 0; i < routes.length; i++) {
+            _validateAdapter(routes[i].adapter);
+            TransferLib.safeTransfer(tokenIn, routes[i].adapter, routes[i].amountIn);
+            totalOut += IAdapter(routes[i].adapter).swap(
+                tokenIn, tokenOut, routes[i].amountIn, address(this), routes[i].extraData
+            );
+        }
     }
 
-    function _executeMultiHop(RouteStep[] calldata routes) internal returns (uint256) {
-        (bool success, bytes memory result) = address(executor).delegatecall(
-            abi.encodeCall(NullExecutor.executeMultiHop, (routes, registry))
-        );
-        require(success, "EXECUTOR_FAILED");
-        return abi.decode(result, (uint256));
+    function _executeMultiHop(RouteStep[] calldata routes) internal returns (uint256 amountOut) {
+        require(routes.length >= 2, "MIN_2_HOPS");
+        for (uint256 i = 0; i < routes.length; i++) {
+            _validateAdapter(routes[i].adapter);
+            uint256 amtIn = i == 0 ? routes[i].amountIn : amountOut;
+            TransferLib.safeTransfer(routes[i].tokenIn, routes[i].adapter, amtIn);
+            amountOut = IAdapter(routes[i].adapter).swap(
+                routes[i].tokenIn, routes[i].tokenOut, amtIn, address(this), routes[i].extraData
+            );
+        }
+    }
+
+    function _validateAdapter(address adapter) internal view {
+        require(registry.isApproved(adapter), "UNAPPROVED_ADAPTER");
     }
 
     // ============================================================
@@ -253,7 +271,7 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     // ============================================================
 
     function setExecutor(address newExecutor) external onlyOwner {
-        executor = NullExecutor(newExecutor);
+        executor = newExecutor;
     }
 
     function setFeeCollector(address newFeeCollector) external onlyOwner {
