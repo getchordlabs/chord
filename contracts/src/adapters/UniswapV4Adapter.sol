@@ -31,6 +31,7 @@ struct PoolKey {
 }
 
 interface IWMON {
+    function deposit() external payable;
     function withdraw(uint256 amount) external;
 }
 
@@ -142,17 +143,28 @@ contract UniswapV4Adapter is IAdapter {
 
         // 3. Take output (receive what PoolManager owes us)
         uint256 amountOut;
+        address outputCurrency;
         if (cb.zeroForOne) {
             amountOut = uint256(uint128(delta1));
-            POOL_MANAGER.take(cb.key.currency1, cb.recipient, amountOut);
+            outputCurrency = cb.key.currency1;
         } else {
             amountOut = uint256(uint128(delta0));
-            POOL_MANAGER.take(cb.key.currency0, cb.recipient, amountOut);
+            outputCurrency = cb.key.currency0;
+        }
+
+        if (outputCurrency == address(0)) {
+            // Output is native MON → take to adapter, wrap to WMON, send to recipient
+            POOL_MANAGER.take(outputCurrency, address(this), amountOut);
+            IWMON(WMON).deposit{value: amountOut}();
+            TransferLib.safeTransfer(WMON, cb.recipient, amountOut);
+        } else {
+            // Output is ERC20 → take directly to recipient
+            POOL_MANAGER.take(outputCurrency, cb.recipient, amountOut);
         }
 
         return abi.encode(amountOut);
     }
 
-    // Accept native MON from WMON.withdraw()
+    // Accept native MON from WMON.withdraw() and PoolManager.take()
     receive() external payable {}
 }
