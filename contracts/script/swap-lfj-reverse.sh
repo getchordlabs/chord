@@ -1,0 +1,28 @@
+#!/bin/bash
+# Swap USDC → WMON via LFJAdapter (binStep=10)
+ADAPTER=0x9aEC60dd373a00e49a1D36bF23831846fd09de54
+USDC_AMOUNT=22142
+
+# Approve
+cast send 0x754704Bc059F8C67012fEd69BC8A327a5aafb603 \
+  "approve(address,uint256)" 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a $USDC_AMOUNT \
+  --legacy --rpc-url https://monad-mainnet.g.alchemy.com/v2/REDACTED \
+  --private-key $DEPLOYER_PRIVATE_KEY
+
+echo "=== Approved. Swapping USDC → WMON ==="
+
+# Swap — tokenPath: USDC → WMON, i=USDC(coin1)→WMON(coin0) but LFJ uses tokenPath
+# extraData = abi.encode(binStep=10)
+cast send 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a \
+  --legacy \
+  --gas-limit 2000000 \
+  --rpc-url https://monad-mainnet.g.alchemy.com/v2/REDACTED \
+  --private-key $DEPLOYER_PRIVATE_KEY \
+  "swap(address,address,uint256,uint256,uint256,(address,address,address,uint256,bytes),address)" \
+  0x754704Bc059F8C67012fEd69BC8A327a5aafb603 \
+  0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A \
+  $USDC_AMOUNT \
+  0 \
+  99999999999 \
+  "($ADAPTER,0x754704Bc059F8C67012fEd69BC8A327a5aafb603,0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A,$USDC_AMOUNT,0x000000000000000000000000000000000000000000000000000000000000000a)" \
+  0x0000000000000000000000000000000000000000
