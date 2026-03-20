@@ -1,0 +1,27 @@
+#!/bin/bash
+# Swap CHOG → MON via NadFunDEXAdapter (sell graduated token)
+# extraData = abi.encode(token, isBuy=false)
+ADAPTER=0x7A957a719096D6a9EB5994c485D1B9570Ae01b4F
+TOKEN=0x350035555e10d9afaf1566aaebfced5ba6c27777
+AMOUNT=328001218176948814157
+
+# Approve CHOG to NullRouter
+cast send $TOKEN "approve(address,uint256)" 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a $AMOUNT \
+  --legacy --rpc-url https://monad-mainnet.g.alchemy.com/v2/REDACTED \
+  --private-key $DEPLOYER_PRIVATE_KEY
+
+echo "=== Approved. Selling CHOG → MON ==="
+
+cast send 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a \
+  --legacy \
+  --gas-limit 2000000 \
+  --rpc-url https://monad-mainnet.g.alchemy.com/v2/REDACTED \
+  --private-key $DEPLOYER_PRIVATE_KEY \
+  "swap(address,address,uint256,uint256,uint256,(address,address,address,uint256,bytes),address)" \
+  $TOKEN \
+  0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A \
+  $AMOUNT \
+  0 \
+  99999999999 \
+  "($ADAPTER,$TOKEN,0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A,$AMOUNT,0x000000000000000000000000350035555e10d9afaf1566aaebfced5ba6c277770000000000000000000000000000000000000000000000000000000000000000)" \
+  0x0000000000000000000000000000000000000000
