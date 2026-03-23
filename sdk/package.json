@@ -1,0 +1,19 @@
+{
+  "name": "@nullterminal/sdk",
+  "version": "0.1.0",
+  "description": "NullTerminal DEX aggregator SDK for Monad",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch"
+  },
+  "keywords": ["monad", "dex", "aggregator", "swap", "defi"],
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}
