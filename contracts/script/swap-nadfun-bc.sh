@@ -9,7 +9,7 @@ cast send 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a \
   --value 0.1ether \
   --legacy \
   --gas-limit 2000000 \
-  --rpc-url https://monad-mainnet.g.alchemy.com/v2/REDACTED \
+  --rpc-url "${MONAD_RPC_URL:?set MONAD_RPC_URL}" \
   --private-key $DEPLOYER_PRIVATE_KEY \
   "swap(address,address,uint256,uint256,uint256,(address,address,address,uint256,bytes),address)" \
   0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A \

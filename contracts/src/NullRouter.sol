@@ -83,7 +83,10 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         address registry_
     ) external initializer {
         __Ownable_init(owner_);
-        // ReentrancyGuard uses transient storage in OZ v5 — no init needed
+        // L3: ReentrancyGuard here is the standard storage-slot guard (OZ
+        // ReentrancyGuard via StorageSlot, NOT EIP-1153 transient storage). For a
+        // proxy the default slot value is 0, which the guard treats as NOT_ENTERED,
+        // so no explicit initialization is required.
 
         wmon = wmon_;
         executor = executor_;
@@ -107,6 +110,14 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     ) external payable nonReentrant returns (uint256 amountOut) {
         _checkDeadline(deadline);
         if (amountIn == 0) revert ZeroAmount();
+        // L2: route must move the function-level token pair
+        if (route.tokenIn != tokenIn || route.tokenOut != tokenOut) revert InvalidRoute();
+        // L1: single route must consume exactly amountIn
+        if (route.amountIn != amountIn) revert InvalidRoute();
+
+        // H1: snapshot pre-existing router balances so only swap-generated dust is swept
+        uint256 baseIn = IERC20(tokenIn).balanceOf(address(this));
+        uint256 baseOut = IERC20(tokenOut).balanceOf(address(this));
 
         // 1. Pull input tokens from user
         _pullTokens(tokenIn, msg.sender, amountIn);
@@ -117,9 +128,9 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         // 3. Deduct fee + deliver output
         amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer);
 
-        // 4. Sweep dust
-        _sweepDust(tokenIn);
-        _sweepDust(tokenOut);
+        // 4. Sweep dust above the pre-swap baseline (never the pre-existing balance)
+        _sweepDustDelta(tokenIn, baseIn);
+        _sweepDustDelta(tokenOut, baseOut);
 
         emit Swap(msg.sender, tokenIn, tokenOut, amountIn, amountOut, _lastFeeAmount, referrer);
     }
@@ -138,6 +149,19 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         if (amountIn == 0) revert ZeroAmount();
         if (routes.length == 0) revert InvalidRoute();
 
+        // L1/L2: every route must move the function-level pair and the per-route
+        // amounts must sum to exactly amountIn (no over/under-pulling vs. user intent)
+        uint256 sumIn;
+        for (uint256 i = 0; i < routes.length; i++) {
+            if (routes[i].tokenIn != tokenIn || routes[i].tokenOut != tokenOut) revert InvalidRoute();
+            sumIn += routes[i].amountIn;
+        }
+        if (sumIn != amountIn) revert InvalidRoute();
+
+        // H1: snapshot pre-existing router balances so only swap-generated dust is swept
+        uint256 baseIn = IERC20(tokenIn).balanceOf(address(this));
+        uint256 baseOut = IERC20(tokenOut).balanceOf(address(this));
+
         // 1. Pull input tokens
         _pullTokens(tokenIn, msg.sender, amountIn);
 
@@ -147,9 +171,9 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         // 3. Deduct fee + deliver output
         amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer);
 
-        // 4. Sweep dust
-        _sweepDust(tokenIn);
-        _sweepDust(tokenOut);
+        // 4. Sweep dust above the pre-swap baseline (never the pre-existing balance)
+        _sweepDustDelta(tokenIn, baseIn);
+        _sweepDustDelta(tokenOut, baseOut);
 
         emit Swap(msg.sender, tokenIn, tokenOut, amountIn, amountOut, _lastFeeAmount, referrer);
     }
@@ -169,6 +193,21 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         address tokenIn = routes[0].tokenIn;
         address tokenOut = routes[routes.length - 1].tokenOut;
 
+        // L1: first hop must consume exactly amountIn (subsequent hops chain the prior
+        // hop's output, so only the entry amount is constrained here). Per-hop token
+        // pairs legitimately differ, so they are NOT constrained (see L2).
+        if (routes[0].amountIn != amountIn) revert InvalidRoute();
+
+        // H1: snapshot pre-existing balances for tokenIn + every hop's tokenOut
+        // (intermediates + final) BEFORE pulling, so only swap-generated dust is swept.
+        // Snapshotting per target (rather than before the loop) keeps the baseline correct
+        // even when the same token recurs across hops.
+        uint256[] memory baselines = new uint256[](routes.length + 1);
+        baselines[0] = IERC20(tokenIn).balanceOf(address(this));
+        for (uint256 i = 0; i < routes.length; i++) {
+            baselines[i + 1] = IERC20(routes[i].tokenOut).balanceOf(address(this));
+        }
+
         // 1. Pull input tokens
         _pullTokens(tokenIn, msg.sender, amountIn);
 
@@ -178,10 +217,10 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         // 3. Deduct fee + deliver output
         amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer);
 
-        // 4. Sweep dust (all intermediate + final tokens)
-        _sweepDust(tokenIn);
+        // 4. Sweep dust above baseline (all intermediate + final tokens)
+        _sweepDustDelta(tokenIn, baselines[0]);
         for (uint256 i = 0; i < routes.length; i++) {
-            _sweepDust(routes[i].tokenOut);
+            _sweepDustDelta(routes[i].tokenOut, baselines[i + 1]);
         }
 
         emit Swap(msg.sender, tokenIn, tokenOut, amountIn, amountOut, _lastFeeAmount, referrer);
@@ -206,6 +245,14 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     ) external nonReentrant returns (uint256 amountOut) {
         _checkDeadline(deadline);
         if (amountIn == 0) revert ZeroAmount();
+        // L2: route must move the function-level token pair
+        if (route.tokenIn != tokenIn || route.tokenOut != tokenOut) revert InvalidRoute();
+        // L1: single route must consume exactly amountIn
+        if (route.amountIn != amountIn) revert InvalidRoute();
+
+        // H1: snapshot pre-existing router balances so only swap-generated dust is swept
+        uint256 baseIn = IERC20(tokenIn).balanceOf(address(this));
+        uint256 baseOut = IERC20(tokenOut).balanceOf(address(this));
 
         // Pull via Permit2
         _pullTokensPermit2(tokenIn, msg.sender, amountIn, nonce, permitDeadline, signature);
@@ -213,8 +260,8 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         amountOut = _executeSingle(route);
         amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer);
 
-        _sweepDust(tokenIn);
-        _sweepDust(tokenOut);
+        _sweepDustDelta(tokenIn, baseIn);
+        _sweepDustDelta(tokenOut, baseOut);
 
         emit Swap(msg.sender, tokenIn, tokenOut, amountIn, amountOut, _lastFeeAmount, referrer);
     }
@@ -290,11 +337,15 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         _lastFeeAmount = feeAmount;
     }
 
-    /// @dev Sweep any remaining tokens to the user. Router must hold 0 tokens.
-    function _sweepDust(address token) internal {
+    /// @dev Sweep only the dust generated by THIS swap back to the user.
+    ///      H1: sweeps `currentBalance - baseline` (floored at 0), where `baseline` was
+    ///      snapshotted at function entry. Any pre-existing router balance (donations,
+    ///      adapter over-delivery from prior txs, pending rescueTokens) stays untouched
+    ///      so it cannot be stolen by the next swapper.
+    function _sweepDustDelta(address token, uint256 baseline) internal {
         uint256 balance = IERC20(token).balanceOf(address(this));
-        if (balance > 0) {
-            TransferLib.safeTransfer(token, msg.sender, balance);
+        if (balance > baseline) {
+            TransferLib.safeTransfer(token, msg.sender, balance - baseline);
         }
     }
 

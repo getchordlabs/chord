@@ -13,6 +13,15 @@ interface IUniV2Pair {
 /// @title UniV2DirectAdapter
 /// @notice Swaps directly on Uniswap V2 pools (no router needed)
 /// @dev Calculates amountOut from reserves, transfers tokenIn to pool, calls pool.swap()
+/// @dev L4 ASSUMPTION: this adapter hardcodes the canonical Uniswap V2 0.3% swap fee
+///      (the 997/1000 factor below) and the pure constant-product x*y=k invariant.
+///      It will MISPRICE any pool that deviates from these assumptions — e.g. forks with
+///      a different fee tier, fee-on-transfer / rebasing tokens (where the amount the pool
+///      actually receives differs from `amountIn`), or non-standard curve math. Only route
+///      standard, non-fee-on-transfer 0.3% V2 pairs through this adapter. The pool's own
+///      `swap()` k-check will revert on a too-optimistic `amountOut`, but mispriced quotes
+///      can still cause failed txs or worse-than-quoted execution; slippage (minAmountOut)
+///      in NullRouter remains the backstop.
 contract UniV2DirectAdapter is IAdapter {
     /// @inheritdoc IAdapter
     /// @dev extraData = abi.encode(address pool)

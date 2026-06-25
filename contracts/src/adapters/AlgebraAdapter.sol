@@ -26,6 +26,13 @@ contract AlgebraAdapter is IAdapter {
     uint160 private constant MIN_SQRT_RATIO = 4295128739;
     uint160 private constant MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970342;
 
+    // M1: transient-storage slot holding the pool we are mid-swap with. Set right before
+    // pool.swap(), checked in algebraSwapCallback(), and cleared after the swap returns.
+    // EIP-1153 (tstore/tload) is available — pragma ^0.8.24 + cancun evm_version.
+    // keccak256("nullterminal.algebra.expectedPool") truncated to a constant slot.
+    uint256 private constant EXPECTED_POOL_SLOT =
+        uint256(keccak256("nullterminal.algebra.expectedPool"));
+
     /// @inheritdoc IAdapter
     /// @dev extraData = abi.encode(address pool)
     function swap(
@@ -46,6 +53,10 @@ contract AlgebraAdapter is IAdapter {
         // Encode callback data: tokenIn + amountIn (adapter will transfer in callback)
         bytes memory callbackData = abi.encode(tokenIn, amountIn, msg.sender);
 
+        // M1: record the exact pool we are about to call so the callback can
+        // authenticate msg.sender == this pool (and reject arbitrary callers).
+        _setExpectedPool(pool);
+
         (int256 amount0, int256 amount1) = algebraPool.swap(
             to,              // recipient gets output directly
             zeroToOne,
@@ -53,6 +64,9 @@ contract AlgebraAdapter is IAdapter {
             sqrtPriceLimit,
             callbackData
         );
+
+        // M1: clear the authorization once the swap (and its callback) completed.
+        _setExpectedPool(address(0));
 
         // Output is the negative delta (tokens sent to recipient)
         amountOut = zeroToOne ? uint256(-amount1) : uint256(-amount0);
@@ -64,11 +78,31 @@ contract AlgebraAdapter is IAdapter {
         int256 amount1Delta,
         bytes calldata data
     ) external {
+        // M1: only the pool we are actively swapping with may invoke this callback.
+        // Without this an arbitrary caller could trigger a token transfer out of the adapter.
+        require(msg.sender == _expectedPool(), "unauthorized callback");
+
         (address tokenIn, uint256 amountIn, address payer) = abi.decode(data, (address, uint256, address));
 
         // Transfer the required amount to the pool
         // Tokens are already in this adapter (transferred by NullRouter before swap())
         uint256 amountRequired = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
         TransferLib.safeTransfer(tokenIn, msg.sender, amountRequired);
+    }
+
+    /// @dev M1: write the expected-pool authorization to transient storage (EIP-1153).
+    function _setExpectedPool(address pool) private {
+        uint256 slot = EXPECTED_POOL_SLOT;
+        assembly {
+            tstore(slot, pool)
+        }
+    }
+
+    /// @dev M1: read the expected-pool authorization from transient storage (EIP-1153).
+    function _expectedPool() private view returns (address pool) {
+        uint256 slot = EXPECTED_POOL_SLOT;
+        assembly {
+            pool := tload(slot)
+        }
     }
 }

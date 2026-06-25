@@ -7,7 +7,7 @@ AMOUNT=1158963227604141954654  # all ZigZag
 
 # Approve ZigZag to NullRouter
 cast send $TOKEN "approve(address,uint256)" 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a $AMOUNT \
-  --legacy --rpc-url https://monad-mainnet.g.alchemy.com/v2/REDACTED \
+  --legacy --rpc-url "${MONAD_RPC_URL:?set MONAD_RPC_URL}" \
   --private-key $DEPLOYER_PRIVATE_KEY
 
 echo "=== Approved. Selling ZigZag → MON ==="
@@ -16,7 +16,7 @@ echo "=== Approved. Selling ZigZag → MON ==="
 cast send 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a \
   --legacy \
   --gas-limit 2000000 \
-  --rpc-url https://monad-mainnet.g.alchemy.com/v2/REDACTED \
+  --rpc-url "${MONAD_RPC_URL:?set MONAD_RPC_URL}" \
   --private-key $DEPLOYER_PRIVATE_KEY \
   "swap(address,address,uint256,uint256,uint256,(address,address,address,uint256,bytes),address)" \
   $TOKEN \

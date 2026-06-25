@@ -7,19 +7,41 @@ import type {
   HealthResponse,
 } from "./types";
 
+/** Default public API endpoint — defined once, referenced everywhere. */
+export const DEFAULT_BASE_URL = "https://api.nullterminal.xyz";
+
+/** Default request timeout in milliseconds. */
+const DEFAULT_TIMEOUT_MS = 10_000;
+
+/** Thrown when the API returns a non-2xx response. Carries status + body. */
+export class NullTerminalApiError extends Error {
+  readonly status: number;
+  readonly body: unknown;
+  constructor(status: number, message: string, body: unknown) {
+    super(message);
+    this.name = "NullTerminalApiError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
 export interface NullTerminalConfig {
   /** API base URL (default: https://api.nullterminal.xyz) */
   baseUrl?: string;
   /** API key for higher rate limits */
   apiKey?: string;
+  /** Per-request timeout in ms (default: 10000) */
+  timeoutMs?: number;
 }
 
 export class NullTerminal {
   private baseUrl: string;
   private headers: Record<string, string>;
+  private timeoutMs: number;
 
   constructor(config?: NullTerminalConfig) {
-    this.baseUrl = config?.baseUrl || "https://api.nullterminal.xyz";
+    this.baseUrl = config?.baseUrl || DEFAULT_BASE_URL;
+    this.timeoutMs = config?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.headers = { "Content-Type": "application/json" };
     if (config?.apiKey) {
       this.headers["X-API-Key"] = config.apiKey;
@@ -29,12 +51,17 @@ export class NullTerminal {
   /**
    * Get the best swap quote across all DEXs.
    *
+   * Slippage MUST be set here via `slippageBps` — it is baked into the
+   * returned quote's `otherAmountThreshold` (minOut). buildSwap does NOT
+   * tighten slippage; it only encodes the already-quoted threshold.
+   *
    * @example
    * ```ts
    * const quote = await nt.getQuote({
    *   inputMint: "0x0000000000000000000000000000000000000000", // MON
    *   outputMint: "0x754704Bc059F8C67012fEd69BC8A327a5aafb603", // USDC
    *   amount: (1000n * 10n ** 18n).toString(),
+   *   slippageBps: 50, // 0.5% — set slippage at QUOTE time
    * });
    * ```
    */
@@ -54,6 +81,9 @@ export class NullTerminal {
    * Build an unsigned swap transaction from a quote.
    * Sign with any wallet library (ethers, viem, wagmi).
    *
+   * Note: slippage cannot be changed here — minOut is taken from the quote's
+   * `otherAmountThreshold` (set at QUOTE time via getQuote's slippageBps).
+   *
    * @example
    * ```ts
    * const { transaction } = await nt.buildSwap({
@@ -71,7 +101,7 @@ export class NullTerminal {
         userPublicKey: params.userPublicKey,
         wrapUnwrapMON: params.wrapUnwrapMON ?? true,
         feeAccount: params.feeAccount,
-        slippageBps: params.slippageBps,
+        usePermit2: params.usePermit2,
       }),
     });
   }
@@ -91,14 +121,34 @@ export class NullTerminal {
     path: string,
     options?: RequestInit
   ): Promise<T> {
-    const res = await globalThis.fetch(`${this.baseUrl}${path}`, {
-      ...options,
-      headers: { ...this.headers, ...options?.headers },
-    });
+    // Abort the request if it exceeds the configured timeout so callers
+    // are not left hanging on a slow/unreachable API.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    let res: Response;
+    try {
+      res = await globalThis.fetch(`${this.baseUrl}${path}`, {
+        ...options,
+        headers: { ...this.headers, ...options?.headers },
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (controller.signal.aborted) {
+        throw new Error(`Request timed out after ${this.timeoutMs}ms: ${path}`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (!res.ok) {
-      const error = await res.json().catch(() => ({ message: res.statusText }));
-      throw new Error(error.message || `API error: ${res.status}`);
+      const body = await res.json().catch(() => ({ message: res.statusText }));
+      const message =
+        (body && typeof body === "object" && "message" in body
+          ? (body as { message?: string }).message
+          : undefined) || `API error: ${res.status}`;
+      throw new NullTerminalApiError(res.status, message, body);
     }
 
     return res.json();

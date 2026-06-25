@@ -59,12 +59,14 @@ export interface QuoteParams {
   slippageBps?: number;
 }
 
+// Aligned with shared SwapRequest. Note: slippage is NOT set here — it is
+// baked into quoteResponse.otherAmountThreshold at QUOTE time (see getQuote).
 export interface SwapParams {
   quoteResponse: QuoteResponse;
   userPublicKey: string;
   wrapUnwrapMON?: boolean;
-  feeAccount?: string;
-  slippageBps?: number;
+  feeAccount?: string; // referral address
+  usePermit2?: boolean;
 }
 
 export interface HealthResponse {

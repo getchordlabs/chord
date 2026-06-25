@@ -7,7 +7,7 @@ USDC_AMOUNT=221840
 cast send 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a \
   --legacy \
   --gas-limit 1000000 \
-  --rpc-url https://monad-mainnet.g.alchemy.com/v2/REDACTED \
+  --rpc-url "${MONAD_RPC_URL:?set MONAD_RPC_URL}" \
   --private-key $DEPLOYER_PRIVATE_KEY \
   "swap(address,address,uint256,uint256,uint256,(address,address,address,uint256,bytes),address)" \
   0x754704Bc059F8C67012fEd69BC8A327a5aafb603 \
