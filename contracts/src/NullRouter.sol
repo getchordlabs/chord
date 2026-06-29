@@ -279,7 +279,10 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
             require(msg.value == amount, "MON_AMOUNT_MISMATCH");
             IWMON(wmon).deposit{value: amount}();
         } else {
-            // ERC20: transferFrom
+            // ERC20 (incl. WMON-as-ERC20). Reject any attached native value: the payable entrypoints +
+            // empty receive() would otherwise silently swallow it with NO refund and NO rescue path
+            // (rescueTokens only reads IERC20.balanceOf) → permanently stuck user funds.
+            require(msg.value == 0, "UNEXPECTED_VALUE");
             TransferLib.safeTransferFrom(token, from, address(this), amount);
         }
     }
@@ -325,10 +328,14 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
             revert InsufficientOutput(userOutput, minAmountOut);
         }
 
-        // Send fee to collector
+        // Send fee to collector. Drop a self-referral (referrer == swapper) so the user cannot claw
+        // back 50% of their own fee → treasury keeps the whole fee. NOTE: a determined user can still
+        // refer from a second wallet (Sybil); fully closing that needs an owner-managed referrer
+        // allowlist, which would break open third-party referral — intentionally left open.
         if (feeAmount > 0) {
+            address ref = referrer == msg.sender ? address(0) : referrer;
             TransferLib.safeTransfer(tokenOut, address(feeCollector), feeAmount);
-            feeCollector.collectFee(tokenOut, feeAmount, referrer);
+            feeCollector.collectFee(tokenOut, feeAmount, ref);
         }
 
         // Send output to user
@@ -391,6 +398,15 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         require(routes.length >= 2, "MIN_2_HOPS");
         for (uint256 i = 0; i < routes.length; i++) {
             _validateAdapter(routes[i].adapter);
+            // Hop continuity: hop i must consume exactly what hop i-1 produced. Without this, the
+            // forwarded amount (`amountOut` of the prior hop) is decoupled from `routes[i].tokenIn`,
+            // letting a caller push the router's standing balance of an ARBITRARY token through a
+            // whitelisted adapter and sweep the proceeds — draining any leftover/donated/over-delivered
+            // tokens and bypassing the H1 dust-baseline guard. (routes[0].tokenIn is constrained by the
+            // entrypoint, which pulls amountIn of it.)
+            if (i > 0) {
+                require(routes[i].tokenIn == routes[i - 1].tokenOut, "HOP_TOKEN_MISMATCH");
+            }
             uint256 amtIn = i == 0 ? routes[i].amountIn : amountOut;
             TransferLib.safeTransfer(routes[i].tokenIn, routes[i].adapter, amtIn);
             amountOut = IAdapter(routes[i].adapter).swap(
