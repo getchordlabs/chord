@@ -5,6 +5,17 @@ export interface Token {
   decimals: number;
   logoURI?: string;
   tags?: string[];
+  /** true = on the official curated list; false/undefined = discovered (meme/long-tail) */
+  verified?: boolean;
+  /** best-pair DexScreener liquidity (USD) */
+  liquidityUsd?: number;
+}
+
+/** Market data for a token (from getTokenMarkets), keyed by lowercase address. */
+export interface TokenMarket {
+  priceUsd?: number;
+  change24h?: number;
+  volume24h?: number;
 }
 
 export interface QuoteResponse {

@@ -1,17 +1,41 @@
 {
   "name": "@nullterminal/sdk",
-  "version": "0.1.0",
-  "description": "NullTerminal DEX aggregator SDK for Monad",
+  "version": "0.2.0",
+  "description": "NullTerminal DEX aggregator SDK for Monad — optimal swap routes across all major DEXs in a single transaction.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch"
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": ["monad", "dex", "aggregator", "swap", "defi"],
+  "keywords": ["monad", "dex", "aggregator", "swap", "defi", "nullterminal"],
   "license": "MIT",
+  "homepage": "https://nullterminal.xyz",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tuantqse90/nullterminal.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/tuantqse90/nullterminal/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "tsup": "^8.0.0",
     "typescript": "^5.0.0"

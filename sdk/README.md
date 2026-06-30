@@ -1,6 +1,6 @@
 # @nullterminal/sdk
 
-DEX aggregator SDK for Monad. Optimal swap routes across 9 DEXs, split orders, single transaction.
+DEX aggregator SDK for Monad. Optimal swap routes across 8 DEXs, split orders, single transaction. Honest, executable quotes only.
 
 ## Install
 
@@ -65,13 +65,33 @@ Build an unsigned transaction from a quote.
 |-------|------|----------|-------------|
 | `quoteResponse` | QuoteResponse | Yes | Quote from `getQuote()` |
 | `userPublicKey` | string | Yes | Wallet address |
-| `slippageBps` | number | No | Override slippage |
+| `feeAccount` | string | No | Referral address (earns 50% of the 5bps fee) |
+
+Slippage is **not** set here — it is baked into the quote's `otherAmountThreshold` at quote time via `getQuote`'s `slippageBps`.
 
 Returns `{ transaction: { to, data, value, gasLimit, chainId } }`
 
 ### `nt.getTokens()`
 
-Returns the full token list with logos and metadata.
+Returns the full curated token list — each token carries `verified` (on the official list) and `liquidityUsd`.
+
+### `nt.searchTokens(query)`
+
+On-chain discovery: find swap-ready tokens by symbol or name that are **not** in the curated list. Results are logo-gated with real on-chain decimals and flagged `verified: false`.
+
+```typescript
+const results = await nt.searchTokens("gmon");
+```
+
+### `nt.getTokenMarkets()`
+
+Market data (`priceUsd`, `change24h`, `volume24h`) for the token list, keyed by lowercase address. Native MON has no entry — use the WMON address for its price.
+
+```typescript
+const markets = await nt.getTokenMarkets();
+const usdc = markets["0x754704bc059f8c67012fed69bc8a327a5aafb603"];
+console.log(usdc?.priceUsd, usdc?.change24h);
+```
 
 ### `nt.getHealth()`
 
@@ -79,7 +99,7 @@ System health check.
 
 ## Supported DEXs
 
-Uniswap V4, Uniswap V3, PancakeSwap V3, Capricorn, OctoSwap, Atlantis, Kuru, LFJ, Uniswap V2
+Uniswap V4, Uniswap V3, PancakeSwap V3, Capricorn, Atlantis, Kuru, LFJ, Nad.fun (bonding curve)
 
 ## Chain
 

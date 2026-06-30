@@ -4,6 +4,7 @@ import type {
   SwapParams,
   SwapResponse,
   Token,
+  TokenMarket,
   HealthResponse,
 } from "./types";
 
@@ -106,10 +107,32 @@ export class NullTerminal {
     });
   }
 
-  /** Get the full token list with logos and metadata. */
+  /** Get the full curated token list with logos, verified flag, and liquidity. */
   async getTokens(): Promise<Token[]> {
     const data = await this.fetch<{ tokens: Token[] }>("/v1/tokens");
     return data.tokens;
+  }
+
+  /**
+   * Discover swap-ready tokens by symbol or name that are NOT in the curated list (on-chain search).
+   * Returns logo-gated, on-chain-decimals tokens flagged `verified: false`.
+   */
+  async searchTokens(query: string): Promise<Token[]> {
+    const data = await this.fetch<{ tokens: Token[] }>(
+      `/v1/tokens/search?q=${encodeURIComponent(query)}`
+    );
+    return data.tokens;
+  }
+
+  /**
+   * Market data (price / 24h change / 24h volume) for the token list, keyed by lowercase address.
+   * Native MON has no entry — use the WMON address for its price.
+   */
+  async getTokenMarkets(): Promise<Record<string, TokenMarket>> {
+    const data = await this.fetch<{ market: Record<string, TokenMarket> }>(
+      "/v1/tokens/market"
+    );
+    return data.market || {};
   }
 
   /** System health check. */
