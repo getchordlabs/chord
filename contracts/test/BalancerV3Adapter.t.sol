@@ -23,6 +23,8 @@ contract MockAggregatorRouter {
     uint256 public rate; // amountOut = amountIn * rate / 1e18
     constructor(address vault_, uint256 rate_) { VAULT = vault_; rate = rate_; }
 
+    function getVault() external view returns (address) { return VAULT; }
+
     function swapSingleTokenExactIn(
         address, // pool
         address tokenIn,
@@ -82,6 +84,12 @@ contract BalancerV3AdapterTest is Test {
         // No mint to the adapter → safeTransfer to the Vault will fail (insufficient balance).
         vm.expectRevert();
         adapter.swap(address(tokenIn), address(tokenOut), 1_000e6, recipient, abi.encode(pool));
+    }
+
+    function test_constructor_revertsOnVaultMismatch() public {
+        // router.getVault() == `vault`; constructing with a different vault must revert.
+        vm.expectRevert(bytes("VAULT_MISMATCH"));
+        new BalancerV3Adapter(address(0xBEEF), address(router));
     }
 
     function test_decode_extraData_isPoolAddress() public {

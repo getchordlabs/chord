@@ -18,6 +18,9 @@ interface IBalancerAggregatorRouter {
         uint256 deadline,
         bytes calldata userData
     ) external returns (uint256 amountOut);
+
+    /// @notice The singleton Vault this router settles against (from RouterCommon).
+    function getVault() external view returns (address);
 }
 
 /// @title BalancerV3Adapter
@@ -40,6 +43,9 @@ contract BalancerV3Adapter is IAdapter {
     IBalancerAggregatorRouter public immutable ROUTER;
 
     constructor(address vault_, address router_) {
+        // The pre-fund flow transfers tokenIn to VAULT but settles via ROUTER — a mismatch would silently
+        // strand funds in the wrong Vault. Pin them together at deploy: ROUTER must settle against vault_.
+        require(IBalancerAggregatorRouter(router_).getVault() == vault_, "VAULT_MISMATCH");
         VAULT = vault_;
         ROUTER = IBalancerAggregatorRouter(router_);
     }
