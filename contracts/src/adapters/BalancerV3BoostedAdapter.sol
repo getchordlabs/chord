@@ -27,9 +27,6 @@ interface IBalancerAggregatorBatchRouter {
         external
         payable
         returns (uint256[] memory pathAmountsOut, address[] memory tokensOut, uint256[] memory amountsOut);
-
-    /// @notice The singleton Vault this router settles against (from RouterCommon).
-    function getVault() external view returns (address);
 }
 
 /// @title BalancerV3BoostedAdapter
@@ -51,7 +48,10 @@ contract BalancerV3BoostedAdapter is IAdapter {
     IBalancerAggregatorBatchRouter public immutable ROUTER;
 
     constructor(address vault_, address router_) {
-        require(IBalancerAggregatorBatchRouter(router_).getVault() == vault_, "VAULT_MISMATCH");
+        // NOTE: the AggregatorBatchRouter exposes no vault accessor (unlike the single-swap
+        // AggregatorRouter), so we cannot cross-check ROUTER↔VAULT on-chain here. Both are supplied by the
+        // deploy script from verified addresses; a mis-wire fails safe (the Vault settle reverts) and is
+        // caught by the mandatory mainnet 2-way swap test.
         VAULT = vault_;
         ROUTER = IBalancerAggregatorBatchRouter(router_);
     }

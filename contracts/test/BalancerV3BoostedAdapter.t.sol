@@ -81,9 +81,4 @@ contract BalancerV3BoostedAdapterTest is Test {
         vm.expectRevert();
         adapter.swap(address(usdc), address(usdt0), 1_000e6, recipient, _steps());
     }
-
-    function test_constructor_revertsOnVaultMismatch() public {
-        vm.expectRevert(bytes("VAULT_MISMATCH"));
-        new BalancerV3BoostedAdapter(address(0xBEEF), address(router));
-    }
 }
