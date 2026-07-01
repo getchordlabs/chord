@@ -65,6 +65,7 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     error InsufficientOutput(uint256 got, uint256 minRequired);
     error ZeroAmount();
     error InvalidRoute();
+    error NativeTransferFailed();
 
     // ============================================================
     // Constructor + Initializer
@@ -110,14 +111,18 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     ) external payable nonReentrant returns (uint256 amountOut) {
         _checkDeadline(deadline);
         if (amountIn == 0) revert ZeroAmount();
+        // Native-MON output sentinel: tokenOut == address(0) means "deliver native MON". The swap
+        // itself produces WMON, unwrapped at settlement; map to WMON for all ERC20-level ops.
+        bool nativeOut = tokenOut == address(0);
+        address outToken = nativeOut ? wmon : tokenOut;
         // L2: route must move the function-level token pair
-        if (route.tokenIn != tokenIn || route.tokenOut != tokenOut) revert InvalidRoute();
+        if (route.tokenIn != tokenIn || route.tokenOut != outToken) revert InvalidRoute();
         // L1: single route must consume exactly amountIn
         if (route.amountIn != amountIn) revert InvalidRoute();
 
         // H1: snapshot pre-existing router balances so only swap-generated dust is swept
         uint256 baseIn = IERC20(tokenIn).balanceOf(address(this));
-        uint256 baseOut = IERC20(tokenOut).balanceOf(address(this));
+        uint256 baseOut = IERC20(outToken).balanceOf(address(this));
 
         // 1. Pull input tokens from user
         _pullTokens(tokenIn, msg.sender, amountIn);
@@ -125,12 +130,12 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         // 2. Execute swap via executor (delegatecall)
         amountOut = _executeSingle(route);
 
-        // 3. Deduct fee + deliver output
-        amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer);
+        // 3. Deduct fee + deliver output (unwrap to native MON if requested)
+        amountOut = _settleOutput(outToken, amountOut, minAmountOut, referrer, nativeOut);
 
         // 4. Sweep dust above the pre-swap baseline (never the pre-existing balance)
         _sweepDustDelta(tokenIn, baseIn);
-        _sweepDustDelta(tokenOut, baseOut);
+        _sweepDustDelta(outToken, baseOut);
 
         emit Swap(msg.sender, tokenIn, tokenOut, amountIn, amountOut, _lastFeeAmount, referrer);
     }
@@ -149,31 +154,35 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         if (amountIn == 0) revert ZeroAmount();
         if (routes.length == 0) revert InvalidRoute();
 
+        // Native-MON output sentinel (see swap): tokenOut == address(0) → deliver native MON.
+        bool nativeOut = tokenOut == address(0);
+        address outToken = nativeOut ? wmon : tokenOut;
+
         // L1/L2: every route must move the function-level pair and the per-route
         // amounts must sum to exactly amountIn (no over/under-pulling vs. user intent)
         uint256 sumIn;
         for (uint256 i = 0; i < routes.length; i++) {
-            if (routes[i].tokenIn != tokenIn || routes[i].tokenOut != tokenOut) revert InvalidRoute();
+            if (routes[i].tokenIn != tokenIn || routes[i].tokenOut != outToken) revert InvalidRoute();
             sumIn += routes[i].amountIn;
         }
         if (sumIn != amountIn) revert InvalidRoute();
 
         // H1: snapshot pre-existing router balances so only swap-generated dust is swept
         uint256 baseIn = IERC20(tokenIn).balanceOf(address(this));
-        uint256 baseOut = IERC20(tokenOut).balanceOf(address(this));
+        uint256 baseOut = IERC20(outToken).balanceOf(address(this));
 
         // 1. Pull input tokens
         _pullTokens(tokenIn, msg.sender, amountIn);
 
         // 2. Execute split via executor
-        amountOut = _executeSplit(tokenIn, tokenOut, routes);
+        amountOut = _executeSplit(tokenIn, outToken, routes);
 
-        // 3. Deduct fee + deliver output
-        amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer);
+        // 3. Deduct fee + deliver output (unwrap to native MON if requested)
+        amountOut = _settleOutput(outToken, amountOut, minAmountOut, referrer, nativeOut);
 
         // 4. Sweep dust above the pre-swap baseline (never the pre-existing balance)
         _sweepDustDelta(tokenIn, baseIn);
-        _sweepDustDelta(tokenOut, baseOut);
+        _sweepDustDelta(outToken, baseOut);
 
         emit Swap(msg.sender, tokenIn, tokenOut, amountIn, amountOut, _lastFeeAmount, referrer);
     }
@@ -186,12 +195,41 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         RouteStep[] calldata routes,
         address referrer
     ) external payable nonReentrant returns (uint256 amountOut) {
+        // Backward-compatible: delivers routes[last].tokenOut as-is (WMON stays WMON).
+        return _multiHopSwap(amountIn, minAmountOut, deadline, routes, referrer, false);
+    }
+
+    /// @notice Multi-hop swap with optional native-MON delivery.
+    /// @dev When `unwrapOutput` is true, the final hop MUST produce WMON, which is unwrapped and
+    ///      forwarded to the caller as native MON. This is the multi-hop counterpart of the
+    ///      `tokenOut == address(0)` sentinel used by swap/splitSwap. NOT in INullRouter (overload).
+    function multiHopSwap(
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 deadline,
+        RouteStep[] calldata routes,
+        address referrer,
+        bool unwrapOutput
+    ) external payable nonReentrant returns (uint256 amountOut) {
+        return _multiHopSwap(amountIn, minAmountOut, deadline, routes, referrer, unwrapOutput);
+    }
+
+    function _multiHopSwap(
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 deadline,
+        RouteStep[] calldata routes,
+        address referrer,
+        bool unwrapOutput
+    ) internal returns (uint256 amountOut) {
         _checkDeadline(deadline);
         if (amountIn == 0) revert ZeroAmount();
         if (routes.length < 2) revert InvalidRoute();
 
         address tokenIn = routes[0].tokenIn;
         address tokenOut = routes[routes.length - 1].tokenOut;
+        // Native output requires the final hop to produce WMON (which we unwrap at settlement).
+        if (unwrapOutput && tokenOut != wmon) revert InvalidRoute();
 
         // L1: first hop must consume exactly amountIn (subsequent hops chain the prior
         // hop's output, so only the entry amount is constrained here). Per-hop token
@@ -214,8 +252,8 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         // 2. Execute multi-hop via executor
         amountOut = _executeMultiHop(routes);
 
-        // 3. Deduct fee + deliver output
-        amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer);
+        // 3. Deduct fee + deliver output (unwrap to native MON if requested)
+        amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer, unwrapOutput);
 
         // 4. Sweep dust above baseline (all intermediate + final tokens)
         _sweepDustDelta(tokenIn, baselines[0]);
@@ -223,7 +261,8 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
             _sweepDustDelta(routes[i].tokenOut, baselines[i + 1]);
         }
 
-        emit Swap(msg.sender, tokenIn, tokenOut, amountIn, amountOut, _lastFeeAmount, referrer);
+        // For native output, emit address(0) as tokenOut to signal native delivery.
+        emit Swap(msg.sender, tokenIn, unwrapOutput ? address(0) : tokenOut, amountIn, amountOut, _lastFeeAmount, referrer);
     }
 
     // ============================================================
@@ -245,23 +284,26 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     ) external nonReentrant returns (uint256 amountOut) {
         _checkDeadline(deadline);
         if (amountIn == 0) revert ZeroAmount();
+        // Native-MON output sentinel (see swap): tokenOut == address(0) → deliver native MON.
+        bool nativeOut = tokenOut == address(0);
+        address outToken = nativeOut ? wmon : tokenOut;
         // L2: route must move the function-level token pair
-        if (route.tokenIn != tokenIn || route.tokenOut != tokenOut) revert InvalidRoute();
+        if (route.tokenIn != tokenIn || route.tokenOut != outToken) revert InvalidRoute();
         // L1: single route must consume exactly amountIn
         if (route.amountIn != amountIn) revert InvalidRoute();
 
         // H1: snapshot pre-existing router balances so only swap-generated dust is swept
         uint256 baseIn = IERC20(tokenIn).balanceOf(address(this));
-        uint256 baseOut = IERC20(tokenOut).balanceOf(address(this));
+        uint256 baseOut = IERC20(outToken).balanceOf(address(this));
 
         // Pull via Permit2
         _pullTokensPermit2(tokenIn, msg.sender, amountIn, nonce, permitDeadline, signature);
 
         amountOut = _executeSingle(route);
-        amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer);
+        amountOut = _settleOutput(outToken, amountOut, minAmountOut, referrer, nativeOut);
 
         _sweepDustDelta(tokenIn, baseIn);
-        _sweepDustDelta(tokenOut, baseOut);
+        _sweepDustDelta(outToken, baseOut);
 
         emit Swap(msg.sender, tokenIn, tokenOut, amountIn, amountOut, _lastFeeAmount, referrer);
     }
@@ -317,7 +359,8 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         address tokenOut,
         uint256 rawOutput,
         uint256 minAmountOut,
-        address referrer
+        address referrer,
+        bool unwrapNative
     ) internal returns (uint256 userOutput) {
         // Calculate fee
         uint256 feeAmount = SwapMath.calculateFee(rawOutput, feeCollector.feeBps());
@@ -338,8 +381,16 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
             feeCollector.collectFee(tokenOut, feeAmount, ref);
         }
 
-        // Send output to user
-        TransferLib.safeTransfer(tokenOut, msg.sender, userOutput);
+        // Send output to user. For a native-MON output the swap produced WMON (tokenOut == wmon,
+        // enforced by callers): unwrap the user's portion and forward native MON. The fee above stays
+        // in WMON to the collector. nonReentrant on every entrypoint guards the native .call.
+        if (unwrapNative) {
+            IWMON(wmon).withdraw(userOutput);
+            (bool ok, ) = payable(msg.sender).call{value: userOutput}("");
+            if (!ok) revert NativeTransferFailed();
+        } else {
+            TransferLib.safeTransfer(tokenOut, msg.sender, userOutput);
+        }
 
         _lastFeeAmount = feeAmount;
     }
