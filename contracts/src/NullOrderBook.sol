@@ -302,9 +302,16 @@ contract NullOrderBook is Ownable, ReentrancyGuard {
             router.splitSwap{value: msgValue}(
                 routerTokenIn, o.tokenOut, amountIn, o.minOutPerFill, block.timestamp, routes, o.referrer
             );
-        } else {
+        } else if (nativeOut) {
+            // 6-arg overload (unwrapOutput) — requires the dff96f8+ router build.
             INullRouterMultiHopNative(address(router)).multiHopSwap{value: msgValue}(
-                amountIn, o.minOutPerFill, block.timestamp, routes, o.referrer, nativeOut
+                amountIn, o.minOutPerFill, block.timestamp, routes, o.referrer, true
+            );
+        } else {
+            // Canonical 5-arg multiHopSwap — present on the currently deployed router,
+            // so ERC20-out multi-hop fills work without waiting for the upgrade.
+            router.multiHopSwap{value: msgValue}(
+                amountIn, o.minOutPerFill, block.timestamp, routes, o.referrer
             );
         }
 
