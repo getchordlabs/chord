@@ -18,11 +18,23 @@ interface INadFunPair {
 ///      (2026-07-06, JAMES) making router-path swaps revert while the pair itself was live and
 ///      public. The pair's swap() is permissionless, so we price and swap against it directly —
 ///      deterministic, no third-party registry in the hot path.
-/// @dev FEE: nad.fun pairs charge 1.6% (γ = 984/1000) — MEASURED from real pair Swap/Sync events
-///      (4 samples, exact). NOT the canonical V2 0.3%. The pair's k-check reverts if this factor
-///      is ever wrong-high; NullRouter's minAmountOut remains the user-facing backstop.
+/// @dev FEES (MEASURED from real pair Swap/Sync events — the pair verifies neither ABI nor source):
+///      ASYMMETRIC.
+///      · BUY (WMON in → token out): 1.6% on input — V2-style dy = dx·984·Ro/(Ri·1000+dx·984),
+///        matches on-chain fills TO THE WEI.
+///      · SELL (token in → WMON out): 0.25% on input THEN 1.35% on output (the pair transfers the
+///        output-side fee to its collector inside swap()). Fitted exactly across sizes
+///        (residual constant 5/32 of the naive-984 spread). A 1bp safety haircut keeps the k-check
+///        green against any remaining rounding drift; NullRouter's minAmountOut stays the
+///        user-facing backstop.
 /// @dev extraData = abi.encode(address pool)
 contract NadFunPairAdapter is IAdapter {
+    address public immutable WMON;
+
+    constructor(address wmon_) {
+        WMON = wmon_;
+    }
+
     /// @inheritdoc IAdapter
     function swap(
         address tokenIn,
@@ -40,9 +52,17 @@ contract NadFunPairAdapter is IAdapter {
             ? (uint256(reserve0), uint256(reserve1))
             : (uint256(reserve1), uint256(reserve0));
 
-        // dy = dx·984·reserveOut / (reserveIn·1000 + dx·984)  — 1.6% pair fee
-        uint256 amountInWithFee = amountIn * 984;
-        amountOut = (amountInWithFee * reserveOut) / (reserveIn * 1000 + amountInWithFee);
+        if (tokenIn == WMON) {
+            // BUY: 1.6% fee on input (exact).
+            uint256 amountInWithFee = amountIn * 984;
+            amountOut = (amountInWithFee * reserveOut) / (reserveIn * 1000 + amountInWithFee);
+        } else {
+            // SELL: 0.25% on input, then 1.35% on output, then a 1bp haircut for rounding safety.
+            uint256 amountInWithFee = amountIn * 9975;
+            amountOut = (amountInWithFee * reserveOut) / (reserveIn * 10000 + amountInWithFee);
+            amountOut = (amountOut * 9865) / 10000;
+            amountOut = (amountOut * 9999) / 10000;
+        }
 
         TransferLib.safeTransfer(tokenIn, pool, amountIn);
         (uint256 amount0Out, uint256 amount1Out) = zeroForOne
