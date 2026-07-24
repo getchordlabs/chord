@@ -27,10 +27,17 @@ contract MockRegistry {
 }
 
 /// Records the referrer the router forwards, so tests can assert self-referral is dropped.
+/// Also models per-token tiered fees: feeBpsFor(token) returns an override if set, else the 5bps default.
 contract MockFeeCollector {
     address public lastReferrer = address(0xDEAD);
     uint256 public lastFee;
+    mapping(address => uint16) public overrideBps; // token → bps (0 = use default)
     function feeBps() external pure returns (uint16) { return 5; }
+    function feeBpsFor(address token) external view returns (uint16) {
+        uint16 o = overrideBps[token];
+        return o == 0 ? 5 : o;
+    }
+    function setOverride(address token, uint16 bps) external { overrideBps[token] = bps; }
     function referralShareBps() external pure returns (uint16) { return 5000; }
     function collectFee(address, uint256 amount, address referrer) external { lastReferrer = referrer; lastFee = amount; }
 }
@@ -99,6 +106,23 @@ contract NullRouterFixesTest is Test {
         vm.prank(user);
         uint256 out = router.multiHopSwap(AMT, 0, block.timestamp + 1, r, address(0));
         assertGt(out, 0, "valid chain should produce output");
+    }
+
+    // ---- Tiered fee: router charges feeBpsFor(OUTPUT token) ----
+    function test_tieredFee_defaultUnchanged_thenTieredOnOutput() public {
+        // Default (no override) → 5 bps on output token tB (behaviour-preserving regression).
+        vm.prank(user);
+        router.swap(address(tA), address(tB), AMT, 0, block.timestamp + 1, _single(address(tA), address(tB)), address(0));
+        assertEq(fc.lastFee(), (AMT * 5) / 10000, "default must stay 5bps");
+
+        // Set a 30 bps override on tB → a swap whose OUTPUT is tB now pays the meme tier.
+        fc.setOverride(address(tB), 30);
+        vm.prank(user);
+        router.swap(address(tA), address(tB), AMT, 0, block.timestamp + 1, _single(address(tA), address(tB)), address(0));
+        assertEq(fc.lastFee(), (AMT * 30) / 10000, "output tB should pay 30bps");
+
+        // A token with no override is unaffected → cheap-exit direction stays 5bps.
+        assertEq(fc.feeBpsFor(address(tC)), 5, "untiered token stays default");
     }
 
     // ---- Fix #2: self-referral dropped, third-party kept ----

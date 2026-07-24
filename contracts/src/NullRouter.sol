@@ -362,8 +362,11 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         address referrer,
         bool unwrapNative
     ) internal returns (uint256 userOutput) {
-        // Calculate fee
-        uint256 feeAmount = SwapMath.calculateFee(rawOutput, feeCollector.feeBps());
+        // Calculate fee. Tiered by the OUTPUT token: a token with no override resolves to the global
+        // default (feeBps), so this is behaviour-preserving until per-token overrides are set. Charging
+        // on the output token means meme BUYS (output = meme) pay the premium tier while SELLS back to a
+        // major (output = major) stay cheap — intentional: don't punish exits.
+        uint256 feeAmount = SwapMath.calculateFee(rawOutput, feeCollector.feeBpsFor(tokenOut));
         userOutput = rawOutput - feeAmount;
 
         // Check slippage

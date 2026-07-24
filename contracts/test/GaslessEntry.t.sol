@@ -43,6 +43,7 @@ contract MockWMON is MockERC20 {
 contract MockRegistry { function isApproved(address) external pure returns (bool) { return true; } }
 contract MockFeeCollector {
     function feeBps() external pure returns (uint16) { return 5; }
+    function feeBpsFor(address) external pure returns (uint16) { return 5; }
     function collectFee(address, uint256, address) external {}
 }
 

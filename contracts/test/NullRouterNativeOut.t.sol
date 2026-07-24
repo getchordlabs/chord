@@ -37,6 +37,7 @@ contract MockRegistry { function isApproved(address) external pure returns (bool
 contract MockFeeCollector {
     uint256 public lastFee;
     function feeBps() external pure returns (uint16) { return 5; }
+    function feeBpsFor(address) external pure returns (uint16) { return 5; }
     function collectFee(address, uint256 amount, address) external { lastFee = amount; }
 }
 

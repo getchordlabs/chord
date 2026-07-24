@@ -61,6 +61,7 @@ contract MockFeeCollector {
     address public lastReferrer = address(0xDEAD);
     uint256 public lastFee;
     function feeBps() external pure returns (uint16) { return 5; }
+    function feeBpsFor(address) external pure returns (uint16) { return 5; }
     function collectFee(address, uint256 amount, address referrer) external { lastReferrer = referrer; lastFee = amount; }
 }
 
