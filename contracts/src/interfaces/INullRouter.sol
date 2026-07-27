@@ -63,6 +63,30 @@ interface INullRouter {
         address referrer
     ) external payable returns (uint256 amountOut);
 
+    /// @notice One independent execution path of a multi-path swap: a linear hop chain
+    ///         consuming its own share of the total input. All paths of one swap share the
+    ///         same entry token (hops[0].tokenIn) and exit token (last hop's tokenOut).
+    struct Path {
+        uint256 amountIn; // this path's share of the total input; hops[0].amountIn must equal it
+        RouteStep[] hops; // >=1 hop; later hops chain the prior hop's output (amountIn = 0)
+    }
+
+    /// @notice Execute a multi-PATH swap: the input is split across 2+ independent paths that run
+    ///         in sequence within one tx (e.g. 60% direct pool + 40% via a 3-hop detour), outputs
+    ///         are summed, and fee + minAmountOut are enforced ONCE on the total.
+    /// @param amountIn Total input (must equal the sum of paths[i].amountIn)
+    /// @param minAmountOut Minimum TOTAL output after fee (slippage guard across all paths)
+    /// @param deadline Transaction deadline
+    /// @param paths Independent hop chains, each consuming its own input share
+    /// @param referrer Referral address
+    function multiPathSwap(
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 deadline,
+        Path[] calldata paths,
+        address referrer
+    ) external payable returns (uint256 amountOut);
+
     /// @notice Emitted on every successful swap
     event Swap(
         address indexed sender,

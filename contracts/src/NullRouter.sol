@@ -214,6 +214,30 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         return _multiHopSwap(amountIn, minAmountOut, deadline, routes, referrer, unwrapOutput);
     }
 
+    /// @inheritdoc INullRouter
+    function multiPathSwap(
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 deadline,
+        Path[] calldata paths,
+        address referrer
+    ) external payable nonReentrant returns (uint256 amountOut) {
+        return _multiPathSwap(amountIn, minAmountOut, deadline, paths, referrer, false);
+    }
+
+    /// @notice Multi-path swap with optional native-MON delivery (WMON final output unwrapped).
+    /// @dev Counterpart of the multiHopSwap unwrap overload. NOT in INullRouter (overload).
+    function multiPathSwap(
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 deadline,
+        Path[] calldata paths,
+        address referrer,
+        bool unwrapOutput
+    ) external payable nonReentrant returns (uint256 amountOut) {
+        return _multiPathSwap(amountIn, minAmountOut, deadline, paths, referrer, unwrapOutput);
+    }
+
     function _multiHopSwap(
         uint256 amountIn,
         uint256 minAmountOut,
@@ -262,6 +286,85 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         }
 
         // For native output, emit address(0) as tokenOut to signal native delivery.
+        emit Swap(msg.sender, tokenIn, unwrapOutput ? address(0) : tokenOut, amountIn, amountOut, _lastFeeAmount, referrer);
+    }
+
+    /// @dev Multi-PATH execution: the input splits across 2+ independent hop chains (e.g. 60%
+    ///      direct pool + 40% via a multi-hop detour through a different pool), outputs are summed,
+    ///      and fee + minAmountOut apply ONCE to the total. Mirrors _multiHopSwap's flow exactly
+    ///      (validate → H1 baselines → pull once → execute → settle once → sweep); each path chain
+    ///      reuses _executeSingle / _executeMultiHop, so the per-hop adapter whitelist and the
+    ///      hop-continuity guard (audit dff96f8) apply unchanged.
+    function _multiPathSwap(
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 deadline,
+        Path[] calldata paths,
+        address referrer,
+        bool unwrapOutput
+    ) internal returns (uint256 amountOut) {
+        _checkDeadline(deadline);
+        if (amountIn == 0) revert ZeroAmount();
+        // 1 path = plain swap/multiHopSwap — use those entrypoints. Multi-path is 2+.
+        if (paths.length < 2) revert InvalidRoute();
+
+        address tokenIn = paths[0].hops[0].tokenIn;
+        address tokenOut = paths[0].hops[paths[0].hops.length - 1].tokenOut;
+        if (unwrapOutput && tokenOut != wmon) revert InvalidRoute();
+
+        // Validate every path: shares the entry/exit tokens, entry hop consumes exactly its
+        // declared share, and the shares sum to amountIn (no free-riding on router balances).
+        uint256 declared;
+        uint256 totalHops;
+        for (uint256 p = 0; p < paths.length; p++) {
+            RouteStep[] calldata hops = paths[p].hops;
+            if (hops.length == 0) revert InvalidRoute();
+            if (hops[0].tokenIn != tokenIn) revert InvalidRoute();
+            if (hops[hops.length - 1].tokenOut != tokenOut) revert InvalidRoute();
+            if (hops[0].amountIn != paths[p].amountIn || paths[p].amountIn == 0) revert InvalidRoute();
+            declared += paths[p].amountIn;
+            totalHops += hops.length;
+        }
+        if (declared != amountIn) revert InvalidRoute();
+
+        // H1: baselines for tokenIn + every hop tokenOut across ALL paths, snapshotted BEFORE the
+        // pull so only swap-generated dust is swept (same token recurring is fine — after the first
+        // sweep restores its baseline, later sweeps of it are no-ops).
+        uint256[] memory baselines = new uint256[](totalHops + 1);
+        baselines[0] = IERC20(tokenIn).balanceOf(address(this));
+        {
+            uint256 b = 1;
+            for (uint256 p = 0; p < paths.length; p++) {
+                for (uint256 h = 0; h < paths[p].hops.length; h++) {
+                    baselines[b++] = IERC20(paths[p].hops[h].tokenOut).balanceOf(address(this));
+                }
+            }
+        }
+
+        // 1. Pull the TOTAL input once
+        _pullTokens(tokenIn, msg.sender, amountIn);
+
+        // 2. Run each path as its own chain, summing outputs
+        for (uint256 p = 0; p < paths.length; p++) {
+            amountOut += paths[p].hops.length == 1
+                ? _executeSingle(paths[p].hops[0])
+                : _executeMultiHop(paths[p].hops);
+        }
+
+        // 3. Fee + slippage ONCE on the total
+        amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer, unwrapOutput);
+
+        // 4. Sweep dust above every baseline
+        _sweepDustDelta(tokenIn, baselines[0]);
+        {
+            uint256 b = 1;
+            for (uint256 p = 0; p < paths.length; p++) {
+                for (uint256 h = 0; h < paths[p].hops.length; h++) {
+                    _sweepDustDelta(paths[p].hops[h].tokenOut, baselines[b++]);
+                }
+            }
+        }
+
         emit Swap(msg.sender, tokenIn, unwrapOutput ? address(0) : tokenOut, amountIn, amountOut, _lastFeeAmount, referrer);
     }
 
