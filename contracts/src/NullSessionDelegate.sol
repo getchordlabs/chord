@@ -56,6 +56,22 @@ contract NullSessionDelegate {
         }
     }
 
+    // Transient reentrancy guard (EIP-1153) — defense in depth on top of checks-effects-interactions.
+    // Namespaced transient slot so it can't clash with the persistent session storage.
+    bytes32 private constant _REENTRANCY_SLOT = keccak256("nullterminal.session.reentrancy.v1");
+
+    modifier nonReentrant() {
+        bytes32 slot = _REENTRANCY_SLOT;
+        assembly {
+            if tload(slot) { revert(0, 0) }
+            tstore(slot, 1)
+        }
+        _;
+        assembly {
+            tstore(slot, 0)
+        }
+    }
+
     // ── config (immutable — a single trusted relayer for the MVP) ─────────────
     INullRouter public immutable router;
     address public immutable relayer;
@@ -105,7 +121,8 @@ contract NullSessionDelegate {
         // Clear any prior token caps this call doesn't set is the caller's job; we overwrite the listed ones.
         s.sessionKey = sessionKey;
         s.expiry = expiry;
-        s.nonce = 0;
+        // NOTE: nonce is NOT reset — it stays monotonic across grants. Resetting it would let a
+        // previously-signed-but-unused message be replayed if the same session key is ever re-granted.
         for (uint256 i = 0; i < tokens.length;) {
             s.remainingCap[tokens[i]] = caps[i]; // cap == 0 ⇒ token not allow-listed
             unchecked {
@@ -151,11 +168,12 @@ contract NullSessionDelegate {
         uint256 deadline,
         bytes calldata sessionSig,
         bytes calldata relayerSig
-    ) external {
+    ) external nonReentrant {
         SessionStorage storage s = _s();
         if (block.timestamp > deadline || block.timestamp > s.expiry) revert SessionExpired();
         if (nonce != s.nonce) revert BadNonce();
-        if (amountIn == 0 || tokenIn == address(0) || tokenIn == tokenOut || routes.length == 0) {
+        // v1 is ERC20-in → ERC20-out only (allow-list is ERC20 majors) — no native-out edge paths.
+        if (amountIn == 0 || tokenIn == address(0) || tokenOut == address(0) || tokenIn == tokenOut || routes.length == 0) {
             revert InvalidRoutePlan();
         }
 
@@ -175,11 +193,8 @@ contract NullSessionDelegate {
 
         // ROUTER-ONLY: approve exact + swap; output is delivered to the EOA (address(this)). We never
         // move funds anywhere else, so a session can only ever swap the user's tokens back to the user.
-        bool nativeOut = tokenOut == address(0);
         if (kind == RouteKind.MultiHop) {
-            if (routes[0].tokenIn != tokenIn) revert InvalidRoutePlan();
-            address lastOut = routes[routes.length - 1].tokenOut;
-            if (nativeOut ? lastOut != wmon : lastOut != tokenOut) revert InvalidRoutePlan();
+            if (routes[0].tokenIn != tokenIn || routes[routes.length - 1].tokenOut != tokenOut) revert InvalidRoutePlan();
         }
 
         uint256 outBefore = _balanceOf(tokenOut);
