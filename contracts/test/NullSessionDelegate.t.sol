@@ -84,10 +84,13 @@ contract NullSessionDelegateTest is Test {
         tokenOut.mint(address(router), 1_000_000e18);
 
         // grant is an EOA self-call → prank the delegate as msg.sender.
-        address[] memory toks = new address[](1);
+        // BOTH tokenIn and tokenOut are allow-listed (tokenOut must be an allowed major to receive value).
+        address[] memory toks = new address[](2);
         toks[0] = address(tokenIn);
-        uint256[] memory caps = new uint256[](1);
+        toks[1] = address(tokenOut);
+        uint256[] memory caps = new uint256[](2);
         caps[0] = CAP;
+        caps[1] = CAP;
         vm.prank(address(d));
         d.grantSession(sessionKey, uint64(block.timestamp + 1 hours), toks, caps);
     }
@@ -205,10 +208,8 @@ contract NullSessionDelegateTest is Test {
 
     // ── revoke kills the session immediately ──
     function test_revokeReverts() public {
-        address[] memory toks = new address[](1);
-        toks[0] = address(tokenIn);
         vm.prank(address(d));
-        d.revokeSession(toks);
+        d.revokeSession();
 
         uint256 deadline = block.timestamp + 600;
         bytes32 dg = _digest(AMT, 180e18, 0, deadline, _routes(), 0);
@@ -267,6 +268,59 @@ contract NullSessionDelegateTest is Test {
         vm.expectRevert(NullSessionDelegate.OnlySelf.selector);
         d.grantSession(sessionKey, uint64(block.timestamp + 1 hours), toks, caps); // msg.sender = test, not self
         vm.expectRevert(NullSessionDelegate.OnlySelf.selector);
-        d.revokeSession(toks);
+        d.revokeSession();
+    }
+
+    // ── F-1: tokenOut must be allow-listed too — capped input can't be routed into an unlisted honeypot ──
+    function test_tokenOutNotAllowlistedReverts() public {
+        MockERC20 honeypot = new MockERC20();
+        honeypot.mint(address(router), 1_000_000e18); // router "has liquidity" for it
+        uint256 deadline = block.timestamp + 600;
+        INullRouter.RouteStep[] memory r = new INullRouter.RouteStep[](1);
+        r[0] = INullRouter.RouteStep({
+            adapter: address(0xAD), tokenIn: address(tokenIn), tokenOut: address(honeypot), amountIn: AMT, extraData: ""
+        });
+        bytes32 structHash = keccak256(
+            abi.encode(
+                SWAP_TYPEHASH,
+                address(tokenIn),
+                AMT,
+                address(honeypot),
+                uint256(0), // attacker self-signs minOut = 0
+                keccak256(abi.encode(r, uint8(0))),
+                uint256(0),
+                deadline
+            )
+        );
+        bytes32 domain = keccak256(
+            abi.encode(DOMAIN_TYPEHASH, keccak256("NullTerminal Session"), keccak256("1"), block.chainid, address(d))
+        );
+        bytes32 dg = keccak256(abi.encodePacked("\x19\x01", domain, structHash));
+        vm.expectRevert(NullSessionDelegate.TokenNotAllowed.selector);
+        d.executeSession(
+            address(tokenIn),
+            AMT,
+            address(honeypot),
+            0,
+            r,
+            NullSessionDelegate.RouteKind.Single,
+            0,
+            deadline,
+            _sig(sessionPk, dg),
+            _sig(relayerPk, dg)
+        );
+    }
+
+    // ── F-2: a re-grant with a fresh token set invalidates the PRIOR session's caps (epoch bump) ──
+    function test_regrantInvalidatesOldCaps() public {
+        // Re-grant with ONLY tokenOut (a new majors set) — tokenIn's old cap must be gone.
+        address[] memory toks = new address[](1);
+        toks[0] = address(tokenOut);
+        uint256[] memory caps = new uint256[](1);
+        caps[0] = CAP;
+        vm.prank(address(d));
+        d.grantSession(sessionKey, uint64(block.timestamp + 1 hours), toks, caps);
+        assertEq(d.remainingCap(address(tokenIn)), 0, "old tokenIn cap invalidated by epoch bump");
+        assertEq(d.isAllowed(address(tokenIn)), false, "old tokenIn allow-list invalidated");
     }
 }

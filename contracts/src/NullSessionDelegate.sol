@@ -45,7 +45,11 @@ contract NullSessionDelegate {
         address sessionKey;
         uint64 expiry;
         uint64 nonce;
-        mapping(address => uint256) remainingCap;
+        // Bumped on every grant/revoke → the current session's caps + allow-list live under this epoch,
+        // so a re-grant or revoke instantly invalidates ALL prior caps with no stale carry-over (F-2).
+        uint64 epoch;
+        mapping(uint256 => mapping(address => uint256)) capByEpoch; // epoch => token => remaining spend cap
+        mapping(uint256 => mapping(address => bool)) allowedByEpoch; // epoch => token => allow-listed (as in OR out)
     }
     // keccak256(abi.encode(uint256(keccak256("nullterminal.session.v1")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant SESSION_SLOT = 0xcfac13c1098f5578e7cd69e27b116684fce86d87a76fda0b94b5180cbeceb500;
@@ -99,6 +103,7 @@ contract NullSessionDelegate {
     error SessionExpired();
     error BadNonce();
     error CapExceeded();
+    error TokenNotAllowed();
     error BadSessionSig();
     error BadRelayerSig();
     error InvalidRoutePlan();
@@ -118,13 +123,16 @@ contract NullSessionDelegate {
         if (msg.sender != address(this)) revert OnlySelf();
         if (sessionKey == address(0) || expiry <= block.timestamp || tokens.length != caps.length) revert BadParams();
         SessionStorage storage s = _s();
-        // Clear any prior token caps this call doesn't set is the caller's job; we overwrite the listed ones.
+        // Fresh epoch → every prior cap + allow-list entry is instantly invalidated (F-2: no stale carry-over).
+        uint64 epoch = s.epoch + 1;
+        s.epoch = epoch;
         s.sessionKey = sessionKey;
         s.expiry = expiry;
         // NOTE: nonce is NOT reset — it stays monotonic across grants. Resetting it would let a
         // previously-signed-but-unused message be replayed if the same session key is ever re-granted.
         for (uint256 i = 0; i < tokens.length;) {
-            s.remainingCap[tokens[i]] = caps[i]; // cap == 0 ⇒ token not allow-listed
+            s.capByEpoch[epoch][tokens[i]] = caps[i];
+            s.allowedByEpoch[epoch][tokens[i]] = true; // allow-listed as an input AND an output token
             unchecked {
                 ++i;
             }
@@ -132,17 +140,12 @@ contract NullSessionDelegate {
         emit SessionGranted(address(this), sessionKey, expiry);
     }
 
-    function revokeSession(address[] calldata tokens) external {
+    function revokeSession() external {
         if (msg.sender != address(this)) revert OnlySelf();
         SessionStorage storage s = _s();
+        s.epoch += 1; // invalidate the current session's caps + allow-list in one write
         s.sessionKey = address(0);
         s.expiry = 0;
-        for (uint256 i = 0; i < tokens.length;) {
-            s.remainingCap[tokens[i]] = 0;
-            unchecked {
-                ++i;
-            }
-        }
         emit SessionRevoked(address(this));
     }
 
@@ -153,7 +156,13 @@ contract NullSessionDelegate {
     }
 
     function remainingCap(address token) external view returns (uint256) {
-        return _s().remainingCap[token];
+        SessionStorage storage s = _s();
+        return s.capByEpoch[s.epoch][token];
+    }
+
+    function isAllowed(address token) external view returns (bool) {
+        SessionStorage storage s = _s();
+        return s.allowedByEpoch[s.epoch][token];
     }
 
     // ── execute a session swap (dual-sig, no user popup, relayer pays gas) ─────
@@ -183,16 +192,21 @@ contract NullSessionDelegate {
         if (ECDSA.recover(digest, sessionSig) != s.sessionKey || s.sessionKey == address(0)) revert BadSessionSig();
         if (ECDSA.recover(digest, relayerSig) != relayer) revert BadRelayerSig();
 
-        // Cap doubles as the allow-list: a token with 0 remaining cap can't be spent.
-        uint256 cap = s.remainingCap[tokenIn];
-        if (cap < amountIn) revert CapExceeded();
+        // BOTH sides must be allow-listed. tokenIn also needs remaining cap; tokenOut being allow-listed
+        // (a trusted major) is what stops even a DUAL-compromised session from routing the capped input
+        // into an attacker honeypot (audit F-1). The cap is the cash bound; the allow-list bounds WHERE.
+        uint64 epoch = s.epoch;
+        if (!s.allowedByEpoch[epoch][tokenOut]) revert TokenNotAllowed();
+        uint256 cap = s.capByEpoch[epoch][tokenIn];
+        if (!s.allowedByEpoch[epoch][tokenIn] || cap < amountIn) revert CapExceeded();
         unchecked {
-            s.remainingCap[tokenIn] = cap - amountIn;
+            s.capByEpoch[epoch][tokenIn] = cap - amountIn;
             s.nonce = s.nonce + 1;
         }
 
-        // ROUTER-ONLY: approve exact + swap; output is delivered to the EOA (address(this)). We never
-        // move funds anywhere else, so a session can only ever swap the user's tokens back to the user.
+        // ROUTER-ONLY: approve exact + swap; output is delivered to the EOA (address(this)), and both
+        // tokens are allow-listed majors, so a session can only ever move value between trusted tokens
+        // held by the user — bounded by the per-token cap.
         if (kind == RouteKind.MultiHop) {
             if (routes[0].tokenIn != tokenIn || routes[routes.length - 1].tokenOut != tokenOut) revert InvalidRoutePlan();
         }
