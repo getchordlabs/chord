@@ -24,6 +24,14 @@ contract DeployV3FamilyAdaptersScript is Script {
 
     // ── PancakeSwap V3 (the real one; engine `pancake_v3`) ───────────────────────────────────────
     // Router read from the live adapter 0x01ae5661…`ROUTER()`; factory from chain.rs.
+    //
+    // ⚠️ FLAVOR TRAP (cost one reverted mainnet swap on 2026-08-05): PancakeSwap's router on Monad
+    // is a SwapRouter **v1** — `exactInputSingle` takes a `deadline` and its selector is 0x414bf389.
+    // It is NOT SwapRouter02 (0x04e45aaf), which is what `PancakeV3Adapter` calls. Wiring
+    // PancakeV3Adapter here compiles, quotes, passes the pool-provenance check, and then reverts
+    // with bare `0x` at execution. The correct contract for this venue is `V3DeadlineAdapter`.
+    // PROBE BEFORE WIRING ANY V3 FORK: `cast code <router>` and grep for 414bf389 vs 04e45aaf.
+    // (Uniswap V3's router 0xfE31F71C IS SwapRouter02 — hence the two different adapters below.)
     address constant PCS_ROUTER = 0x1b81D678ffb9C0263b24A97847620C99d213eB14;
     address constant PCS_FACTORY = 0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865;
 
@@ -49,9 +57,10 @@ contract DeployV3FamilyAdaptersScript is Script {
 
         vm.startBroadcast(pk);
 
-        PancakeV3Adapter pcs =
-            new PancakeV3Adapter(NULL_ROUTER, PCS_ROUTER, PCS_FACTORY, REGISTRY_LANE);
-        console2.log("PancakeV3Adapter (pancake_v3) =", address(pcs));
+        // V3DeadlineAdapter, NOT PancakeV3Adapter — see the FLAVOR TRAP note on PCS_ROUTER.
+        V3DeadlineAdapter pcs =
+            new V3DeadlineAdapter(NULL_ROUTER, PCS_ROUTER, PCS_FACTORY, REGISTRY_LANE);
+        console2.log("V3DeadlineAdapter (pancake_v3)=", address(pcs));
         registry.addAdapter(address(pcs));
 
         V3DeadlineAdapter capricorn =

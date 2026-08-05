@@ -2,7 +2,7 @@
 # Swap 0.1 MON → ZigZag via NadFunBCAdapter (bonding curve)
 # Token: 0x8d23ed562f9ba8d4d5dfecf601bbf7be8fd27777 (ZigZag, NOT graduated)
 # extraData = abi.encode(token, isBuy=true)
-ADAPTER=0xc9F93c048Eb48cE9611C915C62b925f9dDf305F5
+ADAPTER=0x5E78B8bE9c827aaB981baC1345D22b07729Ce43a
 TOKEN=0x8d23ed562f9ba8d4d5dfecf601bbf7be8fd27777
 
 cast send 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a \

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Swap USDC → MON via KuruAdapter → Kuru Router
 # isBuy=true (buying base=MON with quote=USDC), baseIsNative=true
-ADAPTER=0x3D3C7C44CF1657e72B574f768B40A022B863e464
+ADAPTER=0x0e56D285Fa949c6c22A749F6e8c1e3b801e20BDd
 USDC_AMOUNT=22191
 
 # Step 1: Approve USDC

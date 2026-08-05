@@ -1,7 +1,7 @@
 #!/bin/bash
 # Swap ZigZag → MON via NadFunBCAdapter (sell on bonding curve)
 # extraData = abi.encode(token, isBuy=false)
-ADAPTER=0xc9F93c048Eb48cE9611C915C62b925f9dDf305F5
+ADAPTER=0x5E78B8bE9c827aaB981baC1345D22b07729Ce43a
 TOKEN=0x8d23ed562f9ba8d4d5dfecf601bbf7be8fd27777
 AMOUNT=1158963227604141954654  # all ZigZag
 
