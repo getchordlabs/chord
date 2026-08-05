@@ -25,12 +25,18 @@ interface IRouterMin {
 contract MultiPathSwapForkTest is Test {
     // Mainnet
     address constant ROUTER = 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a; // proxy
-    address constant GENERIC = 0x681f6f5B13A7af251be4A2373a0D03118431Aac6; // UniV3GenericAdapter (approved)
+    // UniV3GenericAdapter, H1-hardened (2026-08-05). This is a FORK test: it reads the live
+    // AdapterRegistry, so the address must be one that is approved RIGHT NOW. The pre-H1
+    // 0x681f6f5B… was de-registered in the H1 sweep and the test began failing UNAPPROVED_ADAPTER —
+    // if that happens again, check `isApproved` on-chain before assuming the router broke.
+    address constant GENERIC = 0x27ed74C9F012F77e479725aB0F223dC2059fcD90;
     address constant WMON = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
     address constant USDC = 0x754704Bc059F8C67012fEd69BC8A327a5aafb603;
     address constant AUSD = 0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a;
     address constant PANGOLIN_WMON_AUSD = 0xcd00A33B65b1eaeaE1757c64eB79b94787A497A5;
-    address constant UNI_V3_FACTORY = 0x204FAca1764B154221e35c0d20aBb3c525710498;
+    /// @dev The generic adapter pins pangolin_v3 + monday_trade (chain.rs MONAD_GENERIC_V3_FORKS).
+    ///      Uniswap V3 pools belong to `adapter_v3` 0xbcbF0869 and are NOT authenticable here.
+    address constant PANGOLIN_V3_FACTORY = 0x44805F92db5bB31B54632A55fc4b2B7E885B0e0e;
 
     address user = address(0xCAFE);
 
@@ -44,10 +50,18 @@ contract MultiPathSwapForkTest is Test {
         require(ok, "upgrade failed");
     }
 
+    /// @dev Pools MUST come from a factory the generic adapter pins, not from any V3 factory.
+    ///      Pre-H1 the adapter had no provenance check at all, so a Uniswap V3 pool worked here;
+    ///      the hardened adapter authenticates every pool against its own factory list
+    ///      (pangolin_v3 + monday_trade on Monad) and correctly rejects anything else with
+    ///      `PoolNotCanonical`. Using the Uniswap V3 factory here was the test asserting the
+    ///      absence of the security control, not asserting multiPathSwap.
+    ///      2500 is in the tier list because pangolin pools were created at it (chain.rs
+    ///      `v3_fork_fee_tiers`), even though their live `fee()` reads 10.
     function _pool(address a, address b) internal view returns (address p) {
-        uint24[3] memory fees = [uint24(100), uint24(500), uint24(3000)];
-        for (uint256 i = 0; i < 3; i++) {
-            p = IUniV3FactoryMin(UNI_V3_FACTORY).getPool(a, b, fees[i]);
+        uint24[4] memory fees = [uint24(100), uint24(500), uint24(2500), uint24(3000)];
+        for (uint256 i = 0; i < 4; i++) {
+            p = IUniV3FactoryMin(PANGOLIN_V3_FACTORY).getPool(a, b, fees[i]);
             if (p != address(0)) return p;
         }
         revert("no pool");
@@ -59,7 +73,7 @@ contract MultiPathSwapForkTest is Test {
         INullRouter.RouteStep[] memory a = new INullRouter.RouteStep[](1);
         a[0] = INullRouter.RouteStep(GENERIC, WMON, AUSD, aIn, abi.encode(PANGOLIN_WMON_AUSD));
         paths[0] = INullRouter.Path(aIn, a);
-        // Path B: 2 hops, WMON -> USDC -> AUSD via Uniswap V3 pools (generic adapter).
+        // Path B: 2 hops, WMON -> USDC -> AUSD on pangolin_v3 pools (generic adapter).
         INullRouter.RouteStep[] memory b = new INullRouter.RouteStep[](2);
         b[0] = INullRouter.RouteStep(GENERIC, WMON, USDC, bIn, abi.encode(_pool(WMON, USDC)));
         b[1] = INullRouter.RouteStep(GENERIC, USDC, AUSD, 0, abi.encode(_pool(USDC, AUSD)));
