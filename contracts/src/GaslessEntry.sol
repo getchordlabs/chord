@@ -74,11 +74,18 @@ contract GaslessEntry is EIP712, Ownable, ReentrancyGuard {
         "GaslessOrder(address user,address tokenIn,address tokenOut,uint256 amountIn,uint256 minAmountOut,uint256 relayerFee,uint256 deadline,uint256 nonce)"
     );
 
+    /// @notice Hard ceiling on `maxFeeBps` — matches the band the sibling stock-sell relayer already
+    /// enforces off-chain (relayer.ts: "never eat more than 20% of the output"). The owner can only
+    /// TIGHTEN the band, never widen it past this (audit L4).
+    uint256 public constant MAX_FEE_BPS_CEILING = 2_000;
+
     INullRouter public immutable router;
     address public immutable wmon;
 
     mapping(address => uint256) public nonces;
     mapping(address => bool) public isRelayer;
+    /// @notice Upper bound on `relayerFee` as a share of what the swap actually produced (L4).
+    uint256 public maxFeeBps;
 
     event GaslessSwapExecuted(
         address indexed user,
@@ -90,7 +97,9 @@ contract GaslessEntry is EIP712, Ownable, ReentrancyGuard {
         uint256 nonce
     );
     event RelayerSet(address indexed relayer, bool allowed);
+    event MaxFeeBpsSet(uint256 bps);
 
+    error FeeOutOfBand(uint256 fee, uint256 received);
     error NotRelayer();
     error Expired();
     error BadNonce();
@@ -114,12 +123,21 @@ contract GaslessEntry is EIP712, Ownable, ReentrancyGuard {
         if (router_ == address(0) || wmon_ == address(0)) revert InvalidParams();
         router = INullRouter(router_);
         wmon = wmon_;
+        maxFeeBps = MAX_FEE_BPS_CEILING;
+        emit MaxFeeBpsSet(MAX_FEE_BPS_CEILING);
     }
 
     function setRelayer(address relayer, bool allowed) external onlyOwner {
         if (relayer == address(0)) revert InvalidParams();
         isRelayer[relayer] = allowed;
         emit RelayerSet(relayer, allowed);
+    }
+
+    /// @notice Tighten the relayer-fee band. Cannot be raised above MAX_FEE_BPS_CEILING.
+    function setMaxFeeBps(uint256 bps) external onlyOwner {
+        if (bps > MAX_FEE_BPS_CEILING) revert InvalidParams();
+        maxFeeBps = bps;
+        emit MaxFeeBpsSet(bps);
     }
 
     /// @notice EIP-712 digest the user signs — exposed for FE/relayer parity.
@@ -216,6 +234,10 @@ contract GaslessEntry is EIP712, Ownable, ReentrancyGuard {
         // ---- settle: user gets everything above the exact relayer fee ----
         uint256 received = _balanceOf(o.tokenOut) - outBefore;
         if (received < routerMinOut) revert InsufficientUserOutput(received, routerMinOut);
+        // L4: the fee is exact and user-signed, but nothing related it to the trade — a malicious FE
+        // could sign someone into relayerFee = 99% of output with minAmountOut = 1. Band it against what
+        // the swap actually produced, the same check the stock-sell relayer already does off-chain.
+        if (o.relayerFee * 10_000 > received * maxFeeBps) revert FeeOutOfBand(o.relayerFee, received);
         uint256 userAmount = received - o.relayerFee;
 
         _send(o.tokenOut, o.user, userAmount);

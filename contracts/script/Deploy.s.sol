@@ -43,8 +43,10 @@ contract DeployScript is Script {
 
         // ============================================================
         // 2. Deploy NullExecutor (immutable, no proxy — stateless)
+        //    L9 hardening: the AdapterRegistry is PINNED at construction (it used to be a
+        //    caller-supplied argument = unprotected sweep). Registry from step 1 above.
         // ============================================================
-        NullExecutor executor = new NullExecutor();
+        NullExecutor executor = new NullExecutor(address(registry));
         console2.log("NullExecutor:", address(executor));
 
         // ============================================================

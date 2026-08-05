@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IAdapter} from "../interfaces/IAdapter.sol";
 import {TransferLib} from "../libraries/TransferLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {AllowlistAdapter} from "./BaseAdapter.sol";
 
 /// @notice Metric OMM (legacy deployment) shared SwapRouter — one router for all pools, pool
 ///         address passed per-call. Selector verified on Monad mainnet bytecode 2026-07-22:
@@ -71,14 +72,25 @@ interface IMetricPool {
 ///
 ///      ERC20-only: pools are WMON-based and NullRouter wraps MON->WMON before any ERC20 adapter,
 ///      so this contract never sees native — no receive() needed.
-contract MetricAdapter is IAdapter {
+///
+///      H1 (2026-08-05 audit): `pool` arrived in caller-supplied extraData and was forwarded straight
+///      into the shared router with an approval sized to amountIn — a caller-chosen destination.
+///      Monad's Metric deployment exposes no factory `getPool` view (the engine seeds its 3 verified
+///      pools; only non-Monad chains enumerate PoolCreated logs), so provenance is an IMMUTABLE
+///      ALLOWLIST fixed at construction ({WMON,WBTC,WETH}/USDC) plus the `onlyRouter` entrypoint gate.
+///      Note the pool's own getImmutables().factory is NOT usable as the check — a hostile "pool"
+///      answers that call too.
+contract MetricAdapter is IAdapter, AllowlistAdapter {
     /// @notice Metric OMM shared SwapRouter (no cross-check view exists on it — pinned as given).
     IMetricSwapRouter public immutable ROUTER;
 
     /// @notice Venue-level deadline no-op window (NullRouter enforces the real deadline).
     uint256 private constant EXPIRY_WINDOW = 300;
 
-    constructor(address router_) {
+    constructor(address nullRouter_, address router_, address[] memory pools_)
+        AllowlistAdapter(nullRouter_, pools_)
+    {
+        require(router_ != address(0), "METRIC_ZERO_ROUTER");
         ROUTER = IMetricSwapRouter(router_);
     }
 
@@ -90,8 +102,9 @@ contract MetricAdapter is IAdapter {
         uint256 amountIn,
         address to,
         bytes calldata extraData
-    ) external override returns (uint256 amountOut) {
+    ) external override onlyRouter returns (uint256 amountOut) {
         address pool = abi.decode(extraData, (address));
+        _requireAllowedPool(pool); // H1 provenance — see contract NatSpec.
 
         (,, address token0, address token1,,,,,,,,,,) = IMetricPool(pool).getImmutables();
 

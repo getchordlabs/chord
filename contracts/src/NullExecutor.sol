@@ -11,14 +11,40 @@ import {TransferLib} from "./libraries/TransferLib.sol";
 /// @dev This contract is meant to be called via delegatecall from NullRouter.
 ///      All storage reads/writes happen in NullRouter's context.
 ///      This is a library-style contract — no own state, no proxy.
+///
+///      DEAD CODE, STILL AN ADDRESS (audit 2026-08-05, L9). The delegatecall path was removed on
+///      2026-03-20 (44-gas revert on Monad) — NullRouter calls adapters directly and keeps
+///      `executor` only for storage layout. But the deployed instance is still callable by anyone,
+///      and the whitelist it enforced was a CALLER-SUPPLIED `registry` argument: an attacker
+///      deploys a registry whose `isApproved` returns true, names themselves as the "adapter", and
+///      `TransferLib.safeTransfer` moves this contract's own balance to them. Balance is 0 today,
+///      so the loss was ~$0 — but it is an unprotected sweep on an address the public docs list as
+///      a core contract.
+///
+///      Fix: the registry is pinned at construction. The `registry` parameter is retained on every
+///      entrypoint so the ABI (and the historical delegatecall call sites) still match, but it is
+///      now only ASSERTED to equal the pinned one — supplying anything else reverts before a single
+///      token moves. It is deliberately not silently ignored: a caller passing a foreign registry
+///      is doing something wrong and should hear about it.
 contract NullExecutor {
     error UnapprovedAdapter(address adapter);
     error InsufficientOutput(uint256 got, uint256 minRequired);
     error ZeroAmountIn();
+    error RegistryMismatch(address supplied, address expected);
+    error ZeroRegistry();
+
+    /// @notice The only whitelist this executor will honour. Immutable — see the L9 note above.
+    IAdapterRegistry public immutable REGISTRY;
+
+    /// @param registry_ AdapterRegistry proxy for this chain.
+    constructor(address registry_) {
+        if (registry_ == address(0)) revert ZeroRegistry();
+        REGISTRY = IAdapterRegistry(registry_);
+    }
 
     /// @notice Execute a single route step
     /// @param step The route step to execute
-    /// @param registry AdapterRegistry to check whitelist
+    /// @param registry Must equal the pinned REGISTRY (retained for ABI compatibility)
     /// @return amountOut Amount of output tokens received
     function executeSingle(
         INullRouter.RouteStep calldata step,
@@ -43,7 +69,7 @@ contract NullExecutor {
     /// @param tokenIn Input token address
     /// @param tokenOut Output token address
     /// @param steps Array of route steps (amounts must sum to total amountIn)
-    /// @param registry AdapterRegistry to check whitelist
+    /// @param registry Must equal the pinned REGISTRY (retained for ABI compatibility)
     /// @return totalOut Total output amount across all splits
     function executeSplit(
         address tokenIn,
@@ -72,7 +98,7 @@ contract NullExecutor {
 
     /// @notice Execute a multi-hop swap (A → B → C)
     /// @param steps Ordered route steps for each hop
-    /// @param registry AdapterRegistry to check whitelist
+    /// @param registry Must equal the pinned REGISTRY (retained for ABI compatibility)
     /// @return amountOut Final output amount
     function executeMultiHop(
         INullRouter.RouteStep[] calldata steps,
@@ -108,8 +134,11 @@ contract NullExecutor {
     // Internal
     // ============================================================
 
+    /// @dev Whitelist check against the PINNED registry. The supplied address is only compared,
+    ///      never called — calling it is exactly the L9 bug.
     function _validateAdapter(address registry, address adapter) internal view {
-        if (!IAdapterRegistry(registry).isApproved(adapter)) {
+        if (registry != address(REGISTRY)) revert RegistryMismatch(registry, address(REGISTRY));
+        if (!REGISTRY.isApproved(adapter)) {
             revert UnapprovedAdapter(adapter);
         }
     }

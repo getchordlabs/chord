@@ -16,6 +16,12 @@ contract MockERC20 {
     }
 }
 
+/// Mock Vault: only the registry view the adapter consults (H1 provenance) plus a balance sink.
+contract MockVault {
+    mapping(address => bool) public isPoolRegistered;
+    function register(address pool) external { isPoolRegistered[pool] = true; }
+}
+
 /// Mock AggregatorRouter: settles a pre-funded swap. Asserts the Vault was paid up front, then credits
 /// tokenOut to the SENDER (the adapter) — exactly how the real router's _vault.sendTo(sender, ...) works.
 contract MockAggregatorRouter {
@@ -47,15 +53,19 @@ contract BalancerV3AdapterTest is Test {
     MockAggregatorRouter router;
     MockERC20 tokenIn;
     MockERC20 tokenOut;
-    address vault = address(0xBA11);
+    address vault;
     address recipient = address(0xDEAD);
     address pool = address(0x2DAA);
 
     function setUp() public {
         tokenIn = new MockERC20();
         tokenOut = new MockERC20();
+        MockVault v = new MockVault();
+        v.register(pool);
+        vault = address(v);
         router = new MockAggregatorRouter(vault, 0.99e18); // 0.99 out per 1 in
-        adapter = new BalancerV3Adapter(vault, address(router));
+        // H1: the test contract stands in for NullRouter — adapters are now onlyRouter.
+        adapter = new BalancerV3Adapter(address(this), vault, address(router));
     }
 
     function test_swap_prefundsVault_and_forwardsOutput() public {
@@ -89,7 +99,7 @@ contract BalancerV3AdapterTest is Test {
     function test_constructor_revertsOnVaultMismatch() public {
         // router.getVault() == `vault`; constructing with a different vault must revert.
         vm.expectRevert(bytes("VAULT_MISMATCH"));
-        new BalancerV3Adapter(address(0xBEEF), address(router));
+        new BalancerV3Adapter(address(this), address(0xBEEF), address(router));
     }
 
     function test_decode_extraData_isPoolAddress() public {

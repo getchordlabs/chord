@@ -58,8 +58,15 @@ interface ISignatureTransfer {
 /// Safety — this contract never holds a standing allowance and never has
 /// standing authority over user funds:
 ///   * Permit2 SignatureTransfer is SINGLE-USE per nonce (not an allowance), so
-///     each swap requires a fresh user signature — same per-trade risk as the
-///     EIP-2612 flow, one signature instead of two.
+///     each swap requires a fresh user signature. Permit2's bitmap is UNORDERED,
+///     though, so that alone does NOT give the "at most one live authorisation"
+///     property the EIP-2612 entry has (audit 2026-08-05 M3): the FE mints a
+///     random nonce per signature, so a user who re-signs after a 502 or a quote
+///     refresh left 2-3 signatures independently redeemable for their full 600 s
+///     window — and, having zero native gas by definition, could not call
+///     `Permit2.invalidateUnorderedNonces` to cancel any of them. This entry
+///     therefore keeps its OWN sequential nonce, bound into the witness: signing
+///     order N+1 makes every outstanding order ≤ N unexecutable.
 ///   * The only standing approval is the user's `token.approve(Permit2, …)` to
 ///     the canonical, audited Permit2 — never to this contract.
 ///   * The witness binds tokenOut/minAmountOut/relayerFee, so a malicious relayer
@@ -82,20 +89,39 @@ contract GaslessEntryPermit2 is Ownable, ReentrancyGuard {
         address tokenOut; // address(0) = deliver native MON
         uint256 minAmountOut; // minimum the USER receives AFTER the relayer fee
         uint256 relayerFee; // exact relayer compensation, in tokenOut units
+        uint256 nonce; // THIS entry's sequential nonce — must equal nonces[owner] (M3)
     }
 
     // EIP-712 witness type. The referenced structs are ordered alphabetically
     // (SwapWitness, then TokenPermissions) per EIP-712, exactly as Permit2 expects.
+    //
+    // ⚠️ THREE-SIDED SEAM — the typestring below is BYTE-MATCHED off-chain. Any change to the signed
+    // struct must land in the same change set as:
+    //   1. packages/keeper/src/relayer.ts:184  — `struct SwapWitness { … }` in PERMIT2_ENTRY_ABI
+    //      (+ :186 `execute(...)` if the arg list moves) and the `witness` Zod schema it validates.
+    //   2. packages/web/src/hooks/useGasless.ts:238 — the `SwapWitness` EIP-712 type array, the
+    //      `message.witness` object, and the JSON body posted to /v1/gasless/swap.
+    // A mismatch does not fail loudly: Permit2 recomputes a DIFFERENT witness hash and the swap reverts
+    // with a signature error that looks like a user problem.
     bytes32 public constant WITNESS_TYPEHASH =
-        keccak256("SwapWitness(address tokenOut,uint256 minAmountOut,uint256 relayerFee)");
+        keccak256("SwapWitness(address tokenOut,uint256 minAmountOut,uint256 relayerFee,uint256 nonce)");
     string public constant WITNESS_TYPE_STRING =
-        "SwapWitness witness)SwapWitness(address tokenOut,uint256 minAmountOut,uint256 relayerFee)TokenPermissions(address token,uint256 amount)";
+        "SwapWitness witness)SwapWitness(address tokenOut,uint256 minAmountOut,uint256 relayerFee,uint256 nonce)TokenPermissions(address token,uint256 amount)";
+
+    /// @notice Hard ceiling on `maxFeeBps` — matches the band the sibling stock-sell relayer already
+    /// enforces off-chain (relayer.ts: "never eat more than 20% of the output"). The owner can only
+    /// TIGHTEN the band, never widen it past this (audit L4).
+    uint256 public constant MAX_FEE_BPS_CEILING = 2_000;
 
     ISignatureTransfer public immutable permit2;
     INullRouter public immutable router;
     address public immutable wmon;
 
     mapping(address => bool) public isRelayer;
+    /// @notice Sequential per-user nonce — the single-live-authorisation bound (M3).
+    mapping(address => uint256) public nonces;
+    /// @notice Upper bound on `relayerFee` as a share of what the swap actually produced (L4).
+    uint256 public maxFeeBps;
 
     event GaslessSwapExecuted(
         address indexed user,
@@ -107,6 +133,7 @@ contract GaslessEntryPermit2 is Ownable, ReentrancyGuard {
         uint256 nonce
     );
     event RelayerSet(address indexed relayer, bool allowed);
+    event MaxFeeBpsSet(uint256 bps);
 
     error NotRelayer();
     error InvalidParams();
@@ -115,6 +142,8 @@ contract GaslessEntryPermit2 is Ownable, ReentrancyGuard {
     error InsufficientUserOutput(uint256 got, uint256 floor);
     error NativeTransferFailed();
     error UnexpectedNative();
+    error BadNonce(uint256 got, uint256 expected);
+    error FeeOutOfBand(uint256 fee, uint256 received);
 
     modifier onlyRelayer() {
         if (!isRelayer[msg.sender]) revert NotRelayer();
@@ -126,6 +155,8 @@ contract GaslessEntryPermit2 is Ownable, ReentrancyGuard {
         permit2 = ISignatureTransfer(permit2_);
         router = INullRouter(router_);
         wmon = wmon_;
+        maxFeeBps = MAX_FEE_BPS_CEILING;
+        emit MaxFeeBpsSet(MAX_FEE_BPS_CEILING);
     }
 
     function setRelayer(address relayer, bool allowed) external onlyOwner {
@@ -134,9 +165,16 @@ contract GaslessEntryPermit2 is Ownable, ReentrancyGuard {
         emit RelayerSet(relayer, allowed);
     }
 
+    /// @notice Tighten the relayer-fee band. Cannot be raised above MAX_FEE_BPS_CEILING.
+    function setMaxFeeBps(uint256 bps) external onlyOwner {
+        if (bps > MAX_FEE_BPS_CEILING) revert InvalidParams();
+        maxFeeBps = bps;
+        emit MaxFeeBpsSet(bps);
+    }
+
     /// @notice The witness hash the FE/relayer must reproduce for the Permit2 signature.
     function witnessHash(SwapWitness calldata w) public pure returns (bytes32) {
-        return keccak256(abi.encode(WITNESS_TYPEHASH, w.tokenOut, w.minAmountOut, w.relayerFee));
+        return keccak256(abi.encode(WITNESS_TYPEHASH, w.tokenOut, w.minAmountOut, w.relayerFee, w.nonce));
     }
 
     /// @notice Execute a one-signature gasless swap.
@@ -161,6 +199,14 @@ contract GaslessEntryPermit2 is Ownable, ReentrancyGuard {
         if (amountIn == 0 || tokenIn == address(0)) revert InvalidParams();
         if (tokenIn == w.tokenOut) revert InvalidParams();
         if (routes.length == 0) revert InvalidRoutePlan();
+
+        // M3: OUR sequential nonce, consumed before anything moves. Permit2's own unordered bitmap only
+        // stops the SAME signature twice; this is what makes a superseded signature unexecutable, so a
+        // gasless user (who cannot afford to cancel anything) never has two live authorisations.
+        if (w.nonce != nonces[owner]) revert BadNonce(w.nonce, nonces[owner]);
+        unchecked {
+            nonces[owner] = w.nonce + 1;
+        }
 
         bool nativeOut = w.tokenOut == address(0);
         if (kind == RouteKind.MultiHop) {
@@ -209,6 +255,10 @@ contract GaslessEntryPermit2 is Ownable, ReentrancyGuard {
         // ---- settle: user gets everything above the exact relayer fee ----
         uint256 received = _balanceOf(w.tokenOut) - outBefore;
         if (received < routerMinOut) revert InsufficientUserOutput(received, routerMinOut);
+        // L4: the fee is exact and user-signed, but nothing related it to the trade — a malicious FE
+        // could sign someone into relayerFee = 99% of output with minAmountOut = 1. Band it against what
+        // the swap actually produced, the same check the stock-sell relayer already does off-chain.
+        if (w.relayerFee * 10_000 > received * maxFeeBps) revert FeeOutOfBand(w.relayerFee, received);
         uint256 userAmount = received - w.relayerFee;
 
         _send(w.tokenOut, owner, userAmount);

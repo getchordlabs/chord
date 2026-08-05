@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IAdapter} from "../interfaces/IAdapter.sol";
 import {TransferLib} from "../libraries/TransferLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {AllowlistAdapter} from "./BaseAdapter.sol";
 
 /// @notice LFJ POE OraclePool — there is NO router swap path; swaps execute DIRECTLY on the pool
 ///         with a callback settlement. Selectors verified on Monad mainnet bytecode 2026-07-22:
@@ -31,9 +32,16 @@ interface ILfjPoePool {
 ///      forwarded to `to`; the adapter ends every swap with ZERO balance of tokenIn and tokenOut.
 ///
 ///      extraData = abi.encode(address pool) ONLY. Direction is derived ON-CHAIN from the pool's
-///      getTokens() (swapXtoY = tokenIn == tokenX) — nothing market-specific is pinned, which is
-///      also why there is NO constructor: the pool arrives per-swap and the venue has no shared
-///      router/vault to cross-check, so a stateless-empty adapter is the honest shape.
+///      getTokens() (swapXtoY = tokenIn == tokenX).
+///
+///      H1 (2026-08-05 audit): "the venue has no shared router/vault to cross-check, so a
+///      stateless-empty adapter is the honest shape" was the old rationale for having no constructor
+///      — and it is exactly how a caller-supplied pool address became a drain primitive: the
+///      transient callback gate armed itself to whatever address arrived in extraData. No POE factory
+///      or registry view is verified on Monad, so provenance here is an IMMUTABLE ALLOWLIST fixed at
+///      construction (2 pools today: WMON/USDC, AUSD/USDC) plus the `onlyRouter` entrypoint gate.
+///      Adding a POE pool = new adapter deployment + registry swap. If LFJ ever exposes a POE factory
+///      lookup, replace the allowlist with it — same shape as the V2 `getPair` checks elsewhere.
 ///
 ///      Settlement: pool pays output to this adapter FIRST, then invokes swapCallback here; the
 ///      callback pushes exactly the POSITIVE delta (= actualAmountIn; partial fills owe only that)
@@ -52,9 +60,13 @@ interface ILfjPoePool {
 ///
 ///      ERC20/WMON-only: NullRouter wraps MON->WMON before any ERC20 adapter and the pool settles
 ///      strictly in its two ERC20 tokens — no native handling, no receive().
-contract LfjPoeAdapter is IAdapter {
+contract LfjPoeAdapter is IAdapter, AllowlistAdapter {
     /// @notice Transient slot holding the pool allowed to invoke swapCallback (zero outside swaps).
     bytes32 private constant EXPECTED_POOL_TSLOT = keccak256("nullterminal.lfj-poe.expected-pool");
+
+    constructor(address nullRouter_, address[] memory pools_)
+        AllowlistAdapter(nullRouter_, pools_)
+    {}
 
     /// @inheritdoc IAdapter
     /// @dev extraData = abi.encode(address pool) — the POE OraclePool.
@@ -64,8 +76,11 @@ contract LfjPoeAdapter is IAdapter {
         uint256 amountIn,
         address to,
         bytes calldata extraData
-    ) external override returns (uint256 amountOut) {
+    ) external override onlyRouter returns (uint256 amountOut) {
         address pool = abi.decode(extraData, (address));
+        // H1 provenance: only pools pinned at construction. Everything below (getTokens, the callback
+        // gate) reads state FROM the pool, which is only trustworthy once the pool itself is.
+        _requireAllowedPool(pool);
 
         (address tokenX, address tokenY) = ILfjPoePool(pool).getTokens();
 

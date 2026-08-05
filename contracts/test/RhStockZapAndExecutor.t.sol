@@ -13,10 +13,16 @@ import {AdapterRegistry} from "../src/AdapterRegistry.sol";
 contract MockERC20 {
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
+    /// A non-reverting `false` return — the exact shape L8 says must never be discarded.
+    bool public transferReturnsFalse;
 
+    function setTransferReturnsFalse(bool v) external { transferReturnsFalse = v; }
     function mint(address to, uint256 a) external { balanceOf[to] += a; }
     function approve(address s, uint256 a) external returns (bool) { allowance[msg.sender][s] = a; return true; }
-    function transfer(address to, uint256 a) external returns (bool) { _x(msg.sender, to, a); return true; }
+    function transfer(address to, uint256 a) external returns (bool) {
+        if (transferReturnsFalse) return false;
+        _x(msg.sender, to, a); return true;
+    }
     function transferFrom(address f, address to, uint256 a) external returns (bool) {
         uint256 al = allowance[f][msg.sender];
         if (al != type(uint256).max) { require(al >= a, "ALLOWANCE"); allowance[f][msg.sender] = al - a; }
@@ -75,13 +81,14 @@ contract RhStockZapTest is Test {
 
     // G7 — the bug this contract was born from: hardcoding amountIn instead of pulling the balance.
     // Relay's bridged amount is only known at execution time (fees are taken en route), so any
-    // fixed number is either short (leftover stranded) or too large (TRANSFER_FROM_FAILED).
+    // fixed number is either short (leftover stranded) or too large (TRANSFER_FROM_FAILED). With
+    // H5's `maxIn` the pull is min(balance, maxIn) — a generous ceiling still consumes what arrived.
     function testFuzz_zapAlwaysSwapsTheFullBridgedBalance(uint128 rawBridged) public {
         uint256 bridged = bound(uint256(rawBridged), 1, type(uint96).max);
         _fund(bridged);
 
         vm.prank(bridge);
-        zap.zapFrom(address(stock), 3000, buyer, 0);
+        zap.zapFrom(address(stock), 3000, buyer, 0, type(uint96).max);
 
         assertEq(v3.lastAmountIn(), bridged, "the swap must use exactly what arrived, never a hardcoded amount");
         assertEq(v3.lastRecipient(), buyer, "the stock must go to the buyer, not the zap");
@@ -89,10 +96,57 @@ contract RhStockZapTest is Test {
         assertEq(usdg.balanceOf(bridge), 0, "the whole bridged balance is consumed");
     }
 
+    // ── H5: the pull is BOUNDED by maxIn, never the caller's entire balance ──
+    // The Relay call-executor can be shared across fills. Before this, an attacker submitted their
+    // own tiny order with buyer = ATTACKER, timed so the executor also held a victim's bridged USDG,
+    // and walked off with all of it — a bogus fee tier even made the swap revert into the catch,
+    // which handed them the raw USDG with no pool needed.
+    function test_zapPullsOnlyMaxInAndLeavesTheRestForItsOwner() public {
+        uint256 victimFunds = 10_000e6;
+        uint256 attackerOrder = 100e6;
+        _fund(victimFunds + attackerOrder); // shared executor holds BOTH
+
+        address attacker = address(0xA77ACC);
+        vm.prank(bridge);
+        zap.zapFrom(address(stock), 3000, attacker, 0, attackerOrder);
+
+        assertEq(v3.lastAmountIn(), attackerOrder, "only the caller's own bridged size may be pulled");
+        assertEq(usdg.balanceOf(bridge), victimFunds, "the other fill's funds must be untouched");
+        assertEq(usdg.balanceOf(address(zap)), 0, "the zap must hold nothing between calls");
+    }
+
+    // The same bound protects the REFUND path, which is the one that needs no working pool at all.
+    function test_aFailedSwapRefundsOnlyMaxInNotTheWholeExecutorBalance() public {
+        _fund(10_100e6);
+        v3.setRevert(true);
+
+        address attacker = address(0xA77ACC);
+        vm.prank(bridge);
+        zap.zapFrom(address(stock), 3000, attacker, 0, 100e6);
+
+        assertEq(usdg.balanceOf(attacker), 100e6, "the refund is capped at what this call pulled");
+        assertEq(usdg.balanceOf(bridge), 10_000e6, "everything else stays with its owner");
+    }
+
+    // L8: SwapRouter02 remaps a zero recipient to itself, where a permissionless sweepToken exists.
+    function test_zeroBuyerIsRejected() public {
+        _fund(1_000e6);
+        vm.prank(bridge);
+        vm.expectRevert(RhStockZap.BadBuyer.selector);
+        zap.zapFrom(address(stock), 3000, address(0), 0, 1_000e6);
+    }
+
+    function test_zeroMaxInIsRejected() public {
+        _fund(1_000e6);
+        vm.prank(bridge);
+        vm.expectRevert(RhStockZap.BadMaxIn.selector);
+        zap.zapFrom(address(stock), 3000, buyer, 0, 0);
+    }
+
     function test_emptyBalanceReverts() public {
         vm.prank(bridge);
         vm.expectRevert(RhStockZap.NoBalance.selector);
-        zap.zapFrom(address(stock), 3000, buyer, 0);
+        zap.zapFrom(address(stock), 3000, buyer, 0, 1_000e6);
     }
 
     function test_aFailedSwapReturnsTheUsdgToTheBuyerNotTheCaller() public {
@@ -103,17 +157,30 @@ contract RhStockZapTest is Test {
         v3.setRevert(true);
 
         vm.prank(bridge);
-        zap.zapFrom(address(stock), 3000, buyer, 0);
+        zap.zapFrom(address(stock), 3000, buyer, 0, 1_000e6);
 
         assertEq(usdg.balanceOf(buyer), 1_000e6, "a failed swap must hand the USDG to the buyer");
         assertEq(usdg.balanceOf(address(zap)), 0, "nothing may be left for a later caller to sweep");
         assertEq(stock.balanceOf(buyer), 0);
     }
 
+    // L8: the refund used a raw `transfer` whose return value was discarded, in a contract with no
+    // rescue, no owner and no upgrade — a `false` return stranded the user's whole bridged amount
+    // forever while ZapReturned claimed success. SafeERC20 makes that revert instead.
+    function test_aRefundThatSilentlyFailsMustRevertNotEmitSuccess() public {
+        _fund(1_000e6);
+        v3.setRevert(true);
+        usdg.setTransferReturnsFalse(true);
+
+        vm.prank(bridge);
+        vm.expectRevert();
+        zap.zapFrom(address(stock), 3000, buyer, 0, 1_000e6);
+    }
+
     function test_minOutIsForwardedToThePool() public {
         _fund(500e6);
         vm.prank(bridge);
-        zap.zapFrom(address(stock), 500, buyer, 12345);
+        zap.zapFrom(address(stock), 500, buyer, 12345, 500e6);
         assertEq(v3.lastMinOut(), 12345, "the buyer's accepted slippage floor must reach the pool");
     }
 }
@@ -126,13 +193,14 @@ contract NullExecutorDirectCallTest is Test {
     MockERC20 tB;
 
     function setUp() public {
-        executor = new NullExecutor();
         tA = new MockERC20();
         tB = new MockERC20();
         AdapterRegistry impl = new AdapterRegistry();
         registry = AdapterRegistry(
             address(new ERC1967Proxy(address(impl), abi.encodeCall(AdapterRegistry.initialize, (address(this)))))
         );
+        // L9: the registry is pinned at construction now, so it must exist before the executor.
+        executor = new NullExecutor(address(registry));
     }
 
     function test_directCallStillEnforcesTheWhitelist() public {

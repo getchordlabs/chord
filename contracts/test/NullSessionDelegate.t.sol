@@ -213,9 +213,9 @@ contract NullSessionDelegateTest is Test {
 
         uint256 deadline = block.timestamp + 600;
         bytes32 dg = _digest(AMT, 180e18, 0, deadline, _routes(), 0);
-        // Revoke zeroes expiry AND the session key; the expiry check fires first — either way the
-        // session is dead and the swap reverts.
-        vm.expectRevert(NullSessionDelegate.SessionExpired.selector);
+        // Revoke clears the grant flag, zeroes expiry AND the session key; the M4 grant check fires
+        // first — either way the session is dead and the swap reverts.
+        vm.expectRevert(NullSessionDelegate.SessionNotGranted.selector);
         _exec(AMT, 180e18, 0, _sig(sessionPk, dg), _sig(relayerPk, dg));
     }
 
@@ -309,6 +309,143 @@ contract NullSessionDelegateTest is Test {
             _sig(sessionPk, dg),
             _sig(relayerPk, dg)
         );
+    }
+
+    // ── M6: a delegated EOA has code → ERC-1271 + receiver hooks or Permit2/NFTs break ──
+    function test_isValidSignatureReturnsTheMagicValue() public {
+        uint256 pk = 0xA11CE;
+        address eoa = vm.addr(pk);
+        vm.etch(eoa, address(d).code); // the account runs the delegate's code, as under 7702
+
+        bytes32 hash = keccak256("permit2 witness digest");
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, hash);
+        assertEq(
+            NullSessionDelegate(payable(eoa)).isValidSignature(hash, abi.encodePacked(r, s, v)),
+            bytes4(0x1626ba7e),
+            "the account IS the signer - Permit2 must accept it"
+        );
+        (v, r, s) = vm.sign(uint256(0xBAD5), hash);
+        assertEq(
+            NullSessionDelegate(payable(eoa)).isValidSignature(hash, abi.encodePacked(r, s, v)),
+            bytes4(0xffffffff),
+            "a foreign signature must not validate"
+        );
+    }
+
+    function test_receiverHooksAndPermissiveFallback() public {
+        assertEq(d.onERC721Received(address(0), address(0), 1, ""), bytes4(0x150b7a02));
+        assertEq(d.onERC1155Received(address(0), address(0), 1, 1, ""), bytes4(0xf23a6e61));
+        assertTrue(d.supportsInterface(0x150b7a02));
+        (bool ok,) = address(d).call(abi.encodeWithSignature("nobodyImplementsThis()"));
+        assertTrue(ok, "an EOA never reverts on unknown calldata; nor may a delegated one");
+    }
+
+    // ── M4: clearing the 7702 delegation is NOT a revocation, and re-delegating must not resurrect ──
+    // `revokeSession` needs a self-call, which only works while the delegate is installed. Clearing
+    // the account's code leaves granted/sessionKey/expiry/caps in the EOA's storage, so re-delegating
+    // to the same contract brought the whole grant back. `revokeForever()` is a PLAIN transaction to
+    // the deployed delegate — it works with no code on the account and records the kill in the
+    // DEPLOYED contract's storage, which no re-delegation can reach.
+    function test_clearingDelegationThenReDelegatingDoesNotResurrectTheSession() public {
+        NullSessionDelegate impl = new NullSessionDelegate(address(router), relayer, address(0x1234));
+        address eoa = address(0xE0A);
+        vm.etch(eoa, address(impl).code); // delegate installed
+
+        tokenIn.mint(eoa, 10_000e18);
+        address[] memory toks = new address[](2);
+        toks[0] = address(tokenIn);
+        toks[1] = address(tokenOut);
+        uint256[] memory caps = new uint256[](2);
+        caps[0] = CAP;
+        caps[1] = CAP;
+        uint64 expiry = uint64(block.timestamp + 1 hours);
+        vm.prank(eoa);
+        NullSessionDelegate(payable(eoa)).grantSession(sessionKey, expiry, toks, caps);
+
+        // The user's natural "get me out of this" action: clear the delegation. Storage survives.
+        vm.etch(eoa, "");
+        // …so they must ALSO kill it at the deployed delegate — a plain tx, no code on the account.
+        vm.prank(eoa);
+        impl.revokeForever();
+        assertTrue(impl.isRevokedForever(eoa), "the kill lives in the deployed contract's storage");
+
+        // Re-delegate to the very same contract: EOA storage still says granted, key, caps, expiry.
+        vm.etch(eoa, address(impl).code);
+        assertEq(NullSessionDelegate(payable(eoa)).remainingCap(address(tokenIn)), CAP, "old cap is still there");
+
+        uint256 deadline = block.timestamp + 600;
+        bytes32 dg = _digestFor(eoa, AMT, 180e18, 0, deadline);
+        vm.expectRevert(NullSessionDelegate.SessionKilled.selector);
+        NullSessionDelegate(payable(eoa)).executeSession(
+            address(tokenIn),
+            AMT,
+            address(tokenOut),
+            180e18,
+            _routes(),
+            NullSessionDelegate.RouteKind.Single,
+            0,
+            deadline,
+            _sig(sessionPk, dg),
+            _sig(relayerPk, dg)
+        );
+    }
+
+    // The grant flag itself: storage that this delegate never wrote can never execute.
+    function test_executionRequiresAGrantThisDelegateMade() public {
+        NullSessionDelegate impl = new NullSessionDelegate(address(router), relayer, address(0x1234));
+        address eoa = address(0xE0B);
+        vm.etch(eoa, address(impl).code);
+        // No grantSession → `granted` is false even though everything else could be forged into place.
+        uint256 deadline = block.timestamp + 600;
+        bytes32 dg = _digestFor(eoa, AMT, 180e18, 0, deadline);
+        vm.expectRevert(NullSessionDelegate.SessionNotGranted.selector);
+        NullSessionDelegate(payable(eoa)).executeSession(
+            address(tokenIn),
+            AMT,
+            address(tokenOut),
+            180e18,
+            _routes(),
+            NullSessionDelegate.RouteKind.Single,
+            0,
+            deadline,
+            _sig(sessionPk, dg),
+            _sig(relayerPk, dg)
+        );
+    }
+
+    function test_revokeForeverOnlyOnTheDeployedDelegate() public {
+        NullSessionDelegate impl = new NullSessionDelegate(address(router), relayer, address(0x1234));
+        address eoa = address(0xE0C);
+        vm.etch(eoa, address(impl).code);
+        // Called through a delegated account it would write the EOA's storage, which is exactly the
+        // storage a re-delegation resurrects — reject it rather than record a kill that doesn't stick.
+        vm.prank(eoa);
+        vm.expectRevert(NullSessionDelegate.OnlyDeployedDelegate.selector);
+        NullSessionDelegate(payable(eoa)).revokeForever();
+    }
+
+    /// Same digest as `_digest`, for an arbitrary account address (the EIP-712 domain binds it).
+    function _digestFor(address account, uint256 amt, uint256 minOut, uint256 nonce, uint256 deadline)
+        internal
+        view
+        returns (bytes32)
+    {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                SWAP_TYPEHASH,
+                address(tokenIn),
+                amt,
+                address(tokenOut),
+                minOut,
+                keccak256(abi.encode(_routes(), uint8(0))),
+                nonce,
+                deadline
+            )
+        );
+        bytes32 domain = keccak256(
+            abi.encode(DOMAIN_TYPEHASH, keccak256("NullTerminal Session"), keccak256("1"), block.chainid, account)
+        );
+        return keccak256(abi.encodePacked("\x19\x01", domain, structHash));
     }
 
     // ── F-2: a re-grant with a fresh token set invalidates the PRIOR session's caps (epoch bump) ──

@@ -28,15 +28,18 @@ contract DeployMetricPoeAdaptersScript is Script {
     // NullTerminal AdapterRegistry (UUPS) — onlyOwner gating on addAdapter.
     address constant ADAPTER_REGISTRY = 0x6Cf25d2af1A58d7094B0ac253aE616A8e1F2Ea3f;
 
+    /// @dev NullRouter proxy on Monad — the ONLY allowed caller of swap() (BaseAdapter H1 gate).
+    address constant NULL_ROUTER = 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a;
+
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
 
-        MetricAdapter metric = new MetricAdapter(METRIC_SWAP_ROUTER);
+        MetricAdapter metric = new MetricAdapter(NULL_ROUTER, METRIC_SWAP_ROUTER, _metricPools());
         console2.log("MetricAdapter:", address(metric));
 
-        LfjPoeAdapter poe = new LfjPoeAdapter();
+        LfjPoeAdapter poe = new LfjPoeAdapter(NULL_ROUTER, _poePools());
         console2.log("LfjPoeAdapter:", address(poe));
 
         AdapterRegistry registry = AdapterRegistry(ADAPTER_REGISTRY);
@@ -55,5 +58,26 @@ contract DeployMetricPoeAdaptersScript is Script {
         console2.log("  ADAPTER_METRIC  =", address(metric));
         console2.log("  ADAPTER_LFJ_POE =", address(poe));
         console2.log("(math_quoter.rs has no consts for these venues - both quote via eth_call in quoter.rs.)");
+    }
+
+    /// @dev H1 provenance ALLOWLIST — Metric OMM exposes no factory/registry view we can validate an
+    ///      extraData pool against on Monad, so the pool set is fixed at construction (no setter, no
+    ///      owner). VERBATIM from packages/engine/src/state/pool_syncer.rs (`metric:` block) —
+    ///      "exactly 3 pools, token order verified on-chain via getImmutables 2026-07-22".
+    ///      A 4th pool later = NEW adapter deployment + registry swap.
+    function _metricPools() internal pure returns (address[] memory p) {
+        p = new address[](3);
+        p[0] = 0xFA32f9ec28787d1F9C5BA5c39e54e59984FEF3f0; // WMON/USDC
+        p[1] = 0x2D82AC42334b394A9a8d8f097d61DC1c6B065Fd8; // WBTC/USDC
+        p[2] = 0x354D92279cA0190fF275095fE6A2a6989BAa66Fb; // WETH/USDC
+    }
+
+    /// @dev H1 provenance ALLOWLIST — no POE factory/registry view is verified on Monad, so the pool
+    ///      set is fixed at construction. VERBATIM from pool_syncer.rs (`lfj_poe:` block), tokenX/
+    ///      tokenY verified on-chain via getTokens() 2026-07-22. A 3rd pool = NEW adapter deployment.
+    function _poePools() internal pure returns (address[] memory p) {
+        p = new address[](2);
+        p[0] = 0x02A8A16613a421EabaD6861fF6d8159f6D5EDB8f; // WMON/USDC
+        p[1] = 0x06C526964bFB06c6BAAC17fF91a36EC671382171; // AUSD/USDC
     }
 }

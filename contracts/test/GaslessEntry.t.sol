@@ -256,6 +256,38 @@ contract GaslessEntryTest is Test {
         entry.execute(o, sig, p, r, GaslessEntry.RouteKind.MultiHop, address(0));
     }
 
+    // ---- L4: the signed fee must stay in band relative to what the swap actually produced ----
+    // The fee was exact and user-signed, but nothing related it to the trade: a malicious frontend
+    // could sign someone into relayerFee = 99% of output with minAmountOut = 1 and the contract paid
+    // it out without comment. The sibling stock-sell relayer already banded this off-chain.
+    function test_revert_relayerFeeAboveTheBand() public {
+        uint256 fee = OUT_AFTER_FEE / 2; // 50% of the output
+        GaslessEntry.GaslessOrder memory o = _order(address(tB), 1, fee);
+        bytes memory sig = _signOrder(o);
+        GaslessEntry.PermitData memory p = _permit(AMT);
+        vm.prank(relayer);
+        vm.expectRevert(abi.encodeWithSelector(GaslessEntry.FeeOutOfBand.selector, fee, OUT_AFTER_FEE));
+        entry.execute(o, sig, p, _routes1(address(usdc), address(tB)), GaslessEntry.RouteKind.Single, address(0));
+    }
+
+    function test_feeAtTheBandBoundaryStillWorks() public {
+        uint256 fee = (OUT_AFTER_FEE * 2_000) / 10_000; // exactly 20%
+        GaslessEntry.GaslessOrder memory o = _order(address(tB), 1, fee);
+        bytes memory sig = _signOrder(o);
+        GaslessEntry.PermitData memory p = _permit(AMT);
+        vm.prank(relayer);
+        entry.execute(o, sig, p, _routes1(address(usdc), address(tB)), GaslessEntry.RouteKind.Single, address(0));
+        assertEq(tB.balanceOf(relayer), fee, "the ceiling itself is allowed");
+    }
+
+    function test_maxFeeBpsCanOnlyBeTightened() public {
+        assertEq(entry.maxFeeBps(), 2_000);
+        entry.setMaxFeeBps(100);
+        assertEq(entry.maxFeeBps(), 100);
+        vm.expectRevert(GaslessEntry.InvalidParams.selector);
+        entry.setMaxFeeBps(2_001);
+    }
+
     function test_receive_rejectsStrayNative() public {
         vm.deal(address(0xABCD), 1 ether);
         vm.prank(address(0xABCD));

@@ -62,23 +62,60 @@ contract MockAdapter is IAdapter {
     }
 }
 
+/// Adapter whitelist stand-in: only addresses explicitly approved pass, exactly like the real
+/// AdapterRegistry proxy. (The audit's H6 PoC hinges on the executor having NO whitelist at all.)
+contract MockRegistry {
+    mapping(address => bool) public isApproved;
+
+    function setApproved(address adapter, bool ok) external {
+        isApproved[adapter] = ok;
+    }
+}
+
+/// The H6 attack adapter: it is NOT pre-funded and it swaps nothing. It simply reports whatever
+/// `amountOut` the attacker wants, which the executor used to chain forward and then pay out of its
+/// own standing balance.
+contract FakeAdapter is IAdapter {
+    uint256 public reportedOut;
+
+    constructor(uint256 reportedOut_) {
+        reportedOut = reportedOut_;
+    }
+
+    function swap(address, address, uint256, address, bytes calldata)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        return reportedOut;
+    }
+}
+
 contract NullArbExecutorTest is Test {
     NullArbExecutor exec;
+    MockRegistry registry;
     MockERC20 wmon;
     MockERC20 usdc;
     MockAdapter legA; // WMON -> USDC (rate 1.10 => arb-favourable leg)
     MockAdapter legB; // USDC -> WMON (rate 1.00)
 
-    address bot = address(0xB07);
+    // The operator IS the bot now: `arb` is onlyOwner (audit H6). `stranger` stands in for the
+    // pre-fix "any caller".
     address owner = address(0x0417);
+    address bot = address(0x0417);
+    address stranger = address(0xB07);
 
     function setUp() public {
-        exec = new NullArbExecutor(owner);
+        registry = new MockRegistry();
+        exec = new NullArbExecutor(owner, address(registry));
         wmon = new MockERC20();
         usdc = new MockERC20();
         // Product of rates = 1.155 > 1 => the cycle mints more WMON than it started with (profitable).
         legA = new MockAdapter(1.1e18);
         legB = new MockAdapter(1.05e18);
+        registry.setApproved(address(legA), true);
+        registry.setApproved(address(legB), true);
     }
 
     function _routes(uint256 amountIn) internal view returns (NullArbExecutor.RouteStep[] memory r) {
@@ -166,13 +203,85 @@ contract NullArbExecutorTest is Test {
 
     function test_arb_revertsOnEmptyRoute() public {
         NullArbExecutor.RouteStep[] memory r = new NullArbExecutor.RouteStep[](0);
+        vm.prank(owner);
         vm.expectRevert(NullArbExecutor.EmptyRoute.selector);
         exec.arb(1e18, 0, block.timestamp + 1, r);
     }
 
     function test_arb_revertsOnZeroAmount() public {
+        vm.prank(owner);
         vm.expectRevert(NullArbExecutor.ZeroAmount.selector);
         exec.arb(0, 0, block.timestamp + 1, _routes(0));
+    }
+
+    // ============================================================
+    // H6 (audit 2026-08-05): access control + adapter whitelist.
+    // Both of these PASS-as-drain before the fix — `arb` was `external` with no registry.
+    // ============================================================
+
+    /// A stranger holding a valid, profitable, fully-whitelisted route is still rejected: the
+    /// contract is pre-funded by its operator and only the operator may spend it.
+    function test_arb_revertsForNonOwner() public {
+        uint256 amountIn = 100e18;
+        wmon.mint(stranger, amountIn);
+
+        vm.startPrank(stranger);
+        wmon.approve(address(exec), amountIn);
+        vm.expectRevert(); // OwnableUnauthorizedAccount(stranger)
+        exec.arb(amountIn, 0, block.timestamp + 1, _routes(amountIn));
+        vm.stopPrank();
+    }
+
+    /// The full H6 drain, run by the owner so ONLY the whitelist can stop it: a fake "adapter"
+    /// that swaps nothing and simply reports an output. Pre-fix the executor transferred to it,
+    /// chained its self-reported number, and paid out the contract's standing balance.
+    function test_arb_revertsOnUnapprovedAdapter() public {
+        usdc.mint(address(exec), 500e18); // standing balance the attacker is after
+
+        FakeAdapter fake = new FakeAdapter(500e18);
+        NullArbExecutor.RouteStep[] memory r = new NullArbExecutor.RouteStep[](2);
+        r[0] = NullArbExecutor.RouteStep({
+            adapter: address(fake),
+            tokenIn: address(wmon),
+            tokenOut: address(usdc),
+            amountIn: 1,
+            extraData: ""
+        });
+        r[1] = NullArbExecutor.RouteStep({
+            adapter: address(legB),
+            tokenIn: address(usdc),
+            tokenOut: address(wmon),
+            amountIn: 0,
+            extraData: ""
+        });
+
+        wmon.mint(owner, 1);
+        vm.startPrank(owner);
+        wmon.approve(address(exec), 1);
+        vm.expectRevert(abi.encodeWithSelector(NullArbExecutor.UnapprovedAdapter.selector, address(fake)));
+        exec.arb(1, 0, block.timestamp + 1, r);
+        vm.stopPrank();
+
+        assertEq(usdc.balanceOf(address(exec)), 500e18, "standing balance untouched");
+    }
+
+    /// The whitelist is checked on EVERY hop, not just the entry one — an approved first leg must
+    /// not launder an unapproved second leg.
+    function test_arb_revertsOnUnapprovedAdapter_laterHop() public {
+        registry.setApproved(address(legB), false);
+        uint256 amountIn = 100e18;
+        wmon.mint(owner, amountIn);
+
+        vm.startPrank(owner);
+        wmon.approve(address(exec), amountIn);
+        vm.expectRevert(abi.encodeWithSelector(NullArbExecutor.UnapprovedAdapter.selector, address(legB)));
+        exec.arb(amountIn, 0, block.timestamp + 1, _routes(amountIn));
+        vm.stopPrank();
+    }
+
+    function test_constructor_rejectsZeroRegistry() public {
+        vm.expectRevert(NullArbExecutor.ZeroAddress.selector);
+        new NullArbExecutor(owner, address(0));
     }
 
     // --- rescue() is owner-only ---
@@ -182,9 +291,9 @@ contract NullArbExecutorTest is Test {
         usdc.mint(address(exec), 5e18);
 
         // Non-owner cannot rescue.
-        vm.prank(bot);
+        vm.prank(stranger);
         vm.expectRevert();
-        exec.rescue(address(usdc), 5e18, bot);
+        exec.rescue(address(usdc), 5e18, stranger);
 
         // Owner can.
         vm.prank(owner);

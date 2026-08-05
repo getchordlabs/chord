@@ -9,12 +9,19 @@ contract DeployMentoAdapterScript is Script {
     address constant ADAPTER_REGISTRY = 0x6Cf25d2af1A58d7094B0ac253aE616A8e1F2Ea3f;
     /// @dev Mento protocol Router on Monad (docs.mento.org, defaultFactory verified on-chain).
     address constant MENTO_ROUTER = 0x4861840C2EfB2b98312B0aE34d86fD73E8f9B6f6;
+    /// @dev H1 provenance: the ONLY pool factory this adapter will route through. FPMMFactory —
+    ///      verified on-chain as MENTO_ROUTER.defaultFactory() (MentoAdapter.sol NatSpec) and equal
+    ///      to engine chain.rs `mento_fpmm_factory`, which is what the engine puts in extraData.
+    ///      extraData must match this EXACTLY or swap() reverts FactoryNotPinned.
+    address constant MENTO_FPMM_FACTORY = 0xa849b475FE5a4B5C9C3280152c7a1945b907613b;
+    /// @dev NullRouter proxy on Monad — the ONLY allowed caller of swap() (BaseAdapter H1 gate).
+    address constant NULL_ROUTER = 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        MentoAdapter adapter = new MentoAdapter(MENTO_ROUTER);
+        MentoAdapter adapter = new MentoAdapter(NULL_ROUTER, MENTO_ROUTER, MENTO_FPMM_FACTORY);
         console2.log("MentoAdapter:", address(adapter));
 
         AdapterRegistry(ADAPTER_REGISTRY).addAdapter(address(adapter));

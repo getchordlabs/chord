@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IAdapter} from "../interfaces/IAdapter.sol";
 import {TransferLib} from "../libraries/TransferLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {BaseAdapter} from "./BaseAdapter.sol";
 
 interface ICloberController {
     struct PermitSignature {
@@ -37,11 +38,19 @@ interface ICloberController {
 
 /// @title CloberAdapter
 /// @notice Executes swaps on Clober V2 CLOB via Controller.spend()
-contract CloberAdapter is IAdapter {
+/// @dev H1 (2026-08-05 audit): extraData carries only a `uint192 bookId` — no caller-chosen address —
+///      but swap() was world-callable, and this DEAD-but-still-approved adapter was found holding
+///      1 WMON, i.e. the only concrete loss the whole H1 sweep could point at. `onlyRouter` closes
+///      it. Removing this adapter from the registry (M2) remains the actual fix; the gate just means
+///      the stranded dust cannot be swept by a stranger while that happens.
+contract CloberAdapter is IAdapter, BaseAdapter {
     ICloberController public immutable CONTROLLER;
     address public immutable BOOK_MANAGER;
 
-    constructor(address controller_, address bookManager_) {
+    constructor(address nullRouter_, address controller_, address bookManager_)
+        BaseAdapter(nullRouter_)
+    {
+        require(controller_ != address(0) && bookManager_ != address(0), "CLOBER_ZERO_ADDR");
         CONTROLLER = ICloberController(controller_);
         BOOK_MANAGER = bookManager_;
     }
@@ -54,7 +63,7 @@ contract CloberAdapter is IAdapter {
         uint256 amountIn,
         address to,
         bytes calldata extraData
-    ) external override returns (uint256 amountOut) {
+    ) external override onlyRouter returns (uint256 amountOut) {
         uint192 bookId = abi.decode(extraData, (uint192));
 
         TransferLib.safeApprove(tokenIn, address(CONTROLLER), amountIn);

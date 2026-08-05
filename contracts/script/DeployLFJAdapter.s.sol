@@ -7,13 +7,18 @@ import {AdapterRegistry} from "../src/AdapterRegistry.sol";
 
 contract DeployLFJAdapterScript is Script {
     address constant LB_ROUTER = 0x18556DA13313f3532c54711497A8FedAC273220E;
+    /// @dev H1 provenance: LBFactory — `getLBPairInformation(tokenIn, tokenOut, binStep)` must name a
+    ///      real pair before the router is approved. Matches engine chain.rs `lfj_factory`.
+    address constant LB_FACTORY = 0xb43120c4745967fa9b93E79C149E66B0f2D6Fe0c;
     address constant ADAPTER_REGISTRY = 0x6Cf25d2af1A58d7094B0ac253aE616A8e1F2Ea3f;
+    /// @dev NullRouter proxy on Monad — the ONLY allowed caller of swap() (BaseAdapter H1 gate).
+    address constant NULL_ROUTER = 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        LFJAdapter adapter = new LFJAdapter(LB_ROUTER);
+        LFJAdapter adapter = new LFJAdapter(NULL_ROUTER, LB_ROUTER, LB_FACTORY);
         console2.log("LFJAdapter:", address(adapter));
 
         AdapterRegistry(ADAPTER_REGISTRY).addAdapter(address(adapter));

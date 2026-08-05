@@ -23,15 +23,19 @@ contract DeployBalancerV3AdaptersScript is Script {
     // NullTerminal AdapterRegistry (UUPS) — onlyOwner gating on addAdapter.
     address constant ADAPTER_REGISTRY = 0x6Cf25d2af1A58d7094B0ac253aE616A8e1F2Ea3f;
 
+    // NullRouter proxy on Monad — the ONLY contract allowed to call swap() (BaseAdapter H1 gate).
+    address constant NULL_ROUTER = 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a;
+
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
 
-        BalancerV3Adapter simple = new BalancerV3Adapter(VAULT, AGGREGATOR_ROUTER);
+        BalancerV3Adapter simple = new BalancerV3Adapter(NULL_ROUTER, VAULT, AGGREGATOR_ROUTER);
         console2.log("BalancerV3Adapter (simple):       ", address(simple));
 
-        BalancerV3BoostedAdapter boosted = new BalancerV3BoostedAdapter(VAULT, AGGREGATOR_BATCH_ROUTER);
+        BalancerV3BoostedAdapter boosted =
+            new BalancerV3BoostedAdapter(NULL_ROUTER, VAULT, AGGREGATOR_BATCH_ROUTER);
         console2.log("BalancerV3BoostedAdapter (boosted):", address(boosted));
 
         AdapterRegistry registry = AdapterRegistry(ADAPTER_REGISTRY);

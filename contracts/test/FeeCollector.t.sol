@@ -21,6 +21,35 @@ contract MockERC20 {
     function _x(address f, address to, uint256 a) internal { require(balanceOf[f] >= a, "BAL"); balanceOf[f] -= a; balanceOf[to] += a; }
 }
 
+/// A token whose `transfer` re-enters `collectFee`. It is deployed AS the collector's router so it
+/// passes `onlyRouter` — the shape a hostile referral-token would need. Models the INFO finding:
+/// `collectFee` used to pay the referrer (an external call to a caller-supplied address) BEFORE
+/// crediting the treasury, with no reentrancy guard.
+contract ReenterToken {
+    mapping(address => uint256) public balanceOf;
+    FeeCollector public fc;
+    bool public entered;
+    bool public reenterSucceeded;
+
+    function setFc(FeeCollector f) external { fc = f; }
+    function mint(address to, uint256 a) external { balanceOf[to] += a; }
+
+    function transfer(address to, uint256 a) external returns (bool) {
+        require(balanceOf[msg.sender] >= a, "BAL");
+        balanceOf[msg.sender] -= a;
+        balanceOf[to] += a;
+        if (!entered) {
+            entered = true;
+            // Re-enter with no referrer → the whole amount would be booked a SECOND time.
+            (bool ok, ) = address(fc).call(
+                abi.encodeWithSelector(FeeCollector.collectFee.selector, address(this), a, address(0))
+            );
+            reenterSucceeded = ok;
+        }
+        return true;
+    }
+}
+
 /// Unit tests for the tiered per-token fee added to FeeCollector.
 contract FeeCollectorTest is Test {
     FeeCollector fc;
@@ -156,5 +185,66 @@ contract FeeCollectorTest is Test {
     function test_collectFee_onlyRouter() public {
         vm.expectRevert(FeeCollector.OnlyRouter.selector);
         fc.collectFee(address(tok), 1000, address(0));
+    }
+
+    // ── L1: recovering balance the fee ledger never booked ──────────────────────
+    // withdrawFees pays out of `accumulatedFees`, so anything that arrives unbooked used to be
+    // unrecoverable without a UUPS upgrade. That happened for real: a swap naming the collector as
+    // its own referrer made the referral transfer a self-transfer the ledger never credited.
+
+    function test_sweepUnaccounted_movesOnlyTheUnledgeredBalance() public {
+        tok.mint(address(fc), 1000);
+        vm.prank(router);
+        fc.collectFee(address(tok), 1000, address(0)); // 1000 booked, 1000 held
+        tok.mint(address(fc), 400);                    // arrives unbooked
+
+        fc.sweepUnaccounted(address(tok), treasury);
+
+        assertEq(tok.balanceOf(treasury), 400, "only the unaccounted balance leaves");
+        assertEq(fc.accumulatedFees(address(tok)), 1000, "ledger untouched");
+        assertEq(tok.balanceOf(address(fc)), 1000, "collector still fully covers what it owes");
+    }
+
+    function test_sweepUnaccounted_cannotTouchBookedFees() public {
+        tok.mint(address(fc), 1000);
+        vm.prank(router);
+        fc.collectFee(address(tok), 1000, address(0));
+
+        // Balance == ledger → there is nothing to sweep, and treasury's withdrawal still works.
+        vm.expectRevert(bytes("NOTHING_UNACCOUNTED"));
+        fc.sweepUnaccounted(address(tok), treasury);
+
+        fc.withdrawFees(address(tok), treasury);
+        assertEq(tok.balanceOf(treasury), 1000, "withdrawFees unaffected");
+    }
+
+    function test_sweepUnaccounted_authAndZeroAddress() public {
+        tok.mint(address(fc), 100);
+        vm.prank(notOwner);
+        vm.expectRevert();
+        fc.sweepUnaccounted(address(tok), notOwner);
+
+        vm.expectRevert(FeeCollector.ZeroAddress.selector);
+        fc.sweepUnaccounted(address(tok), address(0));
+    }
+
+    // ── INFO: checks-effects-interactions + reentrancy guard on collectFee ──────
+    function test_collectFee_reentrantReferralTokenCannotDoubleBook() public {
+        ReenterToken rtok = new ReenterToken();
+        FeeCollector impl = new FeeCollector();
+        FeeCollector fc2 = FeeCollector(address(new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(FeeCollector.initialize, (owner, treasury, address(rtok), 5, 5000))
+        )));
+        rtok.setFc(fc2);
+        rtok.mint(address(fc2), 1000);
+
+        address referrer = makeAddr("referrer");
+        vm.prank(address(rtok)); // the token IS the router here, so onlyRouter cannot save us
+        fc2.collectFee(address(rtok), 1000, referrer);
+
+        assertFalse(rtok.reenterSucceeded(), "the re-entrant collectFee must be rejected");
+        assertEq(fc2.accumulatedFees(address(rtok)), 500, "treasury credited exactly once");
+        assertEq(rtok.balanceOf(referrer), 500, "referrer paid exactly once");
     }
 }

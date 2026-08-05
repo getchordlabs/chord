@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IFeeCollector} from "./interfaces/IFeeCollector.sol";
 import {TransferLib} from "./libraries/TransferLib.sol";
 import {SwapMath} from "./libraries/SwapMath.sol";
@@ -10,7 +12,12 @@ import {SwapMath} from "./libraries/SwapMath.sol";
 /// @title FeeCollector
 /// @notice Collects protocol fees (5 bps) and distributes referral rewards (50/50 split).
 /// @dev UUPS upgradeable. Called by NullRouter after every swap.
-contract FeeCollector is IFeeCollector, UUPSUpgradeable, OwnableUpgradeable {
+///      ReentrancyGuard is STORAGE-SAFE to add to this live proxy: OZ 5.6.1's non-upgradeable guard
+///      keeps its status in a fixed ERC-7201 namespaced slot, not a sequential one, so it adds
+///      nothing to the layout (feeBps stays at slot 0). The implementation constructor sets
+///      NOT_ENTERED on the impl only; the proxy reads 0, and the guard tests `== ENTERED`, so 0 is
+///      correctly treated as not-entered. Same reasoning as NullRouter's existing guard.
+contract FeeCollector is IFeeCollector, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuard {
     /// @notice Absolute ceiling for ANY fee (global default or per-token override). Fees can never
     ///         exceed 1% — a hard, on-chain user-protection guarantee.
     uint16 public constant MAX_FEE_BPS = 100;
@@ -34,6 +41,10 @@ contract FeeCollector is IFeeCollector, UUPSUpgradeable, OwnableUpgradeable {
 
     error OnlyRouter();
     error ZeroAddress();
+
+    /// @notice Emitted when unledgered balance is swept out (L1 recovery path). Declared here rather
+    ///         than in IFeeCollector: the interface is the router-facing contract and does not change.
+    event UnaccountedSwept(address indexed token, address indexed to, uint256 amount);
 
     modifier onlyRouter() {
         if (msg.sender != router) revert OnlyRouter();
@@ -70,20 +81,24 @@ contract FeeCollector is IFeeCollector, UUPSUpgradeable, OwnableUpgradeable {
     // ============================================================
 
     /// @inheritdoc IFeeCollector
-    function collectFee(address token, uint256 amount, address referrer) external onlyRouter {
+    function collectFee(address token, uint256 amount, address referrer) external onlyRouter nonReentrant {
         if (amount == 0) return;
 
         if (referrer != address(0) && referralShareBps > 0) {
             (uint256 referralAmount, uint256 treasuryAmount) =
                 SwapMath.splitReferral(amount, referralShareBps);
 
+            // INFO (2026-08-05 audit): checks-effects-INTERACTIONS. The referral payout is an
+            // external call to a caller-supplied address, so the treasury credit is booked FIRST and
+            // the transfer happens last. Not exploitable today (the only caller is onlyRouter and the
+            // router is mid-nonReentrant), but the ordering plus the guard above means adding any
+            // non-owner entrypoint later cannot turn this into a reentrancy hole.
+            accumulatedFees[token] += treasuryAmount;
+
             // Transfer referral share directly to referrer
             if (referralAmount > 0) {
                 TransferLib.safeTransfer(token, referrer, referralAmount);
             }
-
-            // Keep treasury share in this contract
-            accumulatedFees[token] += treasuryAmount;
 
             emit FeeCollected(token, amount, referrer, referralAmount);
         } else {
@@ -103,6 +118,29 @@ contract FeeCollector is IFeeCollector, UUPSUpgradeable, OwnableUpgradeable {
         TransferLib.safeTransfer(token, to, amount);
 
         emit FeeWithdrawn(token, to, amount);
+    }
+
+    /// @notice Sweep any balance of `token` this contract holds that the fee ledger does NOT account
+    ///         for — i.e. `balanceOf(this) - accumulatedFees[token]`.
+    /// @dev L1 (2026-08-05 audit): `withdrawFees` pays out of the LEDGER, so anything that arrives
+    ///      without being booked is unrecoverable without a UUPS upgrade. That happens for real: a
+    ///      swap naming this collector as its own `referrer` made the referral transfer a
+    ///      self-transfer (net no-op) while only `treasuryAmount` was credited — measured at half the
+    ///      fee stranded per such swap (PoC: test/AuditPoCReferrer.t.sol). The router now rejects that
+    ///      reflexive referrer (H2), so this is the recovery path for what already accumulated, plus
+    ///      cover for stray donations and fee-on-transfer rounding. Never touches booked fees:
+    ///      subtracting the ledger first means treasury obligations cannot be swept out from under
+    ///      `withdrawFees`.
+    function sweepUnaccounted(address token, address to) external onlyOwner nonReentrant {
+        if (to == address(0)) revert ZeroAddress();
+        uint256 held = IERC20(token).balanceOf(address(this));
+        uint256 booked = accumulatedFees[token];
+        require(held > booked, "NOTHING_UNACCOUNTED");
+        uint256 amount = held - booked;
+
+        TransferLib.safeTransfer(token, to, amount);
+
+        emit UnaccountedSwept(token, to, amount);
     }
 
     // ============================================================

@@ -199,6 +199,7 @@ contract HanjiAdapterTest is Test {
     MockERC20 quote; // 6-dec quote → sfY = 1
     MockHanjiProxy proxy; // BASE/QUOTE, pure-ERC20 market
     MockHanjiProxy nativeProxy; // WMON/QUOTE market, native payouts on the X side
+    MockHanjiProxy scaledProxy; // same pair with sfY = 1000, for the buy-side dust case
     HanjiAdapter adapter;
 
     address recipient = address(0xDEAD);
@@ -211,11 +212,19 @@ contract HanjiAdapterTest is Test {
         wmon = new MockWMON();
         base = new MockERC20();
         quote = new MockERC20();
-        adapter = new HanjiAdapter(address(wmon));
 
         proxy = new MockHanjiProxy(address(base), address(quote), SF_X, 1, PRICE_RAW, FEE_RATE);
         nativeProxy = new MockHanjiProxy(address(wmon), address(quote), SF_X, 1, PRICE_RAW, FEE_RATE);
         nativeProxy.setNativeX(true);
+        scaledProxy = new MockHanjiProxy(address(base), address(quote), SF_X, 1000, PRICE_RAW, FEE_RATE);
+
+        // H1: the test contract stands in for NullRouter, and every market proxy must be on the
+        // construction-time allowlist (Hanji's market list is API-served, not on-chain).
+        address[] memory proxies = new address[](3);
+        proxies[0] = address(proxy);
+        proxies[1] = address(nativeProxy);
+        proxies[2] = address(scaledProxy);
+        adapter = new HanjiAdapter(address(this), address(wmon), proxies);
 
         // Venue inventory: quote to pay sell proceeds, base to pay buy fills.
         quote.mint(address(proxy), 1_000_000e6);
@@ -366,11 +375,10 @@ contract HanjiAdapterTest is Test {
 
     // 7c. Buy where amountIn floors to a zero target (sfY > amountIn) → HANJI_DUST.
     function test_buy_dust_reverts() public {
-        MockHanjiProxy scaled = new MockHanjiProxy(address(base), address(quote), SF_X, 1000, PRICE_RAW, FEE_RATE);
         quote.mint(address(adapter), 999);
 
         vm.expectRevert(bytes("HANJI_DUST"));
-        adapter.swap(address(quote), address(base), 999, recipient, abi.encode(address(scaled)));
+        adapter.swap(address(quote), address(base), 999, recipient, abi.encode(address(scaledProxy)));
     }
 
     // 8. PUSH model: swap() without pre-funding must revert (venue pull fails on balance).

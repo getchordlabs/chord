@@ -46,6 +46,18 @@ contract MockAdapter {
     }
 }
 
+/// A collector that reports whatever fee it likes — models the L2 threat: MAX_FEE_BPS is a
+/// FeeCollector constant, but the collector is both upgradeable AND swappable via setFeeCollector.
+contract GreedyFeeCollector {
+    uint16 public bps;
+    constructor(uint16 b) { bps = b; }
+    function setBps(uint16 b) external { bps = b; }
+    function feeBps() external view returns (uint16) { return bps; }
+    function feeBpsFor(address) external view returns (uint16) { return bps; }
+    function referralShareBps() external pure returns (uint16) { return 5000; }
+    function collectFee(address, uint256, address) external {}
+}
+
 /// Pays out a fraction — models a sandwich / stale quote, i.e. what minOut exists to catch.
 contract ShortfallAdapter {
     uint256 public numerator;
@@ -244,4 +256,79 @@ contract NullRouterGuardsTest is Test {
         assertEq(tB.balanceOf(user), AMT - fee, "user must receive the full output minus exactly the fee");
         assertEq(tB.balanceOf(address(router)), 0, "the router must not retain output");
     }
+
+    // ── F9 (L2, 2026-08-05 audit): the ROUTER caps the fee it will pay ───────────────
+    // FeeCollector.MAX_FEE_BPS is advertised as a user guarantee but lives in an upgradeable and
+    // wholesale-replaceable contract. One owner tx pointing at a collector returning 10000 used to
+    // make every minAmountOut == 0 swap pay the user nothing.
+    function test_routerRejectsAFeeAboveItsOwnCeiling() public {
+        GreedyFeeCollector greedy = new GreedyFeeCollector(10_000); // 100% — takes everything
+        router.setFeeCollector(address(greedy));
+
+        vm.prank(user);
+        vm.expectRevert(bytes("FEE_TOO_HIGH"));
+        router.swap(address(tA), address(tB), AMT, 0, block.timestamp + 60, _step(honest, AMT), address(0));
+        assertEq(tB.balanceOf(user), 0, "a confiscatory fee must revert, not settle");
+
+        // One bp over the ceiling is still rejected...
+        greedy.setBps(101);
+        vm.prank(user);
+        vm.expectRevert(bytes("FEE_TOO_HIGH"));
+        router.swap(address(tA), address(tB), AMT, 0, block.timestamp + 60, _step(honest, AMT), address(0));
+
+        // ...and exactly at the ceiling still works, so the cap is a bound, not a behaviour change.
+        greedy.setBps(100);
+        _swap(honest, AMT, 0, block.timestamp + 60);
+        assertEq(tB.balanceOf(user), AMT - (AMT * 100) / 10_000, "1% is the most the router will pay");
+    }
+
+    // ── F10 (L2): the setters that point the router at its dependencies ─────────────
+    function test_settersRejectZeroAddress() public {
+        vm.expectRevert(NullRouter.ZeroAddress.selector);
+        router.setFeeCollector(address(0));
+        vm.expectRevert(NullRouter.ZeroAddress.selector);
+        router.setRegistry(address(0));
+        vm.expectRevert(NullRouter.ZeroAddress.selector);
+        router.setExecutor(address(0));
+        vm.expectRevert(NullRouter.ZeroAddress.selector);
+        router.setPermit2(address(0));
+
+        // A real address still goes through.
+        address p2 = address(0x22222);
+        router.setPermit2(p2);
+        assertEq(address(router.permit2()), p2, "a non-zero address must still be accepted");
+    }
+
+    // ── F11 (L5): bare native donations are no longer locked forever ────────────────
+    // receive() accepts native from anyone and rescueTokens reads IERC20.balanceOf, which reverts
+    // for address(0) — so before this there was no way out for donated MON.
+    function test_rescueNativeRecoversDonatedMon() public {
+        address stranger = address(0xD0);
+        vm.deal(stranger, 3 ether);
+        vm.prank(stranger);
+        (bool sent, ) = address(router).call{value: 3 ether}("");
+        assertTrue(sent, "receive() accepts bare native");
+        assertEq(address(router).balance, 3 ether, "and it is stuck there");
+
+        // The ERC20 rescue path cannot reach it (balanceOf on address(0) reverts).
+        vm.expectRevert();
+        router.rescueTokens(address(0), address(this));
+
+        address to = address(0xC0FFEE);
+        router.rescueNative(to);
+        assertEq(to.balance, 3 ether, "owner recovers the donation");
+        assertEq(address(router).balance, 0, "router drained");
+    }
+
+    function test_rescueNativeIsOwnerOnlyAndRejectsZeroTo() public {
+        vm.deal(address(router), 1 ether);
+        vm.prank(address(0xBAD));
+        vm.expectRevert();
+        router.rescueNative(address(0xBAD));
+
+        vm.expectRevert(NullRouter.ZeroAddress.selector);
+        router.rescueNative(address(0));
+    }
+
+    receive() external payable {}
 }

@@ -16,12 +16,28 @@ contract UniV3GenericAdapterForkTest is Test {
     address constant AUSD = 0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a;
     // PangolinV3 WMON/AUSD pool (token0 = AUSD, token1 = WMON), factory 0x44805F92…
     address constant POOL = 0xcd00A33B65b1eaeaE1757c64eB79b94787A497A5;
+    address constant PANGOLIN_V3_FACTORY = 0x44805F92db5bB31B54632A55fc4b2B7E885B0e0e;
 
     address recipient = address(0xBEEF);
 
     function setUp() public {
         vm.createSelectFork("https://rpc.monad.xyz");
-        adapter = new UniV3GenericAdapter();
+        // H1: pin the fork's factory. initCodeHash = 0 selects the REGISTRY lane (factory.getPool),
+        // which is what to use whenever a fork's creation-code hash is not independently verified —
+        // guessing a hash would brick every swap on that fork.
+        address[] memory factories = new address[](1);
+        factories[0] = PANGOLIN_V3_FACTORY;
+        bytes32[] memory hashes = new bytes32[](1);
+        // DYNAMIC FEE, measured on this exact pool 2026-08-05: fee() == 10 today, but the factory
+        // registered it under 2500 — provenance must probe the creation tiers, not the live fee.
+        uint24[] memory tiers = new uint24[](5);
+        tiers[0] = 100;
+        tiers[1] = 500;
+        tiers[2] = 2500;
+        tiers[3] = 3000;
+        tiers[4] = 10000;
+        // This test contract stands in for NullRouter (adapters are onlyRouter now).
+        adapter = new UniV3GenericAdapter(address(this), factories, hashes, tiers);
     }
 
     function test_pangolin_WMON_to_AUSD() public {

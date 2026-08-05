@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IAdapter} from "../interfaces/IAdapter.sol";
 import {TransferLib} from "../libraries/TransferLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {BaseAdapter} from "./BaseAdapter.sol";
 
 // Minimal V4 interfaces
 interface IPoolManager {
@@ -43,7 +44,13 @@ interface IWMON {
 ///   PoolManager: 0x188d586ddcf52439676ca21a244753fa19f9ea8e
 ///
 /// V4 pool: MON(native)/USDC, fee=3000, tickSpacing=60
-contract UniswapV4Adapter is IAdapter {
+///
+/// H1 (2026-08-05 audit): extraData is a full PoolKey and swap() was world-callable. Funds only ever
+/// move to the IMMUTABLE PoolManager (V4 pools are not contracts — a "pool" is a key hash), so there
+/// is no address to validate against a factory; provenance here means BINDING the key to the route:
+/// the key's two currencies must be exactly the route's (tokenIn, tokenOut), with native currency0
+/// mapped to WMON. Without that, a caller could settle the router's input into an unrelated pool.
+contract UniswapV4Adapter is IAdapter, BaseAdapter {
     IPoolManager public immutable POOL_MANAGER;
     address public immutable WMON;
 
@@ -61,8 +68,11 @@ contract UniswapV4Adapter is IAdapter {
 
     error NotPoolManager();
     error SwapFailed();
+    /// @notice The PoolKey's currencies are not the route's (tokenIn, tokenOut).
+    error KeyNotBoundToRoute();
 
-    constructor(address poolManager_, address wmon_) {
+    constructor(address nullRouter_, address poolManager_, address wmon_) BaseAdapter(nullRouter_) {
+        require(poolManager_ != address(0) && wmon_ != address(0), "V4_ZERO_ADDR");
         POOL_MANAGER = IPoolManager(poolManager_);
         WMON = wmon_;
     }
@@ -75,10 +85,20 @@ contract UniswapV4Adapter is IAdapter {
         uint256 amountIn,
         address to,
         bytes calldata extraData
-    ) external override returns (uint256 amountOut) {
+    ) external override onlyRouter returns (uint256 amountOut) {
         PoolKey memory key = abi.decode(extraData, (PoolKey));
         bool zeroForOne = key.currency0 == tokenIn ||
                           (key.currency0 == address(0) && tokenIn == WMON);
+
+        // H1: bind the key to the route. Native currency (address(0)) is the WMON side because
+        // NullRouter always hands ERC20 WMON to adapters and this contract wraps/unwraps around it.
+        address inCurrency = zeroForOne ? key.currency0 : key.currency1;
+        address outCurrency = zeroForOne ? key.currency1 : key.currency0;
+        if (
+            _asToken(inCurrency) != tokenIn || _asToken(outCurrency) != tokenOut
+        ) {
+            revert KeyNotBoundToRoute();
+        }
 
         // If input is WMON and pool uses native MON, unwrap
         if (tokenIn == WMON && key.currency0 == address(0)) {
@@ -96,6 +116,11 @@ contract UniswapV4Adapter is IAdapter {
         );
 
         amountOut = abi.decode(result, (uint256));
+    }
+
+    /// @dev V4 native currency is address(0); the router's token view of that side is always WMON.
+    function _asToken(address currency) internal view returns (address) {
+        return currency == address(0) ? WMON : currency;
     }
 
     /// @dev Called by PoolManager during unlock. Executes swap + settle + take.

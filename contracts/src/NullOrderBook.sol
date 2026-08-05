@@ -7,6 +7,21 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {INullRouter} from "./interfaces/INullRouter.sol";
 
+/// @dev Reference-price source for the keeper sanity bound (audit 2026-08-05, H3).
+///      `referenceOut` must answer "what should `amountIn` of tokenIn be worth in tokenOut right
+///      now", using the SAME address(0)=native-MON convention the order book uses.
+///
+///      TRUST ASSUMPTION: this must be a manipulation-resistant source (TWAP / multi-venue
+///      aggregate), NOT a spot quote off the pools the keeper is allowed to route through — a spot
+///      source can be moved inside the very transaction it is meant to police. The order book
+///      cannot verify that property; the owner takes it on when calling `setOracle`.
+interface IOrderBookOracle {
+    function referenceOut(address tokenIn, address tokenOut, uint256 amountIn)
+        external
+        view
+        returns (uint256 refOut);
+}
+
 /// @dev Overload surface of NullRouter not present in INullRouter (native-out multi-hop).
 interface INullRouterMultiHopNative {
     function multiHopSwap(
@@ -31,9 +46,23 @@ interface INullRouterMultiHopNative {
 /// token pair, fill amount, minimum output, referrer — is read from ORDER STATE, never
 /// from keeper input, so a malicious/compromised keeper cannot redirect funds or relax
 /// the maker's price floor. The router additionally enforces its adapter whitelist and
-/// route-shape invariants on the supplied plan. Worst-case keeper misbehaviour =
-/// choosing a suboptimal route that still clears the maker's floor, or not filling.
-/// (Permissionless keeping needs an oracle price bound — deliberately out of v1 scope.)
+/// route-shape invariants on the supplied plan.
+///
+/// KEEPER SURPLUS BOUND (audit 2026-08-05, H3). The earlier claim here — "worst-case keeper
+/// misbehaviour = a suboptimal route that still clears the floor" — was wrong. A keeper that
+/// controls a pool an approved adapter will trade against can realise EXACTLY the floor
+/// deterministically (sell the maker's input at market inside the same call, hand back precisely
+/// `minOutPerFill`, pocket the rest) and emit an `OrderFilled` indistinguishable from an honest
+/// fill. On the shipped 5% DCA default that is a guaranteed ~5% skim; on a limit order that gapped
+/// through its trigger it is unbounded. Two mitigations, both here, neither sufficient alone:
+///   1. `oracle` + `maxDeviationBps` — a reference-price bound on the measured `received`, so the
+///      maker's floor is no longer the ONLY protection. Skipped entirely when unset (see
+///      `setOracle`), so an unconfigured book behaves exactly as before.
+///   2. `maxFillDelay` — caps how long a keeper may sit on a DUE **DCA** slot, shrinking the
+///      free option of waiting for a dip that still clears the floor. Limit orders are exempt:
+///      "fill whenever price crosses" IS the product, so their only bound is (1).
+/// The structural fix is adapter-side pool provenance (audit H1); these are the containment that
+/// does not require redeploying every adapter.
 ///
 /// Fund-safety invariants:
 /// - tokenIn approval to the router is granted for EXACTLY one fill and revoked in the
@@ -91,6 +120,29 @@ contract NullOrderBook is Ownable, ReentrancyGuard {
 
     mapping(address => bool) public isKeeper;
 
+    // ---- H3 / M8 additions (audit 2026-08-05). Plain contract, not a proxy — but appended
+    //      anyway so a future upgrade-to-proxy inherits a clean layout. ----
+
+    uint256 private constant BPS = 10_000;
+
+    /// @notice Reference-price source for the keeper surplus bound. address(0) = disabled.
+    IOrderBookOracle public oracle;
+
+    /// @notice How far BELOW the oracle reference a fill may land before it is rejected.
+    ///         0 = disabled (also the state when `oracle` is unset).
+    uint16 public maxDeviationBps;
+
+    /// @notice Seconds a keeper may sit on a DUE DCA slot before that slot's window closes and the
+    ///         schedule rolls to the next one. 0 = unbounded (pre-audit behaviour).
+    uint64 public maxFillDelay;
+
+    /// @notice Upper bound on `expiry - now` at creation. Bounds how long an un-fillable spam order
+    ///         can squat in `_openIds` before `pruneExpired` can evict it. 0 = unbounded.
+    uint64 public maxOrderTtl;
+
+    /// @notice Per-tokenIn minimum `amountPerFill` (anti dust-spam). 0 = no minimum for that token.
+    mapping(address => uint128) public minAmountPerFill;
+
     // ============================================================
     // Events / Errors
     // ============================================================
@@ -117,18 +169,28 @@ contract NullOrderBook is Ownable, ReentrancyGuard {
     );
     event OrderCompleted(uint256 indexed orderId);
     event OrderCancelled(uint256 indexed orderId, uint256 refunded);
+    event OrderPruned(uint256 indexed orderId);
     event KeeperSet(address indexed keeper, bool allowed);
+    event OracleSet(address indexed oracle, uint16 maxDeviationBps);
+    event MaxFillDelaySet(uint64 maxFillDelay);
+    event MaxOrderTtlSet(uint64 maxOrderTtl);
+    event MinAmountPerFillSet(address indexed token, uint128 minAmount);
 
     error NotKeeper();
     error OrderNotFound();
     error OrderNotOpen();
     error OrderExpired();
     error FillTooEarly();
+    error FillWindowMissed(uint256 lateBy, uint64 maxFillDelay);
     error NotMaker();
     error InvalidParams();
     error InvalidRoutePlan();
     error BadEscrowAmount();
     error InsufficientFillOutput(uint256 received, uint256 floor);
+    error OracleBoundViolated(uint256 received, uint256 oracleFloor);
+    error OracleUnavailable();
+    error BelowMinNotional(uint128 amountPerFill, uint128 required);
+    error ExpiryTooFar(uint64 expiry, uint64 maxExpiry);
     error NativeTransferFailed();
     error UnexpectedNative();
 
@@ -141,6 +203,12 @@ contract NullOrderBook is Ownable, ReentrancyGuard {
         if (router_ == address(0) || wmon_ == address(0)) revert InvalidParams();
         router = INullRouter(router_);
         wmon = wmon_;
+        // Safe-by-default rather than off-by-default: a book deployed and forgotten still bounds
+        // keeper timing discretion and still produces prunable orders. Both are owner-tunable.
+        maxFillDelay = 15 minutes;
+        maxOrderTtl = 365 days;
+        // `oracle` stays unset: there is no reference source to point at yet, and a wrong one is
+        // worse than none (it would gate every fill on a number nobody validated).
     }
 
     // ============================================================
@@ -172,6 +240,19 @@ contract NullOrderBook is Ownable, ReentrancyGuard {
         ) revert InvalidParams();
         if (expiry <= block.timestamp) revert InvalidParams();
         if (numFills > 1 && interval == 0) revert InvalidParams();
+
+        // M8 anti-spam. createOrder is permissionless and pushes into `_openIds` unconditionally,
+        // so junk orders are a DoS on the OFF-CHAIN keeper (10k dust orders → openOrderIds()
+        // outgrows an RPC response). Two cheap bounds, both owner-tunable, both no-ops when unset:
+        //   - a per-token minimum size, so spam costs real capital in a token we actually route;
+        //   - a TTL, so every order eventually becomes evictable by `pruneExpired` (without it a
+        //     spammer just sets expiry = type(uint64).max and squats forever).
+        uint128 minFill = minAmountPerFill[tokenIn];
+        if (minFill != 0 && amountPerFill < minFill) revert BelowMinNotional(amountPerFill, minFill);
+        if (maxOrderTtl != 0) {
+            uint256 maxExpiry = block.timestamp + maxOrderTtl;
+            if (expiry > maxExpiry) revert ExpiryTooFar(expiry, uint64(maxExpiry));
+        }
 
         uint256 totalEscrow = uint256(amountPerFill) * numFills;
 
@@ -259,6 +340,18 @@ contract NullOrderBook is Ownable, ReentrancyGuard {
         if (block.timestamp < o.nextFillTime) revert FillTooEarly();
         if (routes.length == 0) revert InvalidRoutePlan();
 
+        // H3 (timing half): a DCA slot is fillable for `maxFillDelay` seconds and then closes —
+        // the keeper cannot hold a due slot open across the whole interval waiting for a dip that
+        // still clears the floor. The window REOPENS every interval (`% o.interval`), so a missed
+        // slot self-heals at the next boundary instead of bricking the order. Limit orders
+        // (interval == 0) are exempt by construction: filling whenever price crosses IS the
+        // product; their bound is the oracle check below.
+        uint64 window = maxFillDelay;
+        if (window != 0 && o.interval != 0) {
+            uint256 lateBy = (block.timestamp - o.nextFillTime) % o.interval;
+            if (lateBy > window) revert FillWindowMissed(lateBy, window);
+        }
+
         bool nativeIn = o.tokenIn == address(0);
         bool nativeOut = o.tokenOut == address(0);
         uint256 amountIn = o.amountPerFill;
@@ -281,7 +374,13 @@ contract NullOrderBook is Ownable, ReentrancyGuard {
         if (completed) {
             _removeOpen(orderId);
         } else {
-            o.nextFillTime = uint64(block.timestamp) + o.interval;
+            // Anchor the next slot to the one we just SERVED, not to when the fill landed —
+            // anchoring on `block.timestamp` made every late fill shift the whole schedule, so
+            // lateness compounded across a DCA (audit 2026-08-05, informational). Clamp forward so
+            // a fill that lands several intervals late does not leave a burst of due back-slots.
+            uint256 next = uint256(o.nextFillTime) + o.interval;
+            if (next < block.timestamp) next = block.timestamp;
+            o.nextFillTime = uint64(next);
         }
 
         // Interaction: scoped exact approval → router call → revoke.
@@ -324,10 +423,46 @@ contract NullOrderBook is Ownable, ReentrancyGuard {
         uint256 received = _balanceOf(o.tokenOut) - outBefore;
         if (received < o.minOutPerFill) revert InsufficientFillOutput(received, o.minOutPerFill);
 
+        // H3 (price half): the maker's floor is not the only protection. A keeper that can realise
+        // EXACTLY `minOutPerFill` through a pool it controls now also has to land within
+        // `maxDeviationBps` of an independent reference, which caps the skim at that deviation
+        // instead of at the full distance between floor and market.
+        uint256 oracleFloor = _oracleFloor(o.tokenIn, o.tokenOut, amountIn);
+        if (received < oracleFloor) revert OracleBoundViolated(received, oracleFloor);
+
         emit OrderFilled(orderId, o.maker, fillIndex, amountIn, received, msg.sender);
         if (completed) emit OrderCompleted(orderId);
 
         _send(o.tokenOut, o.maker, received);
+    }
+
+    // ============================================================
+    // Keeper hygiene
+    // ============================================================
+
+    /// @notice Evict ids from the open list that can never be filled again — permissionless.
+    /// @dev M8: `_openIds` only ever shrank on maker-cancel or completion, so an expired order (or
+    ///      a wave of dust spam) sat in the keeper's work list forever. This removes ONLY ids that
+    ///      are genuinely dead: expired, cancelled, or fully filled. It touches no balances and
+    ///      does NOT close the order — `cancelOrder` still refunds the maker afterwards, because
+    ///      cancellation never depended on open-list membership (and `_removeOpen` no-ops on an
+    ///      id already pruned). Ineligible ids are skipped rather than reverting, so one live id
+    ///      in a batch cannot grief the whole prune.
+    /// @param ids Candidate order ids (the keeper reads them from `openOrderIds()`).
+    /// @return pruned How many ids were actually removed.
+    function pruneExpired(uint256[] calldata ids) external returns (uint256 pruned) {
+        for (uint256 i = 0; i < ids.length; i++) {
+            uint256 id = ids[i];
+            if (_openIndex[id] == 0) continue; // unknown or already pruned/closed
+            Order storage o = orders[id];
+            bool dead = o.cancelled || o.filledCount >= o.numFills || block.timestamp > o.expiry;
+            if (!dead) continue;
+            _removeOpen(id);
+            unchecked {
+                ++pruned;
+            }
+            emit OrderPruned(id);
+        }
     }
 
     // ============================================================
@@ -362,6 +497,42 @@ contract NullOrderBook is Ownable, ReentrancyGuard {
         emit KeeperSet(keeper, allowed);
     }
 
+    /// @notice Configure the reference-price bound on fills (H3).
+    /// @dev Degrades to exactly the pre-audit behaviour when disabled: pass `oracle_ = address(0)`
+    ///      (or `maxDeviationBps_ = 0`) and `_oracleFloor` returns 0, so only the maker's floor
+    ///      applies. Enabling it is a LIVENESS tradeoff the owner is making knowingly: a
+    ///      configured oracle that reverts or answers 0 fails CLOSED (`OracleUnavailable`), because
+    ///      falling back to the floor on error would hand the keeper the exact bypass this bound
+    ///      exists to remove. Restore liveness by clearing the oracle, not by weakening the check.
+    ///      See `IOrderBookOracle` for the manipulation-resistance assumption on `oracle_`.
+    /// @param oracle_          Reference source, or address(0) to disable the bound entirely.
+    /// @param maxDeviationBps_ Allowed shortfall vs the reference, in bps (capped at 50%).
+    function setOracle(address oracle_, uint16 maxDeviationBps_) external onlyOwner {
+        if (maxDeviationBps_ > BPS / 2) revert InvalidParams();
+        if (oracle_ != address(0) && maxDeviationBps_ == 0) revert InvalidParams();
+        oracle = IOrderBookOracle(oracle_);
+        maxDeviationBps = maxDeviationBps_;
+        emit OracleSet(oracle_, maxDeviationBps_);
+    }
+
+    /// @notice Seconds a keeper may sit on a due DCA slot. 0 = unbounded (pre-audit behaviour).
+    function setMaxFillDelay(uint64 maxFillDelay_) external onlyOwner {
+        maxFillDelay = maxFillDelay_;
+        emit MaxFillDelaySet(maxFillDelay_);
+    }
+
+    /// @notice Cap on order lifetime at creation, so every order eventually becomes prunable (M8).
+    function setMaxOrderTtl(uint64 maxOrderTtl_) external onlyOwner {
+        maxOrderTtl = maxOrderTtl_;
+        emit MaxOrderTtlSet(maxOrderTtl_);
+    }
+
+    /// @notice Per-token minimum `amountPerFill`. 0 = no minimum (default) (M8).
+    function setMinAmountPerFill(address token, uint128 minAmount) external onlyOwner {
+        minAmountPerFill[token] = minAmount;
+        emit MinAmountPerFillSet(token, minAmount);
+    }
+
     // ============================================================
     // Internal
     // ============================================================
@@ -375,6 +546,27 @@ contract NullOrderBook is Ownable, ReentrancyGuard {
         _openIndex[lastId] = idx + 1;
         _openIds.pop();
         delete _openIndex[orderId];
+    }
+
+    /// @dev Minimum output this fill must produce per the reference source, or 0 when the bound is
+    ///      disabled. Tokens are passed with the order book's address(0)=native-MON convention.
+    function _oracleFloor(address tokenIn, address tokenOut, uint256 amountIn)
+        internal
+        view
+        returns (uint256)
+    {
+        IOrderBookOracle o_ = oracle;
+        uint16 devBps = maxDeviationBps;
+        if (address(o_) == address(0) || devBps == 0) return 0;
+
+        uint256 ref;
+        try o_.referenceOut(tokenIn, tokenOut, amountIn) returns (uint256 r) {
+            ref = r;
+        } catch {
+            revert OracleUnavailable(); // fail closed — see setOracle
+        }
+        if (ref == 0) revert OracleUnavailable();
+        return (ref * (BPS - devBps)) / BPS;
     }
 
     function _balanceOf(address token) internal view returns (uint256) {

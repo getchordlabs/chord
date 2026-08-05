@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IAdapter} from "../interfaces/IAdapter.sol";
 import {TransferLib} from "../libraries/TransferLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {BaseAdapter} from "./BaseAdapter.sol";
 
 /// @notice Mento protocol Router (Velodrome/Aerodrome fork adapted for FPMM pools). Interface
 ///         verified against mento-core `contracts/swap/router/IRouter.sol` 2026-07-25: Route has
@@ -49,15 +50,29 @@ interface IMentoRouter {
 ///
 ///      ERC20-only: every Mento asset is an ERC20 FX/stable token and NullRouter wraps MON->WMON
 ///      before any ERC20 adapter — this contract never sees native, no receive() needed.
-contract MentoAdapter is IAdapter {
+///
+///      H1 (2026-08-05 audit): the `factory` in extraData is what the Router uses to LOOK UP the pool
+///      it pulls tokens into — a caller-supplied factory therefore chose the destination of the whole
+///      input. It is now pinned at construction and extraData must match it exactly, alongside the
+///      `onlyRouter` entrypoint gate. A second Mento factory = a new adapter deployment (adapters are
+///      immutable anyway); the extraData ABI is unchanged so the engine seam does not move.
+contract MentoAdapter is IAdapter, BaseAdapter {
     /// @notice Mento protocol Router (Velodrome-style, pinned at deploy).
     IMentoRouter public immutable ROUTER;
+
+    /// @notice The ONLY pool factory this adapter will route through (FPMMFactory today).
+    address public immutable FACTORY;
 
     /// @notice Venue-level deadline no-op window (NullRouter enforces the real deadline).
     uint256 private constant EXPIRY_WINDOW = 300;
 
-    constructor(address router_) {
+    /// @notice extraData named a factory other than the one pinned at construction.
+    error FactoryNotPinned(address factory);
+
+    constructor(address nullRouter_, address router_, address factory_) BaseAdapter(nullRouter_) {
+        require(router_ != address(0) && factory_ != address(0), "MENTO_ZERO_ADDR");
         ROUTER = IMentoRouter(router_);
+        FACTORY = factory_;
     }
 
     /// @inheritdoc IAdapter
@@ -68,8 +83,9 @@ contract MentoAdapter is IAdapter {
         uint256 amountIn,
         address to,
         bytes calldata extraData
-    ) external override returns (uint256 amountOut) {
+    ) external override onlyRouter returns (uint256 amountOut) {
         address factory = abi.decode(extraData, (address));
+        if (factory != FACTORY) revert FactoryNotPinned(factory); // H1 provenance.
 
         IMentoRouter.Route[] memory routes = new IMentoRouter.Route[](1);
         routes[0] = IMentoRouter.Route({from: tokenIn, to: tokenOut, factory: factory});

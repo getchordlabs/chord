@@ -3,6 +3,11 @@ pragma solidity ^0.8.24;
 
 import {IAdapter} from "../interfaces/IAdapter.sol";
 import {TransferLib} from "../libraries/TransferLib.sol";
+import {BaseAdapter} from "./BaseAdapter.sol";
+
+interface IUniV2Factory {
+    function getPair(address tokenA, address tokenB) external view returns (address pair);
+}
 
 interface IUniV2Pair {
     function token0() external view returns (address);
@@ -22,7 +27,23 @@ interface IUniV2Pair {
 ///      `swap()` k-check will revert on a too-optimistic `amountOut`, but mispriced quotes
 ///      can still cause failed txs or worse-than-quoted execution; slippage (minAmountOut)
 ///      in NullRouter remains the backstop.
-contract UniV2DirectAdapter is IAdapter {
+/// @dev H1 (2026-08-05 audit): this was one of the TWO push-model adapters that did not even need a
+///      callback to be drained — `:52` transferred the entire input straight to a caller-named
+///      address, from a world-callable function. Fixed on both axes: `onlyRouter` (BaseAdapter) and
+///      PROVENANCE — the pool must be the pair the factory pinned at construction returns for
+///      (tokenIn, tokenOut), which also binds the pool to the router's own token pair.
+contract UniV2DirectAdapter is IAdapter, BaseAdapter {
+    /// @notice V2 factory whose pairs this adapter will trade — pinned at deploy.
+    IUniV2Factory public immutable FACTORY;
+
+    /// @notice extraData named something other than FACTORY's canonical pair for (tokenIn, tokenOut).
+    error NotFactoryPair(address pool);
+
+    constructor(address nullRouter_, address factory_) BaseAdapter(nullRouter_) {
+        require(factory_ != address(0), "V2_ZERO_FACTORY");
+        FACTORY = IUniV2Factory(factory_);
+    }
+
     /// @inheritdoc IAdapter
     /// @dev extraData = abi.encode(address pool)
     function swap(
@@ -31,8 +52,13 @@ contract UniV2DirectAdapter is IAdapter {
         uint256 amountIn,
         address to,
         bytes calldata extraData
-    ) external override returns (uint256 amountOut) {
+    ) external override onlyRouter returns (uint256 amountOut) {
         address pool = abi.decode(extraData, (address));
+        // H1 provenance: getPair is symmetric in V2, so one lookup pins BOTH the pool's authenticity
+        // and its pair — a caller can no longer name any address, nor a real pool of another pair.
+        if (pool == address(0) || FACTORY.getPair(tokenIn, tokenOut) != pool) {
+            revert NotFactoryPair(pool);
+        }
         IUniV2Pair pair = IUniV2Pair(pool);
 
         // Get reserves

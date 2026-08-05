@@ -9,12 +9,14 @@ contract DeployCloberAdapterScript is Script {
     address constant CLOBER_CONTROLLER = 0x19b68a2b909D96c05B623050C276FBD457De8e83;
     address constant BOOK_MANAGER = 0x6657d192273731C3cAc646cc82D5F28D0CBE8CCC;
     address constant ADAPTER_REGISTRY = 0x6Cf25d2af1A58d7094B0ac253aE616A8e1F2Ea3f;
+    /// @dev NullRouter proxy on Monad — the ONLY allowed caller of swap() (BaseAdapter H1 gate).
+    address constant NULL_ROUTER = 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        CloberAdapter adapter = new CloberAdapter(CLOBER_CONTROLLER, BOOK_MANAGER);
+        CloberAdapter adapter = new CloberAdapter(NULL_ROUTER, CLOBER_CONTROLLER, BOOK_MANAGER);
         console2.log("CloberAdapter:", address(adapter));
 
         AdapterRegistry(ADAPTER_REGISTRY).addAdapter(address(adapter));

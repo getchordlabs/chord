@@ -57,6 +57,32 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     /// @notice Permit2 contract (canonical address on all EVM chains)
     IPermit2 public permit2;
 
+    /// @dev Temporary storage for last fee amount (for event emission). SLOT 5.
+    ///      L3 (2026-08-05 audit): this declaration used to sit ~360 lines below, in the middle of
+    ///      the contract, invisible from the state block at the top of the file. The trap sprang
+    ///      TWICE — 4d1e2fa inserted `executor` at slot 1 and bc870ac inserted `permit2` at what was
+    ///      then this variable's slot — silently corrupting the fee value carried into the Swap
+    ///      event on a LIVE proxy. Moved here AT ITS CURRENT SLOT (6th declared var → slot 5); the
+    ///      order of every variable above is unchanged, so the on-chain layout is byte-identical.
+    uint256 private _lastFeeAmount;
+
+    // ⚠️ APPEND ONLY BELOW — see docs/audit-contracts-2026-08-05.md (L3).
+    // This is a UUPS proxy: NEVER insert or reorder a state variable above this line. New state goes
+    // here, at the end, and nowhere else. There is no __gap and no automated layout check yet.
+
+    // ============================================================
+    // Constants
+    // ============================================================
+
+    /// @notice Absolute ceiling the ROUTER itself will pay in fee, in bps (1%).
+    /// @dev L2 (2026-08-05 audit): FeeCollector.MAX_FEE_BPS is documented as "a hard, on-chain
+    ///      user-protection guarantee", but it lives inside a contract that is both upgradeable AND
+    ///      replaceable wholesale via setFeeCollector. A single owner tx pointing at a collector that
+    ///      returns 10000 would make every swap with minAmountOut == 0 pay out nothing. This constant
+    ///      is compiled into the router (only an upgrade of the ROUTER can change it), so the
+    ///      guarantee no longer depends on the collector's own honesty.
+    uint16 private constant MAX_FEE_BPS = 100;
+
     // ============================================================
     // Errors
     // ============================================================
@@ -66,6 +92,7 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     error ZeroAmount();
     error InvalidRoute();
     error NativeTransferFailed();
+    error ZeroAddress();
 
     // ============================================================
     // Constructor + Initializer
@@ -124,6 +151,10 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         uint256 baseIn = IERC20(tokenIn).balanceOf(address(this));
         uint256 baseOut = IERC20(outToken).balanceOf(address(this));
 
+        // H2: the swap's true beneficiary (msg.sender for a direct call, the declared principal for
+        // an intermediary) — resolved BEFORE any external call so the referral guard can't be raced.
+        address swapper = _resolveSwapper();
+
         // 1. Pull input tokens from user
         _pullTokens(tokenIn, msg.sender, amountIn);
 
@@ -131,7 +162,7 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         amountOut = _executeSingle(route);
 
         // 3. Deduct fee + deliver output (unwrap to native MON if requested)
-        amountOut = _settleOutput(outToken, amountOut, minAmountOut, referrer, nativeOut);
+        amountOut = _settleOutput(outToken, amountOut, minAmountOut, referrer, nativeOut, swapper);
 
         // 4. Sweep dust above the pre-swap baseline (never the pre-existing balance)
         _sweepDustDelta(tokenIn, baseIn);
@@ -171,6 +202,9 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         uint256 baseIn = IERC20(tokenIn).balanceOf(address(this));
         uint256 baseOut = IERC20(outToken).balanceOf(address(this));
 
+        // H2: see swap() — resolve the true beneficiary for the referral guard.
+        address swapper = _resolveSwapper();
+
         // 1. Pull input tokens
         _pullTokens(tokenIn, msg.sender, amountIn);
 
@@ -178,7 +212,7 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         amountOut = _executeSplit(tokenIn, outToken, routes);
 
         // 3. Deduct fee + deliver output (unwrap to native MON if requested)
-        amountOut = _settleOutput(outToken, amountOut, minAmountOut, referrer, nativeOut);
+        amountOut = _settleOutput(outToken, amountOut, minAmountOut, referrer, nativeOut, swapper);
 
         // 4. Sweep dust above the pre-swap baseline (never the pre-existing balance)
         _sweepDustDelta(tokenIn, baseIn);
@@ -196,7 +230,7 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         address referrer
     ) external payable nonReentrant returns (uint256 amountOut) {
         // Backward-compatible: delivers routes[last].tokenOut as-is (WMON stays WMON).
-        return _multiHopSwap(amountIn, minAmountOut, deadline, routes, referrer, false);
+        return _multiHopSwap(amountIn, minAmountOut, deadline, routes, referrer, false, _resolveSwapper());
     }
 
     /// @notice Multi-hop swap with optional native-MON delivery.
@@ -211,7 +245,7 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         address referrer,
         bool unwrapOutput
     ) external payable nonReentrant returns (uint256 amountOut) {
-        return _multiHopSwap(amountIn, minAmountOut, deadline, routes, referrer, unwrapOutput);
+        return _multiHopSwap(amountIn, minAmountOut, deadline, routes, referrer, unwrapOutput, _resolveSwapper());
     }
 
     /// @inheritdoc INullRouter
@@ -222,7 +256,7 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         Path[] calldata paths,
         address referrer
     ) external payable nonReentrant returns (uint256 amountOut) {
-        return _multiPathSwap(amountIn, minAmountOut, deadline, paths, referrer, false);
+        return _multiPathSwap(amountIn, minAmountOut, deadline, paths, referrer, false, _resolveSwapper());
     }
 
     /// @notice Multi-path swap with optional native-MON delivery (WMON final output unwrapped).
@@ -235,7 +269,7 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         address referrer,
         bool unwrapOutput
     ) external payable nonReentrant returns (uint256 amountOut) {
-        return _multiPathSwap(amountIn, minAmountOut, deadline, paths, referrer, unwrapOutput);
+        return _multiPathSwap(amountIn, minAmountOut, deadline, paths, referrer, unwrapOutput, _resolveSwapper());
     }
 
     function _multiHopSwap(
@@ -244,7 +278,8 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         uint256 deadline,
         RouteStep[] calldata routes,
         address referrer,
-        bool unwrapOutput
+        bool unwrapOutput,
+        address swapper
     ) internal returns (uint256 amountOut) {
         _checkDeadline(deadline);
         if (amountIn == 0) revert ZeroAmount();
@@ -277,7 +312,7 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         amountOut = _executeMultiHop(routes);
 
         // 3. Deduct fee + deliver output (unwrap to native MON if requested)
-        amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer, unwrapOutput);
+        amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer, unwrapOutput, swapper);
 
         // 4. Sweep dust above baseline (all intermediate + final tokens)
         _sweepDustDelta(tokenIn, baselines[0]);
@@ -301,7 +336,8 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         uint256 deadline,
         Path[] calldata paths,
         address referrer,
-        bool unwrapOutput
+        bool unwrapOutput,
+        address swapper
     ) internal returns (uint256 amountOut) {
         _checkDeadline(deadline);
         if (amountIn == 0) revert ZeroAmount();
@@ -352,7 +388,7 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         }
 
         // 3. Fee + slippage ONCE on the total
-        amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer, unwrapOutput);
+        amountOut = _settleOutput(tokenOut, amountOut, minAmountOut, referrer, unwrapOutput, swapper);
 
         // 4. Sweep dust above every baseline
         _sweepDustDelta(tokenIn, baselines[0]);
@@ -399,11 +435,14 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         uint256 baseIn = IERC20(tokenIn).balanceOf(address(this));
         uint256 baseOut = IERC20(outToken).balanceOf(address(this));
 
+        // H2: see swap() — resolve the true beneficiary for the referral guard.
+        address swapper = _resolveSwapper();
+
         // Pull via Permit2
         _pullTokensPermit2(tokenIn, msg.sender, amountIn, nonce, permitDeadline, signature);
 
         amountOut = _executeSingle(route);
-        amountOut = _settleOutput(outToken, amountOut, minAmountOut, referrer, nativeOut);
+        amountOut = _settleOutput(outToken, amountOut, minAmountOut, referrer, nativeOut, swapper);
 
         _sweepDustDelta(tokenIn, baseIn);
         _sweepDustDelta(outToken, baseOut);
@@ -414,9 +453,6 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     // ============================================================
     // Internal: Token Handling
     // ============================================================
-
-    /// @dev Temporary storage for last fee amount (for event emission)
-    uint256 private _lastFeeAmount;
 
     function _pullTokens(address token, address from, uint256 amount) internal {
         if (msg.value > 0 && token == wmon) {
@@ -458,18 +494,51 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         );
     }
 
+    /// @dev Resolve the party the swap is FOR — the beneficiary the self-referral guard must be
+    ///      measured against.
+    ///
+    ///      H2 (2026-08-05 audit), second defect: `_settleOutput` compared `referrer` against
+    ///      `msg.sender`, which is the INTERMEDIARY (GaslessEntry, GaslessEntryPermit2, the order
+    ///      book, the executors) for every contract-mediated swap — never the person whose funds
+    ///      moved. The guard was therefore structurally dead there: a gasless order could simply set
+    ///      `referrer = o.user` and hand the user back half their own fee.
+    ///
+    ///      An intermediary declares its principal by exposing `currentSwapper()`; anything that does
+    ///      not (an EOA, or a contract that has not opted in) falls back to `msg.sender`, which is the
+    ///      correct answer for a direct user call. The hook is deliberately UNTRUSTED: `swapper` is
+    ///      only ever used to DROP a referral, so a lying intermediary gains nothing it could not
+    ///      already get by naming a second wallet (the Sybil case documented below).
+    function _resolveSwapper() internal view returns (address) {
+        if (msg.sender.code.length == 0) return msg.sender;
+        (bool ok, bytes memory ret) =
+            msg.sender.staticcall(abi.encodeWithSelector(ISwapperContext.currentSwapper.selector));
+        if (ok && ret.length == 32) {
+            // Decode defensively: a stray fallback returning 32 bytes of junk must NOT revert the
+            // swap, so reject dirty upper bits instead of using abi.decode(...,(address)).
+            uint256 word = uint256(abi.decode(ret, (bytes32)));
+            // The `word >> 160 == 0` check is what makes the uint160 cast lossless.
+            if (word >> 160 == 0 && word != 0) return address(uint160(word));
+        }
+        return msg.sender;
+    }
+
     function _settleOutput(
         address tokenOut,
         uint256 rawOutput,
         uint256 minAmountOut,
         address referrer,
-        bool unwrapNative
+        bool unwrapNative,
+        address swapper
     ) internal returns (uint256 userOutput) {
         // Calculate fee. Tiered by the OUTPUT token: a token with no override resolves to the global
         // default (feeBps), so this is behaviour-preserving until per-token overrides are set. Charging
         // on the output token means meme BUYS (output = meme) pay the premium tier while SELLS back to a
         // major (output = major) stay cheap — intentional: don't punish exits.
-        uint256 feeAmount = SwapMath.calculateFee(rawOutput, feeCollector.feeBpsFor(tokenOut));
+        // L2: the router enforces its OWN ceiling on whatever the (upgradeable, replaceable) collector
+        // reports, so a swapped-in collector cannot confiscate the output of a minAmountOut == 0 swap.
+        uint16 bps = feeCollector.feeBpsFor(tokenOut);
+        require(bps <= MAX_FEE_BPS, "FEE_TOO_HIGH");
+        uint256 feeAmount = SwapMath.calculateFee(rawOutput, bps);
         userOutput = rawOutput - feeAmount;
 
         // Check slippage
@@ -477,12 +546,26 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
             revert InsufficientOutput(userOutput, minAmountOut);
         }
 
-        // Send fee to collector. Drop a self-referral (referrer == swapper) so the user cannot claw
-        // back 50% of their own fee → treasury keeps the whole fee. NOTE: a determined user can still
-        // refer from a second wallet (Sybil); fully closing that needs an owner-managed referrer
-        // allowlist, which would break open third-party referral — intentionally left open.
+        // Send fee to collector. Drop a REFLEXIVE referral so no one can claw back the referral half
+        // of their own fee → treasury keeps the whole fee. Four addresses are reflexive:
+        //   • swapper       — the beneficiary (see _resolveSwapper; for a direct call == msg.sender)
+        //   • msg.sender    — the caller; for an intermediary the referral half lands in it and is
+        //                     forwarded to the user with the rest of the proceeds
+        //   • address(this) — H2, LIVE LEAK: FeeCollector paid the referral half back INTO the router,
+        //                     where _sweepDustDelta then forwarded it to msg.sender. A permissionless
+        //                     50% fee rebate, one tx, no second wallet (PoC: AuditPoCReferrer)
+        //   • feeCollector  — L1: the referral transfer becomes a self-transfer that the ledger never
+        //                     books, stranding half the fee (recoverable via sweepUnaccounted)
+        // NOTE: a determined user can still refer from a second wallet (Sybil); fully closing that
+        // needs an owner-managed referrer allowlist, which would break open third-party referral —
+        // intentionally left open.
         if (feeAmount > 0) {
-            address ref = referrer == msg.sender ? address(0) : referrer;
+            address ref = referrer;
+            if (
+                ref == swapper || ref == msg.sender || ref == address(this) || ref == address(feeCollector)
+            ) {
+                ref = address(0);
+            }
             TransferLib.safeTransfer(tokenOut, address(feeCollector), feeAmount);
             feeCollector.collectFee(tokenOut, feeAmount, ref);
         }
@@ -521,20 +604,42 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     // Internal: Execution (direct adapter calls — no delegatecall)
     // ============================================================
 
+    // M1 (2026-08-05 audit): every hop's output below is a MEASURED balance delta, never the
+    // adapter's self-reported return value.
+    //
+    // Why: fee and payout were computed from what the adapter CLAIMED it delivered. When an adapter
+    // delivered less (a hostile pool named in extraData — H1 — or simply a buggy one), the shortfall
+    // was silently covered out of whatever the router happened to be holding: the post-settlement
+    // balance ended BELOW the H1 baseline, so _sweepDustDelta became a no-op and nothing reverted.
+    // multiPathSwap amplified it, because earlier paths' proceeds sit in the router while later paths
+    // run. PoC: test/AuditPoC.t.sol.
+    //
+    // Chosen over the cheaper `require(balanceOf >= baseline + rawOutput)` alternative in
+    // _settleOutput: measuring costs one extra balanceOf pair per hop (the token is already warm from
+    // the safeTransfer immediately above), and it is strictly stronger — with a measured delta that
+    // invariant holds by construction, so the require would be dead code. Measuring also makes
+    // fee-on-transfer OUTPUT tokens work for the first time (the live blocker in plan.md): the router
+    // now settles on what actually landed rather than on the pre-tax number, instead of over-paying
+    // the user out of its own balance and reverting on the transfer.
+    //
+    // The snapshot is taken AFTER the input transfer to the adapter, so a route whose tokenIn ==
+    // tokenOut measures the swap's effect only.
     function _executeSingle(RouteStep calldata route) internal returns (uint256) {
         _validateAdapter(route.adapter);
 
         // Transfer tokens to adapter
         TransferLib.safeTransfer(route.tokenIn, route.adapter, route.amountIn);
 
-        // Execute swap via adapter
-        return IAdapter(route.adapter).swap(
+        // Execute swap via adapter — the return value is deliberately IGNORED (see above)
+        uint256 balBefore = IERC20(route.tokenOut).balanceOf(address(this));
+        IAdapter(route.adapter).swap(
             route.tokenIn,
             route.tokenOut,
             route.amountIn,
             address(this),
             route.extraData
         );
+        return IERC20(route.tokenOut).balanceOf(address(this)) - balBefore;
     }
 
     function _executeSplit(
@@ -545,9 +650,12 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         for (uint256 i = 0; i < routes.length; i++) {
             _validateAdapter(routes[i].adapter);
             TransferLib.safeTransfer(tokenIn, routes[i].adapter, routes[i].amountIn);
-            totalOut += IAdapter(routes[i].adapter).swap(
+            // M1: measured delta per route, not the adapter's claim.
+            uint256 balBefore = IERC20(tokenOut).balanceOf(address(this));
+            IAdapter(routes[i].adapter).swap(
                 tokenIn, tokenOut, routes[i].amountIn, address(this), routes[i].extraData
             );
+            totalOut += IERC20(tokenOut).balanceOf(address(this)) - balBefore;
         }
     }
 
@@ -566,9 +674,13 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
             }
             uint256 amtIn = i == 0 ? routes[i].amountIn : amountOut;
             TransferLib.safeTransfer(routes[i].tokenIn, routes[i].adapter, amtIn);
-            amountOut = IAdapter(routes[i].adapter).swap(
+            // M1: measured delta per hop. The next hop then forwards an amount the router provably
+            // holds, so an over-reporting hop can no longer borrow the router's standing balance.
+            uint256 balBefore = IERC20(routes[i].tokenOut).balanceOf(address(this));
+            IAdapter(routes[i].adapter).swap(
                 routes[i].tokenIn, routes[i].tokenOut, amtIn, address(this), routes[i].extraData
             );
+            amountOut = IERC20(routes[i].tokenOut).balanceOf(address(this)) - balBefore;
         }
     }
 
@@ -580,19 +692,28 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
     // Admin
     // ============================================================
 
+    // L2: all four setters point the router at a contract it then calls unconditionally on the money
+    // path — a fat-fingered address(0) would brick every swap (registry/collector) or every Permit2
+    // pull, and for feeCollector it is also the address the fee is pushed to. Cheap guard, and the
+    // matching checks already exist on FeeCollector's own setters.
+
     function setExecutor(address newExecutor) external onlyOwner {
+        if (newExecutor == address(0)) revert ZeroAddress();
         executor = newExecutor;
     }
 
     function setFeeCollector(address newFeeCollector) external onlyOwner {
+        if (newFeeCollector == address(0)) revert ZeroAddress();
         feeCollector = IFeeCollector(newFeeCollector);
     }
 
     function setRegistry(address newRegistry) external onlyOwner {
+        if (newRegistry == address(0)) revert ZeroAddress();
         registry = IAdapterRegistry(newRegistry);
     }
 
     function setPermit2(address newPermit2) external onlyOwner {
+        if (newPermit2 == address(0)) revert ZeroAddress();
         permit2 = IPermit2(newPermit2);
     }
 
@@ -601,6 +722,22 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance > 0) {
             TransferLib.safeTransfer(token, to, balance);
+        }
+    }
+
+    /// @dev Emergency: rescue stuck NATIVE MON.
+    ///      L5 (2026-08-05 audit): `receive()` accepts native from anyone, and the only rescue path
+    ///      (rescueTokens) reads IERC20.balanceOf, which reverts for address(0) — so a bare donation
+    ///      was locked forever. The June audit closed the attached-msg.value case (_pullTokens
+    ///      rejects UNEXPECTED_VALUE); this closes the donation case. Not a new attack surface: the
+    ///      router never holds native between transactions on the swap path (native output is
+    ///      unwrapped and forwarded to the caller in the same call).
+    function rescueNative(address to) external onlyOwner {
+        if (to == address(0)) revert ZeroAddress();
+        uint256 balance = address(this).balance;
+        if (balance > 0) {
+            (bool ok, ) = payable(to).call{value: balance}("");
+            if (!ok) revert NativeTransferFailed();
         }
     }
 
@@ -618,4 +755,15 @@ contract NullRouter is INullRouter, UUPSUpgradeable, OwnableUpgradeable, Reentra
 interface IWMON {
     function deposit() external payable;
     function withdraw(uint256 amount) external;
+}
+
+/// @dev Opt-in hook a contract-mediated caller implements to declare WHO the swap is for.
+///      H2 (2026-08-05 audit): without it the router only sees the intermediary (GaslessEntry,
+///      GaslessEntryPermit2, NullOrderBook, NullOneClickExecutor, NullSessionDelegate) as
+///      `msg.sender`, so the self-referral guard could never fire for a contract-mediated swap and
+///      an order could name its own user as referrer. Implementers return the principal for the
+///      in-flight call and address(0) otherwise; the router falls back to msg.sender either way.
+///      Untrusted input — used only to DROP a referral, never to move funds (see _resolveSwapper).
+interface ISwapperContext {
+    function currentSwapper() external view returns (address);
 }

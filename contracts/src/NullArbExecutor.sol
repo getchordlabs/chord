@@ -5,6 +5,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IAdapter} from "./interfaces/IAdapter.sol";
+import {IAdapterRegistry} from "./interfaces/IAdapterRegistry.sol";
 import {TransferLib} from "./libraries/TransferLib.sol";
 
 /// @title NullArbExecutor
@@ -22,6 +23,19 @@ import {TransferLib} from "./libraries/TransferLib.sol";
 ///      guard below), so no arbitrary standing balance can be pushed through a whitelisted adapter and
 ///      swept. The final output is forwarded to msg.sender in full — no fee is retained. Any residual
 ///      dust that somehow accrues is recoverable ONLY by the owner via `rescue`.
+///
+///      AUDIT 2026-08-05 (H6): the two claims above — "AdapterRegistry-whitelisted" and
+///      "owner-operated" — were NatSpec only; neither existed in code. `arb()` was `external` with no
+///      registry, so any caller could pass a self-written "adapter" that returns an arbitrary
+///      `amountOut` and walk out with this contract's entire balance of any token. The hop-continuity
+///      guard did not help: the value it chains is the RETURN VALUE of the attacker's contract, so the
+///      guard is satisfied before it is reached. Both claims are now enforced — `onlyOwner` plus a
+///      per-hop `registry.isApproved` against a registry pinned at construction.
+///
+///      Residual risk this does NOT close: a whitelisted adapter still self-reports `amountOut`
+///      (audit M1/H1). `minAmountOut` is measured against that report, not a balance delta, so an
+///      over-reporting adapter can still make an unprofitable cycle look profitable. Acceptable here
+///      because the only caller is the owner and the only funds at risk are the owner's own.
 contract NullArbExecutor is ReentrancyGuard, Ownable {
     /// @notice One leg of an arb cycle. Same shape as NullRouter.RouteStep.
     /// @param adapter   Whitelisted DEX adapter to call (same addresses the NullRouter uses).
@@ -42,14 +56,28 @@ contract NullArbExecutor is ReentrancyGuard, Ownable {
     error ZeroAmount();
     error HopTokenMismatch();
     error InsufficientOutput(uint256 got, uint256 minRequired);
+    error UnapprovedAdapter(address adapter);
+    error ZeroAddress();
 
-    /// @param owner_ The arb bot operator (holds rescue rights).
-    constructor(address owner_) Ownable(owner_) {}
+    /// @notice The SAME whitelist the NullRouter enforces. Immutable: a settable registry would put
+    ///         the whitelist behind the owner key that this contract's only caller already holds,
+    ///         which buys nothing and adds a compromise path.
+    IAdapterRegistry public immutable registry;
+
+    /// @param owner_    The arb bot operator (the only caller of `arb`; holds rescue rights).
+    /// @param registry_ AdapterRegistry proxy — the adapter whitelist, pinned for this deployment.
+    constructor(address owner_, address registry_) Ownable(owner_) {
+        if (registry_ == address(0)) revert ZeroAddress();
+        registry = IAdapterRegistry(registry_);
+    }
 
     /// @notice Execute an atomic multi-leg arb cycle through whitelisted adapters, fee-free.
     /// @dev Mirrors NullRouter._executeMultiHop: transfer-then-call per hop, output credited to THIS
     ///      contract, chained forward under a strict hop-continuity guard. No fee is taken; the full
     ///      final output is returned to msg.sender.
+    ///      `onlyOwner` + the per-hop registry check are BOTH required (audit H6): the registry alone
+    ///      would still let a stranger route this contract's standing balance through a real adapter,
+    ///      and `onlyOwner` alone would still let a mistyped/compromised route call arbitrary code.
     /// @param amountIn     Entry amount of routes[0].tokenIn to pull from msg.sender (must be pre-approved).
     /// @param minAmountOut Minimum acceptable final output — the revert-protection for an unprofitable arb.
     /// @param deadline     Unix timestamp after which the call reverts.
@@ -60,7 +88,7 @@ contract NullArbExecutor is ReentrancyGuard, Ownable {
         uint256 minAmountOut,
         uint256 deadline,
         RouteStep[] calldata routes
-    ) external nonReentrant returns (uint256 amountOut) {
+    ) external onlyOwner nonReentrant returns (uint256 amountOut) {
         if (block.timestamp > deadline) revert Expired();
         if (routes.length == 0) revert EmptyRoute();
         if (amountIn == 0) revert ZeroAmount();
@@ -76,6 +104,10 @@ contract NullArbExecutor is ReentrancyGuard, Ownable {
             // whitelisted adapter and sweep the proceeds — draining any leftover/donated/over-delivered
             // tokens. (routes[0].tokenIn is constrained by the entry pull of amountIn above.)
             if (i > 0 && routes[i].tokenIn != routes[i - 1].tokenOut) revert HopTokenMismatch();
+
+            // The gate the NatSpec always claimed. Checked per hop, BEFORE any transfer to it, so a
+            // non-whitelisted address never receives tokens and never gets to run code here.
+            if (!registry.isApproved(routes[i].adapter)) revert UnapprovedAdapter(routes[i].adapter);
 
             uint256 amtIn = i == 0 ? amountIn : amountOut;
 

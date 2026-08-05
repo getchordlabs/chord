@@ -3,6 +3,13 @@ pragma solidity ^0.8.24;
 
 import {IAdapter} from "../interfaces/IAdapter.sol";
 import {TransferLib} from "../libraries/TransferLib.sol";
+import {BaseAdapter} from "./BaseAdapter.sol";
+
+/// @notice nad.fun DEX pair factory (V2 fork, "NADLP") — `getPair` is the venue's own registry and
+///         is symmetric in its arguments.
+interface INadFunFactory {
+    function getPair(address tokenA, address tokenB) external view returns (address pair);
+}
 
 interface INadFunPair {
     function token0() external view returns (address);
@@ -28,22 +35,39 @@ interface INadFunPair {
 ///        green against any remaining rounding drift; NullRouter's minAmountOut stays the
 ///        user-facing backstop.
 /// @dev extraData = abi.encode(address pool)
-contract NadFunPairAdapter is IAdapter {
+/// @dev H1 (2026-08-05 audit): `:67` was an UNCONDITIONAL safeTransfer of the entire input to a
+///      caller-named address, from a world-callable function — the report's sharpest push-model
+///      primitive alongside UniV2Direct. Fixed on both axes: `onlyRouter` (BaseAdapter) and
+///      PROVENANCE against the nad.fun pair factory pinned at construction (`getPair`), which also
+///      binds the pair to the router's own (tokenIn, tokenOut).
+contract NadFunPairAdapter is IAdapter, BaseAdapter {
     address public immutable WMON;
+    /// @notice nad.fun DEX pair factory (0xA25b1312… on Monad) — pinned at deploy.
+    INadFunFactory public immutable FACTORY;
 
-    constructor(address wmon_) {
+    /// @notice extraData named something other than FACTORY's canonical pair for (tokenIn, tokenOut).
+    error NotFactoryPair(address pool);
+
+    constructor(address nullRouter_, address wmon_, address factory_) BaseAdapter(nullRouter_) {
+        require(wmon_ != address(0) && factory_ != address(0), "NADPAIR_ZERO_ADDR");
         WMON = wmon_;
+        FACTORY = INadFunFactory(factory_);
     }
 
     /// @inheritdoc IAdapter
     function swap(
         address tokenIn,
-        address, /* tokenOut */
+        address tokenOut,
         uint256 amountIn,
         address to,
         bytes calldata extraData
-    ) external override returns (uint256 amountOut) {
+    ) external override onlyRouter returns (uint256 amountOut) {
         address pool = abi.decode(extraData, (address));
+        // H1 provenance: one symmetric lookup pins BOTH that the pair is factory-deployed and that it
+        // is the pair for the tokens the router is pricing.
+        if (pool == address(0) || FACTORY.getPair(tokenIn, tokenOut) != pool) {
+            revert NotFactoryPair(pool);
+        }
         INadFunPair pair = INadFunPair(pool);
 
         (uint112 reserve0, uint112 reserve1,) = pair.getReserves();

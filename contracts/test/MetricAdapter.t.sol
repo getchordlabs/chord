@@ -129,7 +129,11 @@ contract MetricAdapterTest is Test {
         usdc = new MockERC20();
         pool = new MockMetricPool(address(wmon), address(usdc));
         router = new MockMetricRouter();
-        adapter = new MetricAdapter(address(router));
+        // H1: the test contract stands in for NullRouter, and the pool must be on the
+        // construction-time allowlist (Metric exposes no factory getPool view on Monad).
+        address[] memory pools = new address[](1);
+        pools[0] = address(pool);
+        adapter = new MetricAdapter(address(this), address(router), pools);
 
         // Venue inventory on the router (it pays recipients from its own balance).
         wmon.mint(address(router), 1_000e18);

@@ -15,6 +15,14 @@ contract MockERC20 {
     }
 }
 
+/// Mock Vault: the two registry views the boosted adapter consults for per-step H1 provenance.
+contract MockVault {
+    mapping(address => bool) public isPoolRegistered;
+    mapping(address => bool) public isERC4626BufferInitialized;
+    function register(address pool) external { isPoolRegistered[pool] = true; }
+    function registerBuffer(address wrapped) external { isERC4626BufferInitialized[wrapped] = true; }
+}
+
 /// Mock AggregatorBatchRouter: settles a pre-funded multi-step swap. Asserts the Vault was paid up front,
 /// reads tokenIn/exactAmountIn from the path + the final tokenOut from the last step, and credits the
 /// output to the SENDER (the adapter) — like the real router's _vault.sendTo(sender, ...).
@@ -44,7 +52,7 @@ contract BalancerV3BoostedAdapterTest is Test {
     MockAggregatorBatchRouter router;
     MockERC20 usdc;   // raw in
     MockERC20 usdt0;  // raw out
-    address vault = address(0xBA11);
+    address vault;
     address recipient = address(0xDEAD);
     address pool = address(0x2DAA);
     address wnUSDC = address(0x1111);
@@ -53,8 +61,14 @@ contract BalancerV3BoostedAdapterTest is Test {
     function setUp() public {
         usdc = new MockERC20();
         usdt0 = new MockERC20();
+        MockVault v = new MockVault();
+        v.register(pool);
+        v.registerBuffer(wnUSDC);
+        v.registerBuffer(wnUSDT0);
+        vault = address(v);
         router = new MockAggregatorBatchRouter(vault, 1.001e18); // ~1:1 stable
-        adapter = new BalancerV3BoostedAdapter(vault, address(router));
+        // H1: the test contract stands in for NullRouter — adapters are now onlyRouter.
+        adapter = new BalancerV3BoostedAdapter(address(this), vault, address(router));
     }
 
     function _steps() internal view returns (bytes memory) {

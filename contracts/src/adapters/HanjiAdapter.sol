@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IAdapter} from "../interfaces/IAdapter.sol";
 import {TransferLib} from "../libraries/TransferLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {AllowlistAdapter} from "./BaseAdapter.sol";
 
 /// @notice Hanji on-chain CLOB — one FastQuoterProxy per market (e.g. MON/USDC
 ///         0x1aed222dda944a87703c918745b11be13f8eef10). Orders execute on the PROXY and ERC20
@@ -95,7 +96,15 @@ interface IWMON {
 ///      NullRouter, whose dust-sweep returns it to the user. A full IOC no-fill (venue refunds
 ///      everything without reverting) leaves the output delta at zero → revert HANJI_NO_FILL so
 ///      the router never treats a refund as a fill.
-contract HanjiAdapter is IAdapter {
+///
+///      H1 (2026-08-05 audit): the proxy arrived in caller-supplied extraData and then received an
+///      ERC20 approval sized to the input — a caller-chosen spender. Hanji's market list comes from
+///      api-monad.hanji.io/aggregators/markets with no on-chain registry to pin, so provenance is an
+///      IMMUTABLE ALLOWLIST of proxies fixed at construction, plus the `onlyRouter` entrypoint gate.
+///      Allowlisting the PROXY (not the underlying LOB) is the right granularity: the proxy is UUPS
+///      and rotates generations behind a stable address, which is precisely why all market config is
+///      still read on-chain per swap.
+contract HanjiAdapter is IAdapter, AllowlistAdapter {
     /// @notice Canonical WMON — native proceeds/refunds are re-wrapped here before forwarding.
     address public immutable WMON;
 
@@ -106,7 +115,10 @@ contract HanjiAdapter is IAdapter {
     /// @notice IOC order lifetime — venue reverts when block.timestamp > expires.
     uint256 private constant EXPIRY_WINDOW = 300;
 
-    constructor(address wmon_) {
+    constructor(address nullRouter_, address wmon_, address[] memory proxies_)
+        AllowlistAdapter(nullRouter_, proxies_)
+    {
+        require(wmon_ != address(0), "HANJI_ZERO_WMON");
         WMON = wmon_;
     }
 
@@ -118,8 +130,9 @@ contract HanjiAdapter is IAdapter {
         uint256 amountIn,
         address to,
         bytes calldata extraData
-    ) external override returns (uint256 amountOut) {
+    ) external override onlyRouter returns (uint256 amountOut) {
         address proxy = abi.decode(extraData, (address));
+        _requireAllowedPool(proxy); // H1 provenance — see contract NatSpec.
 
         (uint256 sfX, uint256 sfY, address tokenX, address tokenY,,,,,,,,,) = IHanjiProxy(proxy).getConfig();
 

@@ -130,6 +130,9 @@ contract LfjPoeAdapterTest is Test {
     MockERC20 wmon; // tokenX, 18-dec
     MockERC20 usdc; // tokenY, 6-dec
     MockPoePool pool;
+    /// @dev Allowlisted DELIBERATELY: the callback-gate test must still reach the callback path, so
+    ///      the hostile-pool check (H1) cannot be what stops it.
+    MockHijackPool hijack;
     LfjPoeAdapter adapter;
 
     address recipient = address(0xDEAD);
@@ -138,7 +141,13 @@ contract LfjPoeAdapterTest is Test {
         wmon = new MockERC20();
         usdc = new MockERC20();
         pool = new MockPoePool(address(wmon), address(usdc));
-        adapter = new LfjPoeAdapter();
+        // H1: the test contract stands in for NullRouter (adapters are onlyRouter now), and the pool
+        // must be on the construction-time allowlist (POE has no on-chain registry to pin).
+        hijack = new MockHijackPool(address(wmon), address(usdc));
+        address[] memory pools = new address[](2);
+        pools[0] = address(pool);
+        pools[1] = address(hijack);
+        adapter = new LfjPoeAdapter(address(this), pools);
 
         // Venue inventory: the pool pays output from its own balance.
         wmon.mint(address(pool), 1_000e18);
@@ -228,7 +237,6 @@ contract LfjPoeAdapterTest is Test {
     // 6b. Callback gating: a DIFFERENT contract calling swapCallback DURING an active swap must
     //     also revert — only the tstore'd pool itself may settle.
     function test_callback_hijack_reverts() public {
-        MockHijackPool hijack = new MockHijackPool(address(wmon), address(usdc));
         wmon.mint(address(adapter), 1e18);
 
         vm.expectRevert(bytes("POE_BAD_CALLBACK"));

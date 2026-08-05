@@ -3,6 +3,12 @@ pragma solidity ^0.8.24;
 
 import {IAdapter} from "../interfaces/IAdapter.sol";
 import {TransferLib} from "../libraries/TransferLib.sol";
+import {BaseAdapter} from "./BaseAdapter.sol";
+
+/// @notice Balancer V3 Vault registry view — the venue's own source of truth for "is this a pool".
+interface IBalancerVaultRegistry {
+    function isPoolRegistered(address pool) external view returns (bool);
+}
 
 /// @notice Balancer V3 AggregatorRouter — the "sender pays the Vault up front" router: no Permit2, no
 ///         token approval. The caller transfers tokenIn to the Vault, then the router settles the swap
@@ -35,14 +41,24 @@ interface IBalancerAggregatorRouter {
 ///
 /// extraData = abi.encode(address pool). Simple (non-boosted) single-pool path only. Boosted ERC4626
 /// buffer paths go through a separate AggregatorBatchRouter flow (Phase 1), not this contract.
-contract BalancerV3Adapter is IAdapter {
+///
+/// H1 (2026-08-05 audit): `pool` arrived in caller-supplied extraData and swap() was world-callable.
+/// The funds never went to the pool directly (they are pre-paid to the IMMUTABLE Vault), but the
+/// entrypoint let anyone push this adapter's between-transaction balance through it. Fixed with
+/// `onlyRouter` (BaseAdapter) + PROVENANCE via the Vault's own `isPoolRegistered` — the ideal case
+/// for this venue: the registry is the same singleton the swap settles against, so provenance can
+/// never drift from execution.
+contract BalancerV3Adapter is IAdapter, BaseAdapter {
     /// @notice Balancer V3 singleton Vault — tokenIn is paid here up front.
     address public immutable VAULT;
 
     /// @notice AggregatorRouter — settles the pre-funded swap (no approval).
     IBalancerAggregatorRouter public immutable ROUTER;
 
-    constructor(address vault_, address router_) {
+    /// @notice The Vault does not know this pool.
+    error PoolNotRegistered(address pool);
+
+    constructor(address nullRouter_, address vault_, address router_) BaseAdapter(nullRouter_) {
         // The pre-fund flow transfers tokenIn to VAULT but settles via ROUTER — a mismatch would silently
         // strand funds in the wrong Vault. Pin them together at deploy: ROUTER must settle against vault_.
         require(IBalancerAggregatorRouter(router_).getVault() == vault_, "VAULT_MISMATCH");
@@ -58,8 +74,10 @@ contract BalancerV3Adapter is IAdapter {
         uint256 amountIn,
         address to,
         bytes calldata extraData
-    ) external override returns (uint256 amountOut) {
+    ) external override onlyRouter returns (uint256 amountOut) {
         address pool = abi.decode(extraData, (address));
+        // H1 provenance: ask the Vault we are about to pre-fund whether this is one of its pools.
+        if (!IBalancerVaultRegistry(VAULT).isPoolRegistered(pool)) revert PoolNotRegistered(pool);
 
         // Aggregator model: pay the Vault up front, then swap. No approval/Permit2.
         TransferLib.safeTransfer(tokenIn, VAULT, amountIn);
