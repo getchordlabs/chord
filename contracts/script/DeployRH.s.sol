@@ -5,7 +5,6 @@ import {Script, console2} from "forge-std/Script.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {AdapterRegistry} from "../src/AdapterRegistry.sol";
 import {FeeCollector} from "../src/FeeCollector.sol";
-import {NullExecutor} from "../src/NullExecutor.sol";
 import {NullRouter} from "../src/NullRouter.sol";
 import {UniV3GenericAdapter} from "../src/adapters/UniV3GenericAdapter.sol";
 
@@ -48,8 +47,10 @@ contract DeployRHScript is Script {
         );
         AdapterRegistry registry = AdapterRegistry(address(registryProxy));
 
-        // 2. NullExecutor (immutable, stateless) — registry PINNED at construction (audit L9).
-        NullExecutor executor = new NullExecutor(address(registry));
+        // 2. (removed 2026-08-05) NullExecutor is NOT deployed any more. The delegatecall leg
+        //    executor left the swap path on 2026-03-20 (44-gas revert on Monad) — NullRouter calls
+        //    adapters directly. The router's `executor` slot survives only for UUPS storage-layout
+        //    compatibility, hence address(0) below. Do NOT re-add it here.
 
         // 3. NullRouter (UUPS proxy) — placeholder feeCollector, updated in step 5
         NullRouter routerImpl = new NullRouter();
@@ -58,7 +59,7 @@ contract DeployRHScript is Script {
             abi.encodeCall(NullRouter.initialize, (
                 deployer,
                 WETH9,
-                address(executor),
+                address(0), // executor — deprecated slot, storage-layout only (see step 2)
                 address(1), // placeholder feeCollector
                 address(registry)
             ))
@@ -108,7 +109,6 @@ contract DeployRHScript is Script {
         console2.log("=== NullTerminal on Robinhood Chain (4663) ===");
         console2.log("AdapterRegistry proxy:", address(registry));
         console2.log("AdapterRegistry impl: ", address(registryImpl));
-        console2.log("NullExecutor:         ", address(executor));
         console2.log("NullRouter proxy:     ", address(router));
         console2.log("NullRouter impl:      ", address(routerImpl));
         console2.log("FeeCollector proxy:   ", address(feeCollector));

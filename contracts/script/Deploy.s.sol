@@ -5,7 +5,6 @@ import {Script, console2} from "forge-std/Script.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {AdapterRegistry} from "../src/AdapterRegistry.sol";
 import {FeeCollector} from "../src/FeeCollector.sol";
-import {NullExecutor} from "../src/NullExecutor.sol";
 import {NullRouter} from "../src/NullRouter.sol";
 
 /// @notice Deploy NullTerminal core contracts to Monad mainnet
@@ -42,12 +41,13 @@ contract DeployScript is Script {
         console2.log("AdapterRegistry impl:", address(registryImpl));
 
         // ============================================================
-        // 2. Deploy NullExecutor (immutable, no proxy — stateless)
-        //    L9 hardening: the AdapterRegistry is PINNED at construction (it used to be a
-        //    caller-supplied argument = unprotected sweep). Registry from step 1 above.
+        // 2. (removed 2026-08-05) NullExecutor is NOT deployed any more.
+        //    It was the delegatecall leg-executor; it left the swap path on 2026-03-20 (44-gas
+        //    revert on Monad) and NullRouter has called adapters directly ever since. The router's
+        //    `executor` slot only survives for UUPS storage-layout compatibility, so it is
+        //    initialized to address(0) below. Do NOT re-add: deploying it advertises a core
+        //    contract that does nothing, and BaseAdapter's onlyRouter gate rejects it anyway.
         // ============================================================
-        NullExecutor executor = new NullExecutor(address(registry));
-        console2.log("NullExecutor:", address(executor));
 
         // ============================================================
         // 3. Deploy NullRouter (UUPS proxy) — temporary feeCollector
@@ -68,7 +68,7 @@ contract DeployScript is Script {
             abi.encodeCall(NullRouter.initialize, (
                 deployer,
                 WMON,
-                address(executor),
+                address(0), // executor — deprecated slot, storage-layout only (see step 2)
                 address(1), // placeholder feeCollector — will update
                 address(registry)
             ))
@@ -109,7 +109,6 @@ contract DeployScript is Script {
         console2.log("");
         console2.log("=== NullTerminal Deployment Complete ===");
         console2.log("AdapterRegistry:", address(registry));
-        console2.log("NullExecutor:   ", address(executor));
         console2.log("NullRouter:     ", address(router));
         console2.log("FeeCollector:   ", address(feeCollector));
         console2.log("");
