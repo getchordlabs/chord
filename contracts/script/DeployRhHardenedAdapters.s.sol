@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Script, console2} from "forge-std/Script.sol";
 import {AdapterRegistry} from "../src/AdapterRegistry.sol";
-import {UniV3GenericAdapter} from "../src/adapters/UniV3GenericAdapter.sol";
+import {UniV3AnyForkAdapter} from "../src/adapters/UniV3AnyForkAdapter.sol";
 import {UniV2GenericAdapter} from "../src/adapters/UniV2GenericAdapter.sol";
 import {UniswapV4Adapter} from "../src/adapters/UniswapV4Adapter.sol";
 import {MetricAdapter} from "../src/adapters/MetricAdapter.sol";
@@ -156,8 +156,8 @@ contract DeployRhHardenedAdaptersScript is Script {
 
         AdapterRegistry registry = AdapterRegistry(ADAPTER_REGISTRY);
 
-        // ── 1. UniV3GenericAdapter — every V3-family fork on 4663 ─────────────────────────────────
-        UniV3GenericAdapter v3 = new UniV3GenericAdapter(
+        // ── 1. UniV3AnyForkAdapter — every V3-family fork on 4663, BOTH registry shapes ──────────
+        UniV3AnyForkAdapter v3 = new UniV3AnyForkAdapter(
             NULL_ROUTER, _rhV3Factories(), _rhV3InitCodeHashes(), _rhV3FeeTiers()
         );
         registry.addAdapter(address(v3));
@@ -238,7 +238,7 @@ contract DeployRhHardenedAdaptersScript is Script {
         }
 
         console2.log("=== RH (4663) H1-hardened adapter set: DEPLOYED + APPROVED ===");
-        console2.log("UniV3GenericAdapter:", v3);
+        console2.log("UniV3AnyForkAdapter:", v3);
         console2.log("UniV2GenericAdapter:", v2);
         console2.log("UniswapV4Adapter:   ", v4);
         console2.log("MetricAdapter:      ", metric);
@@ -290,10 +290,17 @@ contract DeployRhHardenedAdaptersScript is Script {
     ///      them costs only staticcall gas on the failing path and grants no trust — a factory that
     ///      never returns a match can never authenticate anything.
     ///
-    ///      The owner call is one of: (a) teach the adapter the int24 lane and redeploy, (b) drop the
-    ///      three from `RH_GENERIC_V3_FORKS`/`RH_SLIPSTREAM_FORKS` so the engine stops quoting routes
-    ///      that cannot execute, or (c) accept failing swaps on those three forks. Doing nothing
-    ///      leaves users with quotes that revert.
+    ///      RESOLVED 2026-08-05 — option (a). `UniV3AnyForkAdapter` (used above) is a superset of
+    ///      `UniV3GenericAdapter` with a THIRD provenance lane that reads the pool's live
+    ///      `tickSpacing()` and staticcalls `getPool(address,address,int24)`. Verified against the
+    ///      live chain: up_v3 pool 0x851d1b03… (the very pool chain.rs cites as the KINDRA benchmark
+    ///      fix) matches on the int24 lane and NOT on the uint24 lane. Mutation-tested — deleting the
+    ///      lane turns exactly one test red, deleting provenance entirely turns four red.
+    ///      Why a new contract instead of editing UniV3GenericAdapter: that source compiles the LIVE
+    ///      Monad adapter 0x27ed74C9 (Sourcify exact_match) and one character costs it verification.
+    ///      Tick spacing is read live with NO candidate list, deliberately unlike `feeTiers`: a
+    ///      dynamic-fee fork can report a `fee()` it was not salted with (the PangolinV3 lesson), but
+    ///      tick spacing is fixed at creation AND is the registry key itself. It fails closed.
     function _rhV3Factories() internal pure returns (address[] memory f) {
         f = new address[](13);
         // ── authenticated via getPool(address,address,uint24) — all probed 2026-08-05 ──

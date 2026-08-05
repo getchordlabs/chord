@@ -29,6 +29,12 @@ contract DeployOrderBookScript is Script {
     address constant WMON = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
 
     function run() external {
+        // Chain guard (2026-08-05). Every constant below is a MONAD address, but the deployer's
+        // nonces happen to line up across chains, so the registry/router constants are ACCIDENTALLY
+        // valid addresses on Robinhood 4663 too. Without this line, pointing --rpc-url at RH would
+        // deploy a Monad-configured adapter and addAdapter it into the LIVE RH registry: it registers
+        // cleanly and then reverts on every swap.
+        require(block.chainid == 143, "wrong chain: this script is Monad-only");
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address keeper = vm.envAddress("KEEPER_ADDRESS");
         address owner = vm.addr(deployerPrivateKey);

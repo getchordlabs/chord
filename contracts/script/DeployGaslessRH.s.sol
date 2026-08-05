@@ -18,6 +18,12 @@ contract DeployGaslessRH is Script {
     address constant RELAYER = 0x66449F79050828abb7A205434C0971dBA7a44C38;
 
     function run() external {
+        // Chain guard (2026-08-05). Every constant below is a ROBINHOOD 4663 address, but the deployer's
+        // nonces happen to line up across chains, so the registry/router constants are ACCIDENTALLY
+        // valid addresses on Monad 143 too. Without this line, pointing --rpc-url at Monad would
+        // deploy an RH-configured contract and addAdapter it into the LIVE Monad registry: it registers
+        // cleanly and then reverts on every swap.
+        require(block.chainid == 4663, "wrong chain: this script is Robinhood-only");
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
         console.log("deployer:", deployer);

@@ -26,6 +26,12 @@ contract DeployPancakeV3FixScript is Script {
     bytes32 constant REGISTRY_LANE = bytes32(0);
 
     function run() external {
+        // Chain guard (2026-08-05). Every constant below is a MONAD address, but the deployer's
+        // nonces happen to line up across chains, so the registry/router constants are ACCIDENTALLY
+        // valid addresses on Robinhood 4663 too. Without this line, pointing --rpc-url at RH would
+        // deploy a Monad-configured adapter and addAdapter it into the LIVE RH registry: it registers
+        // cleanly and then reverts on every swap.
+        require(block.chainid == 143, "wrong chain: this script is Monad-only");
         vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
 
         V3DeadlineAdapter adapter =
