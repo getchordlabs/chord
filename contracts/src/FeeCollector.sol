@@ -39,8 +39,22 @@ contract FeeCollector is IFeeCollector, UUPSUpgradeable, OwnableUpgradeable, Ree
     ///         upgrade, so deploying the upgrade alone changes nothing until overrides are set.
     mapping(address => uint16) private _feeOverridePlus1;
 
+    // ── Fee manager (appended storage — preserves the pre-upgrade slot layout) ──
+    /// @notice Optional least-privilege operator allowed to set/clear PER-TOKEN overrides only.
+    /// @dev Exists so the automated fee-churn keeper can run without the owner key. The owner key
+    ///      also authorises `_authorizeUpgrade` on the router/registry, so putting it on a shared
+    ///      host would turn any host compromise into total protocol control. A stolen feeManager key
+    ///      can only move per-token fees inside [0, MAX_FEE_BPS] — it cannot withdraw fees, change
+    ///      the treasury/router, move the global default, or upgrade anything — and the owner
+    ///      revokes it with `setFeeManager(address(0))`. Zero address = feature off (default).
+    address public feeManager;
+
     error OnlyRouter();
     error ZeroAddress();
+    error NotFeeAdmin();
+
+    /// @notice Emitted when the least-privilege per-token fee operator changes (0 = revoked).
+    event FeeManagerSet(address indexed feeManager);
 
     /// @notice Emitted when unledgered balance is swept out (L1 recovery path). Declared here rather
     ///         than in IFeeCollector: the interface is the router-facing contract and does not change.
@@ -48,6 +62,15 @@ contract FeeCollector is IFeeCollector, UUPSUpgradeable, OwnableUpgradeable, Ree
 
     modifier onlyRouter() {
         if (msg.sender != router) revert OnlyRouter();
+        _;
+    }
+
+    /// @dev Owner, or the least-privilege fee manager when one is set. Guards PER-TOKEN overrides
+    ///      ONLY — every other admin entrypoint stays strictly `onlyOwner`.
+    modifier onlyFeeAdmin() {
+        if (msg.sender != owner() && (feeManager == address(0) || msg.sender != feeManager)) {
+            revert NotFeeAdmin();
+        }
         _;
     }
 
@@ -163,14 +186,14 @@ contract FeeCollector is IFeeCollector, UUPSUpgradeable, OwnableUpgradeable, Ree
     }
 
     /// @inheritdoc IFeeCollector
-    function setTokenFeeBps(address token, uint16 bps) external onlyOwner {
+    function setTokenFeeBps(address token, uint16 bps) external onlyFeeAdmin {
         require(bps <= MAX_FEE_BPS, "FEE_TOO_HIGH");
         _feeOverridePlus1[token] = bps + 1;
         emit TokenFeeBpsSet(token, bps);
     }
 
     /// @inheritdoc IFeeCollector
-    function setTokenFeeBpsBatch(address[] calldata tokens, uint16[] calldata bpsList) external onlyOwner {
+    function setTokenFeeBpsBatch(address[] calldata tokens, uint16[] calldata bpsList) external onlyFeeAdmin {
         require(tokens.length == bpsList.length, "LENGTH_MISMATCH");
         for (uint256 i = 0; i < tokens.length; i++) {
             require(bpsList[i] <= MAX_FEE_BPS, "FEE_TOO_HIGH");
@@ -180,9 +203,15 @@ contract FeeCollector is IFeeCollector, UUPSUpgradeable, OwnableUpgradeable, Ree
     }
 
     /// @inheritdoc IFeeCollector
-    function clearTokenFeeBps(address token) external onlyOwner {
+    function clearTokenFeeBps(address token) external onlyFeeAdmin {
         delete _feeOverridePlus1[token];
         emit TokenFeeBpsCleared(token);
+    }
+
+    /// @notice Grant/revoke the least-privilege per-token fee operator. Owner-only, revocable.
+    function setFeeManager(address newFeeManager) external onlyOwner {
+        feeManager = newFeeManager;
+        emit FeeManagerSet(newFeeManager);
     }
 
     function setReferralShareBps(uint16 newShareBps) external onlyOwner {
