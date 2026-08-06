@@ -8,6 +8,10 @@ optimizer_runs = 200
 via_ir = true
 evm_version = "cancun"
 ffi = false
+# Read-only, and only our own sources. Round 50 added a coverage invariant that reads src/ and
+# test/ at test time, so a new adapter cannot ship with no test at all — the gap it was written
+# for was 12 contracts with zero references, four of them live on mainnet.
+fs_permissions = [{ access = "read", path = "./src" }, { access = "read", path = "./test" }]
 fuzz = { runs = 256 }
 
 [profile.ci]
