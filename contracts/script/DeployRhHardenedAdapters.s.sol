@@ -102,9 +102,12 @@ contract DeployRhHardenedAdaptersScript is Script {
     ///        registry()     = 0x6Cf25d2af1A58d7094B0ac253aE616A8e1F2Ea3f (the registry below)
     ///        wmon()         = 0x0Bd7D308…AD73 (WETH9 on 4663 — Monad's router answers WMON)
     ///        owner()        = 0x0f1171209dAD379AF0E486f2c77D275D6E0a4f79 (deployer EOA)
-    ///        impl (EIP1967) = 0x1cd8CeED960dE0c9787295c8F1BF278D4A36698c — the PRE-H2 router; RH
-    ///                         never received the 2026-08-05 router upgrade either. Out of scope
-    ///                         here (adapters only), but do not mistake this script for that fix.
+    ///        impl (EIP1967) = 0x3D3C7C44CF1657e72B574f768B40A022B863e464 since 2026-08-21 (H2/M1/
+    ///                         L2/L3/L5 source, UpgradeNullRouter.s.sol, Blockscout-verified). Before
+    ///                         that it was 0x1cd8CeED… — the PRE-H2 router, byte-identical to the
+    ///                         b654976 build; RH ran it for 16 days after Monad's 08-05 upgrade.
+    ///                         FeeCollector went 0xd55fe37e… → 0x34DA6E05… the same day (feeManager
+    ///                         role + L1 sweep). Out of scope here (adapters only).
     address constant NULL_ROUTER = 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a;
 
     /// @notice The LIVE RH AdapterRegistry. Owner is the deployer EOA, so `addAdapter` is callable.
