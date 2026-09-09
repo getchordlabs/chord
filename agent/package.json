@@ -9,7 +9,7 @@
   "files": ["dist", "tools.json", "README.md"],
   "scripts": {
     "build": "tsc -p tsconfig.json && node -e \"const fs=require('fs');fs.chmodSync('dist/mcp.js',0o755)\"",
-    "manifest": "node dist/manifest.js > tools.json",
+    "manifest": "node dist/manifest.js > tools.json && mkdir -p ../web/public/agent && cp tools.json ../web/public/agent/tools.json",
     "smoke": "node dist/smoke.js",
     "start": "node dist/mcp.js",
     "lint": "tsc --noEmit -p tsconfig.json"
