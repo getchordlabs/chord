@@ -1,0 +1,211 @@
+{
+  "name": "chord",
+  "version": "0.1.0",
+  "base_url": "https://api.getchord.xyz",
+  "auth": {
+    "header": "X-API-Key",
+    "required": false,
+    "note": "Reads work without a key at a lower limit; a key raises it to your plan."
+  },
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_overview",
+        "description": "What the Chord index holds right now on chain 4663: 24h volume, swap count, tokens traded, and the venues with their share. Use first to orient.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_search_tokens",
+        "description": "Find listed tokens on chain 4663 by symbol, name or address. Returns up to 10 matches with addresses and whether each is a tokenized stock.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Symbol, name fragment, or 0x address"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_price",
+        "description": "Live price, 24h change, 24h volume and trade count for one token, from Chord's own index of on-chain trades.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "token": {
+              "type": "string",
+              "description": "Symbol like NVDA or USDG, or a 0x address"
+            }
+          },
+          "required": [
+            "token"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_stocks",
+        "description": "Every tokenized stock and ETF on the chain with price, 24h change, 24h volume, trades, traders, buy share, after-hours share of the last 7 days, and the gap to the issuer's reference price (NAV) where published. Sorted by 24h volume.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "default": 50,
+              "description": "How many rows, by 24h volume"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_stock",
+        "description": "One tokenized stock in depth: the screener row plus activity windows (5m/1h/6h/24h buys, sells, volume, wallets), all-time high, first trade, and the pools it traded in over the last 24h.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "token": {
+              "type": "string",
+              "description": "Symbol like SPY or a 0x address"
+            }
+          },
+          "required": [
+            "token"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_quote",
+        "description": "Best route to swap one token for another across every venue on the chain. Amount is human units (e.g. \"0.5\" ETH). Returns the expected output, price impact, the venues on the route, and the raw quote to pass to chord_swap_tx.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "tokenIn": {
+              "type": "string",
+              "description": "Symbol or address to pay with, e.g. ETH, USDG"
+            },
+            "tokenOut": {
+              "type": "string",
+              "description": "Symbol or address to receive, e.g. NVDA"
+            },
+            "amount": {
+              "type": "string",
+              "description": "Amount of tokenIn in human units, as a string"
+            },
+            "slippageBps": {
+              "type": "integer",
+              "default": 100,
+              "description": "Slippage tolerance in basis points, default 100 = 1%"
+            }
+          },
+          "required": [
+            "tokenIn",
+            "tokenOut",
+            "amount"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_swap_tx",
+        "description": "Turn a quote from chord_quote into an UNSIGNED transaction (to, data, value, gasLimit) for the given wallet. Chord never signs or holds funds: send the result to the agent's wallet to sign and broadcast on chain 4663. An ERC-20 input needs an allowance for the returned `to` first.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "quote": {
+              "description": "The `quote` object returned by chord_quote"
+            },
+            "wallet": {
+              "type": "string",
+              "description": "The wallet that will sign and receive"
+            },
+            "slippageBps": {
+              "type": "integer",
+              "default": 100
+            }
+          },
+          "required": [
+            "quote",
+            "wallet"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_smart_money",
+        "description": "The wallets that traded best on the chain, ranked from the tape with routers and bots removed: profit, volume, trades, win rate, best token.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "window": {
+              "type": "string",
+              "enum": [
+                "24h",
+                "7d",
+                "30d",
+                "all"
+              ],
+              "default": "7d"
+            },
+            "limit": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_wallet_pnl",
+        "description": "One wallet's book on the chain: realized and open profit per token from an average-cost read of its swaps, plus totals. Balances that arrived by transfer have no cost basis and are excluded.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "wallet": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "wallet"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}
