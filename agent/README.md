@@ -19,6 +19,10 @@ signs and never holds funds: the agent's own wallet signs.
 | `chord_quote` | best route across every venue, expected output, price impact, the route |
 | `chord_swap_tx` | the unsigned transaction for a quote, for the agent's wallet to sign |
 | `chord_smart_money` | wallets ranked from the tape, routers and bots removed |
+| `chord_arc_overview` | the same index on Arc (chain 5042): 24h volume in USDC, swaps, venues, coverage |
+| `chord_arc_tokens` | Arc tokens traded in the last 24h, listed or not, with on-chain symbol/name |
+| `chord_arc_token` | one Arc token: identity, hourly series, venue split, every indexed pool |
+| `chord_arc_venues` | Arc per-venue daily volume and share for 1..180 days |
 | `chord_wallet_pnl` | realized and open profit per token for one wallet |
 
 ## MCP (Claude Desktop, Claude Code, Cursor, any MCP client)

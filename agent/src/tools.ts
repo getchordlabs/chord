@@ -177,6 +177,45 @@ export const tools = [
       return { wallet: wallet.toLowerCase(), realizedUsd: d.realized, openUsd: d.unrealized, totalUsd: d.total, tokens: (d.tokens ?? []).map((t: any) => ({ symbol: t.symbol, token: t.token, amount: t.curAmount, valueUsd: t.curValue, avgCost: t.avgCost, realizedUsd: t.realizedUsd, openUsd: t.unrealizedUsd, roiPct: t.roiPct })) };
     },
   }),
+  // ── Arc (chain 5042) — the same index on Circle's stablecoin L1 (docs/arc-tape.md). Read-only:
+  // no quote / swap on Arc until Chord's router is deployed there.
+  tool({
+    name: "chord_arc_overview",
+    description: "What the Chord index holds on Arc (chain 5042, USDC-native) right now: 24h volume in USDC, swap count, tokens traded, venues with their share, and how far back the records go. Arc is indexed by Chord itself from every Uniswap pool and launchpad on the chain.",
+    input: z.object({}),
+    run: async () => {
+      const d = await api<any>("/v1/arc/overview");
+      return { chain: d.chain, last24h: d.last24h, venues24h: (d.venues24h ?? []).map((v: any) => ({ dex: v.dex, volUsd: Math.round(v.volUsd), trades: v.trades, sharePct: +v.sharePct.toFixed(2) })), coverage: d.coverage, updatedAt: d.updatedAt };
+    },
+  }),
+  tool({
+    name: "chord_arc_tokens",
+    description: "Tokens traded on Arc in the last 24h with price, 24h change, volume, buy/sell split, trades and attributed traders. Most Arc tokens are unlisted (no logo yet) but carry their on-chain symbol and name; `listed` says which have curated metadata.",
+    input: z.object({ limit: z.number().int().min(1).max(200).default(50), sort: z.enum(["volume", "trades", "traders", "change"]).default("volume") }),
+    run: async ({ limit, sort }) => {
+      const d = await api<any>(`/v1/arc/tokens?limit=${limit}&sort=${sort}&includeUnlisted=1`);
+      return { chain: d.chain, total: d.total, rows: (d.tokens ?? []).map((t: any) => ({ address: t.address, symbol: t.symbol, name: t.name, decimals: t.decimals, listed: t.listed, priceUsd: t.priceUsd, change24hPct: t.change24hPct, volume24hUsd: Math.round(t.volume24h), buySharePct: t.volume24h > 0 ? +((t.buyVolume24h / t.volume24h) * 100).toFixed(1) : null, trades24h: t.trades24h, traders: t.traders, lastTradeTs: t.lastTradeTs })) };
+    },
+  }),
+  tool({
+    name: "chord_arc_token",
+    description: "One Arc token in depth: identity (on-chain symbol/name/decimals), 24h figures, an hourly volume/price series for the requested window, venue split, and every indexed pool holding it (V3/V2 pool addresses or V4 poolIds with hooks).",
+    input: z.object({ address: z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe("Token address on Arc"), hours: z.number().int().min(1).max(720).default(168) }),
+    run: async ({ address, hours }) => {
+      const a = address.toLowerCase();
+      const [t, p] = await Promise.all([api<any>(`/v1/arc/token/${a}?hours=${hours}`), api<any>(`/v1/arc/token/${a}/pools`).catch(() => ({ pools: [] }))]);
+      return { chain: t.chain, token: t.token, hours: t.hours, series: t.series, byDex: t.byDex, pools: p.pools ?? [] };
+    },
+  }),
+  tool({
+    name: "chord_arc_venues",
+    description: "Per-venue daily volume on Arc for the last N days (1..180) with each venue's share of the window — Uniswap V3, V2, V4 and the launchpad forks as separate rows.",
+    input: z.object({ days: z.number().int().min(1).max(180).default(30) }),
+    run: async ({ days }) => {
+      const d = await api<any>(`/v1/arc/venues?days=${days}`);
+      return { chain: d.chain, days: d.days, since: d.since, totals: d.totals, venues: (d.venues ?? []).map((v: any) => ({ dex: v.dex, volUsd: Math.round(v.volUsd), trades: v.trades, sharePct: +v.sharePct.toFixed(2), series: v.series })) };
+    },
+  }),
 ] as const;
 
 export type AnyTool = (typeof tools)[number];

@@ -206,6 +206,86 @@
           "additionalProperties": false
         }
       }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_arc_overview",
+        "description": "What the Chord index holds on Arc (chain 5042, USDC-native) right now: 24h volume in USDC, swap count, tokens traded, venues with their share, and how far back the records go. Arc is indexed by Chord itself from every Uniswap pool and launchpad on the chain.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_arc_tokens",
+        "description": "Tokens traded on Arc in the last 24h with price, 24h change, volume, buy/sell split, trades and attributed traders. Most Arc tokens are unlisted (no logo yet) but carry their on-chain symbol and name; `listed` says which have curated metadata.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "default": 50
+            },
+            "sort": {
+              "type": "string",
+              "enum": [
+                "volume",
+                "trades",
+                "traders",
+                "change"
+              ],
+              "default": "volume"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_arc_token",
+        "description": "One Arc token in depth: identity (on-chain symbol/name/decimals), 24h figures, an hourly volume/price series for the requested window, venue split, and every indexed pool holding it (V3/V2 pool addresses or V4 poolIds with hooks).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "address": {
+              "type": "string",
+              "description": "Token address on Arc"
+            },
+            "hours": {
+              "type": "integer",
+              "default": 168
+            }
+          },
+          "required": [
+            "address"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_arc_venues",
+        "description": "Per-venue daily volume on Arc for the last N days (1..180) with each venue's share of the window — Uniswap V3, V2, V4 and the launchpad forks as separate rows.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "days": {
+              "type": "integer",
+              "default": 30
+            }
+          },
+          "additionalProperties": false
+        }
+      }
     }
   ]
 }
