@@ -47,7 +47,16 @@ contract DeployArcScript is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. AdapterRegistry (UUPS proxy)
+        // NONCE MAP (must reproduce Monad/RH for identical proxy addresses — read on-chain 2026-09-16
+        // by cast compute-address over the deployer's nonces on both chains):
+        //   0 registry impl · 1 registry PROXY · 2 (any contract) · 3 router impl · 4 router PROXY ·
+        //   5 (any contract) · 6 collector PROXY · 7+ config calls.
+        // So the FeeCollector impl goes at nonce 2 and the adapter at nonce 5 — both constructor-only
+        // deploys that need nothing but addresses already known. The proxies then land exactly on
+        // 0x6cf25d2a… / 0x1B1Fee89… / 0x6c662296…. Anything that changes this order (a failed tx, a
+        // console-only run that still broadcasts, an extra `new`) shifts every later address.
+
+        // 1. AdapterRegistry (UUPS proxy) — nonce 0 impl, nonce 1 proxy
         AdapterRegistry registryImpl = new AdapterRegistry();
         ERC1967Proxy registryProxy = new ERC1967Proxy(
             address(registryImpl),
@@ -55,8 +64,11 @@ contract DeployArcScript is Script {
         );
         AdapterRegistry registry = AdapterRegistry(address(registryProxy));
 
-        // 2. NullRouter (UUPS proxy) — placeholder feeCollector, updated in step 4. `executor`
-        //    slot is deprecated (storage-layout only) — address(0), never re-add.
+        // 2. FeeCollector impl — nonce 2 (the "any contract" slot)
+        FeeCollector feeCollectorImpl = new FeeCollector();
+
+        // 3. NullRouter (UUPS proxy) — nonce 3 impl, nonce 4 proxy. Placeholder feeCollector, wired in
+        //    step 6. `executor` slot is deprecated (storage-layout only) — address(0), never re-add.
         NullRouter routerImpl = new NullRouter();
         ERC1967Proxy routerProxy = new ERC1967Proxy(
             address(routerImpl),
@@ -70,8 +82,20 @@ contract DeployArcScript is Script {
         );
         NullRouter router = NullRouter(payable(address(routerProxy)));
 
-        // 3. FeeCollector (UUPS proxy)
-        FeeCollector feeCollectorImpl = new FeeCollector();
+        // 4. UniV3GenericAdapter — nonce 5. Pool-direct swap for the Uniswap V3 factory (registry
+        //    lane: initCodeHash ZERO ⇒ factory.getPool provenance). One factory in this slice;
+        //    adding a fork later = NEW adapter (immutable) + registry swap.
+        address[] memory v3Factories = new address[](1);
+        v3Factories[0] = UNISWAP_V3_FACTORY;
+        bytes32[] memory v3InitCodeHashes = new bytes32[](1);
+        uint24[] memory feeTiers = new uint24[](4);
+        feeTiers[0] = 100;
+        feeTiers[1] = 500;
+        feeTiers[2] = 3000;
+        feeTiers[3] = 10000;
+        UniV3GenericAdapter v3Adapter = new UniV3GenericAdapter(address(router), v3Factories, v3InitCodeHashes, feeTiers);
+
+        // 5. FeeCollector proxy — nonce 6
         ERC1967Proxy feeCollectorProxy = new ERC1967Proxy(
             address(feeCollectorImpl),
             abi.encodeCall(FeeCollector.initialize, (
@@ -84,24 +108,11 @@ contract DeployArcScript is Script {
         );
         FeeCollector feeCollector = FeeCollector(address(feeCollectorProxy));
 
-        // 4. Wire the real FeeCollector
+        // 6. Wire the real FeeCollector, approve the adapter — nonces 7, 8
         router.setFeeCollector(address(feeCollector));
-
-        // 5. UniV3GenericAdapter — pool-direct swap for the Uniswap V3 factory (registry lane:
-        //    initCodeHash ZERO ⇒ factory.getPool provenance). One factory in this slice; adding a
-        //    fork later = NEW adapter (immutable) + registry swap.
-        address[] memory v3Factories = new address[](1);
-        v3Factories[0] = UNISWAP_V3_FACTORY;
-        bytes32[] memory v3InitCodeHashes = new bytes32[](1);
-        uint24[] memory feeTiers = new uint24[](4);
-        feeTiers[0] = 100;
-        feeTiers[1] = 500;
-        feeTiers[2] = 3000;
-        feeTiers[3] = 10000;
-        UniV3GenericAdapter v3Adapter = new UniV3GenericAdapter(address(router), v3Factories, v3InitCodeHashes, feeTiers);
         registry.addAdapter(address(v3Adapter));
 
-        // 6. Fee tiers: the dollar and euro stables → 0 bps.
+        // 7. Fee tiers: the dollar and euro stables → 0 bps.
         address[] memory zeroFee = new address[](2);
         zeroFee[0] = USDC;
         zeroFee[1] = EURC;
