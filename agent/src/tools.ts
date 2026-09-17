@@ -216,6 +216,16 @@ export const tools = [
       return { chain: d.chain, days: d.days, since: d.since, totals: d.totals, venues: (d.venues ?? []).map((v: any) => ({ dex: v.dex, volUsd: Math.round(v.volUsd), trades: v.trades, sharePct: +v.sharePct.toFixed(2), series: v.series })) };
     },
   }),
+  tool({
+    name: "chord_ask",
+    description: "Ask Chord's analyst about Arc (chain 5042) in plain language and get a researched answer: trending, a token's flow/holders/risk, support and resistance with an entry ladder, top traders on a token, a wallet's PnL and trades, largest prints, launches, depth, a bridge quote, position sizing, or an ad-hoc SQL question over the index. Returns the answer text, source links, an optional route card and any tables the analysis produced. Needs a Chord API key (CHORD_API_KEY). Slower than the data tools (5–40 s); use it for judgement, use the other tools for raw numbers.",
+    input: z.object({ question: z.string().min(1).max(1000), wallet: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional().describe("The agent's own wallet, so 'my PnL' resolves") }),
+    run: async ({ question, wallet }) => {
+      if (!KEY) throw new Error("chord_ask needs CHORD_API_KEY");
+      const d = await api<any>("/v1/ask", { method: "POST", body: JSON.stringify({ question, stream: false, ...(wallet ? { wallet } : {}) }) });
+      return { answer: d.text, citations: d.citations, quote: d.quote, report: d.artifact?.report ?? null, tables: (d.viz ?? []).filter((v: any) => v.kind === "table"), toolsUsed: d.toolsUsed };
+    },
+  }),
 ] as const;
 
 export type AnyTool = (typeof tools)[number];
