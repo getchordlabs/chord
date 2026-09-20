@@ -1,0 +1,3110 @@
+{
+ "/v1/health": {
+  "status": "ok",
+  "version": "0.1.0",
+  "uptime": 494.311362193,
+  "engine": {
+   "status": "ok",
+   "latencyMs": 1
+  },
+  "redis": {
+   "status": "ok"
+  },
+  "poolCount": 1649,
+  "lastSyncBlock": 106412042
+ },
+ "/v1/arc/status": {
+  "chain": 5042,
+  "enabled": true,
+  "recentAt": 1789891429,
+  "staleSec": 423,
+  "floorHour": 1780520400,
+  "genesisHour": 1780520400,
+  "backfillComplete": true,
+  "index": {
+   "pools": 30528,
+   "v4Pools": 190394,
+   "cursor": 21808222,
+   "genesis": true
+  },
+  "holders": {
+   "enabled": true,
+   "tracked": 1000,
+   "complete": 225,
+   "forwardCursor": 21808247,
+   "from": 21273472,
+   "backfilling": "0x3600000000000000000000000000000000000000"
+  },
+  "updatedAt": 1789891853280
+ },
+ "/v1/arc/overview": {
+  "chain": 5042,
+  "last24h": {
+   "volUsd": 70377594.2336901,
+   "swaps": 788926,
+   "tokens": 6288,
+   "sinceHour": 1789808400
+  },
+  "venues24h": [
+   {
+    "dex": "uniswap_v4",
+    "volUsd": 55014882.201828234,
+    "trades": 683313,
+    "tokens": 4059,
+    "sharePct": 78.17101849084284
+   },
+   {
+    "dex": "uniswap_v3",
+    "volUsd": 12910961.69548591,
+    "trades": 91957,
+    "tokens": 2163,
+    "sharePct": 18.345272861437724
+   }
+  ],
+  "hourly24": [
+   {
+    "hour": 1789808400,
+    "volUsd": 3234644.52212066,
+    "swaps": 50225
+   },
+   {
+    "hour": 1789812000,
+    "volUsd": 2223745.3392903497,
+    "swaps": 36071
+   }
+  ],
+  "daily": [
+   {
+    "day": 1787356800,
+    "swaps": 5712,
+    "volUsd": 609934.6437347728,
+    "tokens": 292,
+    "wallets": 768,
+    "venues": 4
+   },
+   {
+    "day": 1787443200,
+    "swaps": 3057,
+    "volUsd": 241890.2647458107,
+    "tokens": 274,
+    "wallets": 508,
+    "venues": 6
+   }
+  ],
+  "coverage": {
+   "recentAt": 1789891429,
+   "stale": false,
+   "floorHour": 1780520400,
+   "genesisHour": 1780520400,
+   "backfillComplete": true
+  },
+  "updatedAt": 1789891764243
+ },
+ "/v1/arc/venues?days=2": {
+  "chain": 5042,
+  "days": 2,
+  "since": 1789776000,
+  "venues": [
+   {
+    "dex": "uniswap_v4",
+    "volUsd": 68035852.94572023,
+    "trades": 984421,
+    "sharePct": 75.67924527197266,
+    "series": [
+     {
+      "day": 1789776000,
+      "volUsd": 58377642.50907503,
+      "trades": 798150,
+      "tokens": 4499
+     },
+     {
+      "day": 1789862400,
+      "volUsd": 9658210.4366452,
+      "trades": 186271,
+      "tokens": 1536
+     }
+    ]
+   },
+   {
+    "dex": "uniswap_v3",
+    "volUsd": 18354272.62782195,
+    "trades": 133374,
+    "sharePct": 20.41625760314611,
+    "series": [
+     {
+      "day": 1789776000,
+      "volUsd": 14284128.68933594,
+      "trades": 103080,
+      "tokens": 2418
+     },
+     {
+      "day": 1789862400,
+      "volUsd": 4070143.9384860075,
+      "trades": 30294,
+      "tokens": 728
+     }
+    ]
+   }
+  ],
+  "totals": {
+   "volUsd": 89900279.3978931,
+   "trades": 1135137
+  },
+  "updatedAt": 1789891853672
+ },
+ "/v1/arc/tokens?limit=2": {
+  "chain": 5042,
+  "sinceHour": 1789808400,
+  "tradersSince": 1789776000,
+  "sort": "volume",
+  "offset": 0,
+  "tokens": [
+   {
+    "address": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+    "symbol": "cirBTC",
+    "name": "cirBTC",
+    "decimals": 8,
+    "logoURI": "https://api.getchord.xyz/v1/logo/5042/0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+    "tags": [],
+    "listed": true,
+    "priceUsd": 80423.22925858323,
+    "change24hPct": -1.0826513878648192,
+    "volume24h": 5689551.810770997,
+    "buyVolume24h": 2765666.247710997,
+    "sellVolume24h": 2923885.56306,
+    "trades24h": 19472,
+    "buys24h": 10554,
+    "sells24h": 8918,
+    "traders": 3203,
+    "lastTradeTs": 1789891845,
+    "totalSupply": 336.81495614,
+    "marketCapUsd": 27087746.435366876,
+    "pools": {
+     "v3": 21,
+     "v2": 5,
+     "v4": 483,
+     "byDex": {
+      "uniswap_v3": 10,
+      "v2fork_a2448256": 1,
+      "slipstream_fork": 2,
+      "v3fork_5bfbceb7": 6,
+      "v3fork_bb74f231": 2,
+      "v2fork_49aa1c63": 2,
+      "v3fork_711492df": 1,
+      "sushi_v2": 2,
+      "uniswap_v4": 483
+     }
+    },
+    "routable": true,
+    "logoUriRaw": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/bitcoin/info/logo.png"
+   },
+   {
+    "address": "0xece5ca8bf9220718e5727754026757512212cb3c",
+    "symbol": "ARGUS",
+    "name": "Argus",
+    "decimals": 18,
+    "logoURI": "https://api.getchord.xyz/v1/logo/5042/0xece5ca8bf9220718e5727754026757512212cb3c",
+    "tags": [],
+    "listed": true,
+    "priceUsd": 0.01923385111168061,
+    "change24hPct": 12.687321807963436,
+    "volume24h": 4051551.451917998,
+    "buyVolume24h": 2089331.6579039998,
+    "sellVolume24h": 1962219.7940139996,
+    "trades24h": 25479,
+    "buys24h": 13716,
+    "sells24h": 11763,
+    "traders": 4549,
+    "lastTradeTs": 1789891399,
+    "totalSupply": 1000000000,
+    "marketCapUsd": 19233851.11168061,
+    "pools": {
+     "v3": 15,
+     "v2": 5,
+     "v4": 1141,
+     "byDex": {
+      "uniswap_v3": 12,
+      "v2fork_e64d552a": 1,
+      "v2fork_a1a044ff": 1,
+      "v3fork_cae668d0": 1,
+      "uniswap_v2": 1,
+      "v3fork_aa5865dc": 1,
+      "synthra_v3": 1,
+      "sushi_v2": 2,
+      "uniswap_v4": 1141
+     }
+    },
+    "routable": true,
+    "logoUriRaw": "https://coin-images.coingecko.com/coins/images/102178392/large/argus-token.png?1789463380"
+   }
+  ],
+  "total": 1528,
+  "updatedAt": 1789891853851
+ },
+ "/v1/arc/tokens/search?q=argus&limit=2": {
+  "chain": 5042,
+  "q": "argus",
+  "tokens": [
+   {
+    "address": "0xece5ca8bf9220718e5727754026757512212cb3c",
+    "symbol": "ARGUS",
+    "name": "Argus",
+    "decimals": 18,
+    "logoURI": "https://api.getchord.xyz/v1/logo/5042/0xece5ca8bf9220718e5727754026757512212cb3c",
+    "tags": [],
+    "listed": true,
+    "priceUsd": 0.018829227933149367,
+    "change24hPct": 10.31671479507974,
+    "volume24h": 4045502.7263479983,
+    "buyVolume24h": 2085285.1237909999,
+    "sellVolume24h": 1960217.6025569995,
+    "trades24h": 25431,
+    "buys24h": 13691,
+    "sells24h": 11740,
+    "traders": 4548,
+    "lastTradeTs": 1789890980,
+    "totalSupply": null,
+    "marketCapUsd": null,
+    "pools": {
+     "v3": 15,
+     "v2": 5,
+     "v4": 1141,
+     "byDex": {
+      "uniswap_v3": 12,
+      "v2fork_e64d552a": 1,
+      "v2fork_a1a044ff": 1,
+      "v3fork_cae668d0": 1,
+      "uniswap_v2": 1,
+      "v3fork_aa5865dc": 1,
+      "synthra_v3": 1,
+      "sushi_v2": 2,
+      "uniswap_v4": 1141
+     }
+    },
+    "routable": true,
+    "logoUriRaw": "https://coin-images.coingecko.com/coins/images/102178392/large/argus-token.png?1789463380"
+   }
+  ],
+  "total": 1,
+  "coverage": {
+   "resolved": 240,
+   "total": 6270
+  },
+  "updatedAt": 1789891854005
+ },
+ "/v1/arc/trending?limit=2": {
+  "chain": 5042,
+  "window": "2h",
+  "tokens": [
+   {
+    "address": "0xc1347b8f2b79af2f150d26f350eb974cd7dab6f3",
+    "symbol": "ARK",
+    "name": "Ark",
+    "decimals": 18,
+    "logoURI": "https://api.getchord.xyz/v1/logo/5042/0xc1347b8f2b79af2f150d26f350eb974cd7dab6f3",
+    "tags": [],
+    "listed": true,
+    "priceUsd": 4.0595162215532016e-05,
+    "change24hPct": 293.1545690698809,
+    "volume24h": 22263.892306000005,
+    "buyVolume24h": 14913.083264000003,
+    "sellVolume24h": 7350.809042000001,
+    "trades24h": 443,
+    "buys24h": 305,
+    "sells24h": 138,
+    "traders": 186,
+    "lastTradeTs": 1789891841,
+    "totalSupply": 1000000000,
+    "marketCapUsd": 40595.162215532015,
+    "pools": {
+     "v3": 1,
+     "v2": 0,
+     "v4": 4,
+     "byDex": {
+      "uniswap_v3": 1,
+      "uniswap_v4": 4
+     }
+    },
+    "routable": true,
+    "score": 14.783,
+    "volNow": 17096.819990000004,
+    "tradesNow": 328,
+    "change1hPct": 16.748692419251164,
+    "momentum": 33.1,
+    "logoUriRaw": "https://ark-ai.xyz/api/uploads/578af1067cda7e6bd593deff82c2eb46.jpg"
+   },
+   {
+    "address": "0x11435e6c80944f8d8a5f34c3fabd5dd06e7c7367",
+    "symbol": "MCAT",
+    "name": "Stealth Cat",
+    "decimals": 18,
+    "logoURI": "https://api.getchord.xyz/v1/logo/5042/0x11435e6c80944f8d8a5f34c3fabd5dd06e7c7367",
+    "tags": [],
+    "listed": true,
+    "priceUsd": 0.0015085540687515264,
+    "change24hPct": 302.92128960120704,
+    "volume24h": 44245.77249448278,
+    "buyVolume24h": 26326.794866251035,
+    "sellVolume24h": 17918.97762823173,
+    "trades24h": 124,
+    "buys24h": 74,
+    "sells24h": 50,
+    "traders": 38,
+    "lastTradeTs": 1789887925,
+    "totalSupply": 1000000000,
+    "marketCapUsd": 1508554.0687515265,
+    "pools": {
+     "v3": 0,
+     "v2": 0,
+     "v4": 1,
+     "byDex": {
+      "uniswap_v4": 1
+     }
+    },
+    "routable": false,
+    "score": 14.154,
+    "volNow": 43073.29349448278,
+    "tradesNow": 119,
+    "change1hPct": 302.92128960120704,
+    "momentum": 18.4,
+    "logoUriRaw": "https://ipfs.filebase.io/ipfs/QmcQFUJagLR9nUss299zLcy5HM3AKyUuNuKf5uFieitRNm"
+   }
+  ],
+  "updatedAt": 1789891854247
+ },
+ "/v1/arc/graduated?hours=48&limit=2": {
+  "chain": 5042,
+  "hours": 48,
+  "tokens": [
+   {
+    "address": "0xf31599ae7a1a2c7e3d99f2bf307c44a71196e987",
+    "symbol": "DePIN",
+    "name": "X DePIN",
+    "decimals": 18,
+    "logoURI": null,
+    "tags": [],
+    "listed": false,
+    "priceUsd": 1.1092869541991106e-05,
+    "change24hPct": null,
+    "volume24h": 55.392897000000005,
+    "buyVolume24h": 55.392897000000005,
+    "sellVolume24h": 0,
+    "trades24h": 2,
+    "buys24h": 2,
+    "sells24h": 0,
+    "traders": 3,
+    "lastTradeTs": 1789891653,
+    "totalSupply": 1000000000,
+    "marketCapUsd": 11092.869541991106,
+    "pools": {
+     "v3": 0,
+     "v2": 1,
+     "v4": 0,
+     "byDex": {
+      "uniswap_v2": 1
+     }
+    },
+    "routable": true,
+    "launchedAt": 1789891314,
+    "launcher": "0x89e5db8b5aa49aa85ac63f691524311aeb649eba",
+    "creator": "0xd4bd5a99286f728f9529dc8a1fc8b1c702c04497",
+    "ageSec": 540,
+    "launcherName": null
+   },
+   {
+    "address": "0xa210789b8b0666afa2d4ed00cf701083a2d72c52",
+    "symbol": "RWA",
+    "name": "X RWA",
+    "decimals": 18,
+    "logoURI": null,
+    "tags": [],
+    "listed": false,
+    "priceUsd": 1.1336625606769674e-05,
+    "change24hPct": null,
+    "volume24h": 430.557449,
+    "buyVolume24h": 430.557449,
+    "sellVolume24h": 0,
+    "trades24h": 17,
+    "buys24h": 17,
+    "sells24h": 0,
+    "traders": 17,
+    "lastTradeTs": 1789891140,
+    "totalSupply": 1000000000,
+    "marketCapUsd": 11336.625606769674,
+    "pools": {
+     "v3": 0,
+     "v2": 1,
+     "v4": 0,
+     "byDex": {
+      "uniswap_v2": 1
+     }
+    },
+    "routable": true,
+    "launchedAt": 1789890414,
+    "launcher": "0x89e5db8b5aa49aa85ac63f691524311aeb649eba",
+    "creator": "0xd4bd5a99286f728f9529dc8a1fc8b1c702c04497",
+    "ageSec": 1440,
+    "launcherName": null
+   }
+  ],
+  "total": 85,
+  "screened": {
+   "not_routable": 2614,
+   "impostor": 4,
+   "no_sells": 13,
+   "few_traders": 68,
+   "serial_creator": 1615,
+   "no_trades": 23098,
+   "no_symbol": 0
+  },
+  "updatedAt": 1789891854594
+ },
+ "/v1/arc/launchers?hours=24": {
+  "chain": 5042,
+  "hours": 24,
+  "launchers": [
+   {
+    "launcher": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    "name": "Uniswap V4 PoolManager (direct)",
+    "site": "https://app.uniswap.org",
+    "logo": "/launchers/uniswap.png",
+    "kinds": [
+     "v4"
+    ],
+    "shapes": [
+     {
+      "hooks": "0x4d850668513130fda0dd37b9a905b5e393ede844",
+      "fee": 0,
+      "tickSpacing": 60,
+      "pools": 3
+     },
+     {
+      "hooks": "0x0000000000000000000000000000000000000000",
+      "fee": 3000,
+      "tickSpacing": 60,
+      "pools": 3
+     }
+    ],
+    "pools1h": 4,
+    "pools24h": 66,
+    "creators24h": 56,
+    "firstSeen": 1789474488,
+    "lastSeen": 1789891301,
+    "swaps24h": 12880,
+    "volume24h": 24433932.86648278,
+    "wallets24h": 649,
+    "activePools24h": 96
+   },
+   {
+    "launcher": "0x6049c9a0e26405c0985f9e3685c87d0ae917f82b",
+    "name": "Uniswap Liquidity Launcher",
+    "site": "https://github.com/Uniswap/sdks",
+    "logo": "/launchers/uniswap.png",
+    "kinds": [
+     "v4"
+    ],
+    "shapes": [
+     {
+      "hooks": "0x0000000000000000000000000000000000000000",
+      "fee": 10000,
+      "tickSpacing": 200,
+      "pools": 330
+     },
+     {
+      "hooks": "0x0000000000000000000000000000000000000000",
+      "fee": 2500,
+      "tickSpacing": 50,
+      "pools": 295
+     }
+    ],
+    "pools1h": 35,
+    "pools24h": 2030,
+    "creators24h": 935,
+    "firstSeen": 1789481791,
+    "lastSeen": 1789891349,
+    "swaps24h": 431537,
+    "volume24h": 18499363.187061056,
+    "wallets24h": 5773,
+    "activePools24h": 2065
+   }
+  ],
+  "updatedAt": 1789891854880
+ },
+ "/v1/arc/attention?limit=2": {
+  "chain": 5042,
+  "days": 1,
+  "rows": [
+   {
+    "token": "0xece5ca8bf9220718e5727754026757512212cb3c",
+    "score": 8,
+    "ask": 1,
+    "search": 2,
+    "view": 3,
+    "watch": 0
+   },
+   {
+    "token": "0x972b159ca91baec0ec88f2c114cf1d7aa5db240e",
+    "score": 6,
+    "ask": 0,
+    "search": 0,
+    "view": 6,
+    "watch": 0
+   }
+  ],
+  "updatedAt": 1789891855038
+ },
+ "/v1/arc/token/0x171a4217b86a807a64eb94757db6849fb4bdbaa0?hours=2": {
+  "chain": 5042,
+  "token": {
+   "address": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+   "symbol": "cirBTC",
+   "name": "cirBTC",
+   "decimals": 8,
+   "logoURI": "https://api.getchord.xyz/v1/logo/5042/0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+   "tags": [],
+   "listed": true,
+   "priceUsd": 80423.22925858323,
+   "change24hPct": -1.0826513878648192,
+   "volume24h": 5689551.810770997,
+   "buyVolume24h": 2765666.247710997,
+   "sellVolume24h": 2923885.56306,
+   "trades24h": 19472,
+   "buys24h": 10554,
+   "sells24h": 8918,
+   "traders": 3203,
+   "lastTradeTs": 1789891845,
+   "totalSupply": 336.81495614,
+   "marketCapUsd": 27087746.435366876,
+   "pools": {
+    "v3": 21,
+    "v2": 5,
+    "v4": 483,
+    "byDex": {
+     "uniswap_v3": 10,
+     "v2fork_a2448256": 1,
+     "slipstream_fork": 2,
+     "v3fork_5bfbceb7": 6,
+     "v3fork_bb74f231": 2,
+     "v2fork_49aa1c63": 2,
+     "v3fork_711492df": 1,
+     "sushi_v2": 2,
+     "uniswap_v4": 483
+    }
+   },
+   "routable": true,
+   "logoUriRaw": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/bitcoin/info/logo.png"
+  },
+  "hours": 2,
+  "series": [
+   {
+    "hour": 1789887600,
+    "volUsd": 109750.71408699999,
+    "buyUsd": 59532.95500899996,
+    "sellUsd": 50217.759078,
+    "trades": 465,
+    "buys": 247,
+    "sells": 218,
+    "priceLast": 80315.09208021293
+   },
+   {
+    "hour": 1789891200,
+    "volUsd": 14523.166291000001,
+    "buyUsd": 13047.791779000001,
+    "sellUsd": 1475.374512,
+    "trades": 32,
+    "buys": 23,
+    "sells": 9,
+    "priceLast": 80404.02465976504
+   }
+  ],
+  "byDex": [
+   {
+    "dex": "uniswap_v3",
+    "volUsd": 100905.00920399999,
+    "trades": 460,
+    "sharePct": 81.1956695140446
+   },
+   {
+    "dex": "slipstream_fork",
+    "volUsd": 23247.566194,
+    "trades": 28,
+    "sharePct": 18.706719483843752
+   }
+  ],
+  "updatedAt": 1789891855212
+ },
+ "/v1/arc/token/0x171a4217b86a807a64eb94757db6849fb4bdbaa0/pools": {
+  "chain": 5042,
+  "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+  "pools": [
+   {
+    "pool": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+    "dex": "uniswap_v3",
+    "kind": "clmm",
+    "token0": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+    "token1": "0x3600000000000000000000000000000000000000",
+    "fee": 100,
+    "createdBlock": 21076890
+   },
+   {
+    "pool": "0xecd988913031a292bcf0e4e07ccd5815c8969a48",
+    "dex": "uniswap_v3",
+    "kind": "clmm",
+    "token0": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+    "token1": "0x3600000000000000000000000000000000000000",
+    "fee": 3000,
+    "createdBlock": 21081300
+   }
+  ],
+  "updatedAt": 1789891855402
+ },
+ "/v1/arc/token/0x171a4217b86a807a64eb94757db6849fb4bdbaa0/holders?limit=2": {
+  "chain": 5042,
+  "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+  "tracked": true,
+  "complete": true,
+  "coverage": {
+   "addedBlock": 21273471,
+   "floorBlock": 560194,
+   "backfillCursor": 560194,
+   "forwardCursor": 21808247,
+   "logs": 68037
+  },
+  "decimals": 8,
+  "totalSupply": "33681495614",
+  "holders": 2599,
+  "heldByWalletsPct": 96.0477,
+  "concentration": {
+   "top1": 63.64,
+   "top5": 90.91,
+   "top10": 90.91,
+   "top20": 90.91,
+   "top50": 90.91,
+   "top100": 90.91
+  },
+  "top": [
+   {
+    "holder": "0x34cd04070dd72b14e241112f6d83812df5af7fcd",
+    "balance": "21451899028",
+    "amount": 214.51899,
+    "sharePct": 63.6904,
+    "kind": "wallet"
+   },
+   {
+    "holder": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+    "balance": "6776124246",
+    "amount": 67.761242,
+    "sharePct": 20.1182,
+    "kind": "pool"
+   }
+  ],
+  "updatedAt": 1789891855690
+ },
+ "/v1/tokens?chain=5042": {
+  "tokens": [
+   {
+    "address": "0x3600000000000000000000000000000000000000",
+    "symbol": "USDC",
+    "name": "USD Coin",
+    "decimals": 6,
+    "logoURI": "https://api.nullterminal.xyz/v1/logo/5042/0x3600000000000000000000000000000000000000",
+    "verified": true,
+    "tags": [
+     "stablecoin"
+    ],
+    "logoUriRaw": "https://assets.coingecko.com/coins/images/6319/small/usdc.png"
+   },
+   {
+    "address": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+    "symbol": "EURC",
+    "name": "Euro Coin",
+    "decimals": 6,
+    "logoURI": "https://api.nullterminal.xyz/v1/logo/5042/0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+    "verified": true,
+    "tags": [
+     "stablecoin",
+     "fx"
+    ],
+    "logoUriRaw": "https://assets.coingecko.com/coins/images/26045/small/euro.png"
+   }
+  ]
+ },
+ "/v1/tokens/market?chain=5042": {
+  "market": {
+   "0x3bd359c1119da7da1d913d1c4d2b7c461115433a": {
+    "priceUsd": 0.02368204533669354,
+    "change24h": -1.8134557220420358,
+    "volume24h": 16621438
+   },
+   "0x00000000efe302beaa2b3e6e1b18d08d69a9012a": {
+    "priceUsd": 0.9998642386218862,
+    "change24h": -0.2361841646922963,
+    "volume24h": 224880
+   },
+   "0xd18b7ec58cdf4876f6afebd3ed1730e4ce10414b": {
+    "priceUsd": 80409.9493069186,
+    "change24h": -1.06540133716574,
+    "volume24h": 2697541
+   },
+   "0x1b68626dca36c7fe922fd2d55e4f631d962de19c": {
+    "priceUsd": 0.038401057540666805,
+    "change24h": -1.7998458710222387,
+    "volume24h": 6501
+   },
+   "0xf59d81cd43f620e722e07f9cb3f6e41b031017a3": {
+    "priceUsd": 2.385273414575838,
+    "change24h": -0.46370339580436937
+   },
+   "0x01bff41798a0bcf287b996046ca68b395dbc1071": {
+    "priceUsd": 4371.00496640503,
+    "change24h": -0.08155037055167545,
+    "volume24h": 5512075
+   },
+   "0x8498312a6b3cbd158bf0c93abdcf29e6e4f55081": {
+    "priceUsd": 0.025963875802404078,
+    "change24h": -1.8134933329230007,
+    "volume24h": 6801
+   },
+   "0x91b81bfbe3a747230f0529aa28d8b2bc898e6d56": {
+    "priceUsd": 0.02337909431512567,
+    "change24h": -1.7766748441611393
+   },
+   "0xee8c0e9f1bffb4eb878d8f15f368a02a35481242": {
+    "priceUsd": 2581.5223486524187,
+    "change24h": -1.8799955338805356,
+    "volume24h": 5705726
+   },
+   "0xe7cd86e13ac4309349f30b3435a9d337750fc82d": {
+    "priceUsd": 0.9997980707284683,
+    "change24h": -0.2463907039282608,
+    "volume24h": 332454
+   },
+   "0x1001ff13bf368aa4fa85f21043648079f00e1001": {
+    "priceUsd": 0.05855850882682224,
+    "change24h": -1.8694220521335463
+   },
+   "0xfd44b35139ae53fff7d8f2a9869c503d987f00d1": {
+    "priceUsd": 0.9913075192851595,
+    "change24h": -0.07921755974165279
+   },
+   "0x0c65a0bc65a5d819235b71f554d210d3f80e0852": {
+    "priceUsd": 0.02576092998983822,
+    "change24h": -1.8349496245251329,
+    "volume24h": 31648
+   },
+   "0x0555e30da8f98308edb960aa94c0db47230d2b9c": {
+    "priceUsd": 80419.08203274303,
+    "change24h": -1.0130847139260994,
+    "volume24h": 1133239
+   },
+   "0xa3227c5969757783154c60bf0bc1944180ed81b9": {
+    "priceUsd": 0.026233901127343685,
+    "change24h": -1.8050539859073325,
+    "volume24h": 5412
+   },
+   "0x1d4795a4670033f47f572b910553be0295077b51": {
+    "priceUsd": 0.023695665560062872,
+    "change24h": -1.8134557220420369
+   },
+   "0xaca92e438df0b2401ff60da7e4337b687a2435da": {
+    "priceUsd": 0.9999517478565256,
+    "change24h": -0.001553537211098908,
+    "volume24h": 2250136
+   },
+   "0x111111d2bf19e43c34263401e0cad979ed1cdb61": {
+    "priceUsd": 0.9497171237312727,
+    "change24h": -4.369560475682017
+   },
+   "0xc9ea90692757831d98ac629f2a0140e02b80a7da": {
+    "priceUsd": 1.0017974253770319,
+    "change24h": 0
+   },
+   "0x103222f020e98bba0ad9809a011fdf8e6f067496": {
+    "priceUsd": 1.010251511597367,
+    "change24h": 0
+   },
+   "0xfc421ad3c883bf9e7c4f42de845c4e4405799e73": {
+    "priceUsd": 0.9992730023052504,
+    "change24h": 0.001914818105208137,
+    "volume24h": 30236
+   },
+   "0x0000000000000000000000000000000000000000": {
+    "priceUsd": 0.02368204533669354,
+    "change24h": -1.8134557220420358,
+    "volume24h": 16621438
+   },
+   "0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2": {
+    "priceUsd": 1.2522575958587683,
+    "change24h": 0.208733151984653
+   },
+   "0xab6e5a0c3799d020c790d34f7b2c02639e238af7": {
+    "priceUsd": 1.1832262725008706,
+    "change24h": 0.0080989055208435,
+    "volume24h": 30000
+   },
+   "0x754704bc059f8c67012fed69bc8a327a5aafb603": {
+    "priceUsd": 0.9999999999999999,
+    "change24h": -1.1102230246251565e-14
+   },
+   "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34": {
+    "priceUsd": 0.9984554254846537,
+    "change24h": 0
+   },
+   "0x43cf5407bda1400498b8064d50a7e17528d87777": {
+    "priceUsd": 0.002969187173300586,
+    "change24h": 6.823604033380957,
+    "volume24h": 5179
+   },
+   "0x0a332311633c0625f63cfc51ee33fc49826e0a3c": {
+    "priceUsd": 0.15446162800032956,
+    "change24h": 2.2640898627736106,
+    "volume24h": 477
+   },
+   "0x4fc5b9f8933597d3ecf84d0611687e1dc8dd576f": {
+    "priceUsd": 91.63762060879192,
+    "change24h": 0
+   },
+   "0x350035555e10d9afaf1566aaebfced5ba6c27777": {
+    "priceUsd": 0.0014210482236377679,
+    "change24h": -5.5648901764096195,
+    "volume24h": 11320
+   },
+   "0x81a224f8a62f52bde942dbf23a56df77a10b7777": {
+    "priceUsd": 0.0007867797548988377,
+    "change24h": -9.126409963352803,
+    "volume24h": 12304
+   },
+   "0xb1c0d1a1cc0199d78649efc40fde85a080cd7777": {
+    "priceUsd": 9.650823044125628e-05,
+    "change24h": -1.81345572204203
+   },
+   "0xa9da3c77ec7cdc4dfaa1fe142af583543d1c540f": {
+    "priceUsd": 0.0001957145620488542,
+    "change24h": -19.467203547745793,
+    "volume24h": 22438
+   },
+   "0x405b6330e213ded490240cbcdd64790806827777": {
+    "priceUsd": 0.00017551374308739592,
+    "change24h": -14.321746065925787,
+    "volume24h": 2389
+   },
+   "0x7b2728c04ad436153285702e969e6efac3a97777": {
+    "priceUsd": 0.00017243765612700115,
+    "change24h": -21.736444456733977,
+    "volume24h": 3789
+   },
+   "0x1ad7052bb331a0529c1981c3ec2bc4663498a110": {
+    "priceUsd": 0.0008361875719406973,
+    "change24h": -1.8134557220420324
+   },
+   "0x42a4aa89864a794de135b23c6a8d2e05513d7777": {
+    "priceUsd": 0.00013022690458125292,
+    "change24h": 1.7741851110141162,
+    "volume24h": 1521
+   },
+   "0x21e325b059cd83d4037c82f0f5998ba2df3d7777": {
+    "priceUsd": 6.482848634594424e-05,
+    "change24h": -10.460011169761724,
+    "volume24h": 1085
+   },
+   "0x3ec7310937281ca4bf89d5bb11704be9b7ff7777": {
+    "priceUsd": 5.6489709779598215e-05,
+    "change24h": -11.161395382927608,
+    "volume24h": 674
+   },
+   "0x788571e0e5067adea87e6ba22a2b738ffdf48888": {
+    "priceUsd": 4.7600431374789417e-05,
+    "change24h": -23.52212946088665,
+    "volume24h": 916
+   },
+   "0x0158abff6d8344b35b5afffe7dbefc431b731a70": {
+    "priceUsd": 4.9124617131686295e-05,
+    "change24h": 10.760392686672125,
+    "volume24h": 1989
+   },
+   "0x94cf69b5b13e621cb11f5153724afb58c7337777": {
+    "priceUsd": 2.8914798120363068e-05,
+    "change24h": -1.8134557220420326
+   },
+   "0x3842751a46d23b41a47e702473dff316e6237777": {
+    "priceUsd": 3.7979362449587626e-05,
+    "change24h": -1.7558865085978246,
+    "volume24h": 2
+   },
+   "0x73b62ff5cfea3fb857dbe84a57f1631630247777": {
+    "priceUsd": 3.4334612719099437e-05,
+    "change24h": -3.591698903056025,
+    "volume24h": 62
+   },
+   "0x39b9e06f226ff6d7500c870b82333aacbd2f7777": {
+    "priceUsd": 3.234716806247902e-05,
+    "change24h": -2.2014021031631854,
+    "volume24h": 203
+   },
+   "0x29e8a68e6f5275c36767ae531b9f6b5953ba7777": {
+    "priceUsd": 2.252593856264782e-05,
+    "change24h": -1.8122577322223197,
+    "volume24h": 0
+   },
+   "0xd10cf12099f5fb424bc77401df49f0c785657777": {
+    "priceUsd": 2.105583349966784e-05,
+    "change24h": -6.856482863764711,
+    "volume24h": 561
+   },
+   "0xb6842737e2a6d5a92aba03ed0cca578303e87777": {
+    "priceUsd": 1.398911356152656e-05,
+    "change24h": -2.2191388225291977,
+    "volume24h": 16
+   },
+   "0xc911ba7aee487f5145702c20c20a40d9e5b87777": {
+    "priceUsd": 2.0000091260962473e-05,
+    "change24h": -1.813455722042042,
+    "volume24h": 0
+   },
+   "0x1f80c65cc2c37af84abbe1ea03183a624a6f8888": {
+    "priceUsd": 3.373683441277022e-06,
+    "change24h": 0
+   },
+   "0x228c673cae7aad0f4d9f309616d6b546356b7777": {
+    "priceUsd": 1.8857608844733204e-05,
+    "change24h": -1.8134557220420435
+   },
+   "0x5bea301626702c4a253d92be06d36e86bb6b58b5": {
+    "priceUsd": 1.4954465070326862e-05,
+    "change24h": -1.8134557220420309
+   },
+   "0xb744f5cdb792d8187640214c4a1c9ace29af7777": {
+    "priceUsd": 1.4922386894649472e-05,
+    "change24h": -1.8713937608572953,
+    "volume24h": 52
+   },
+   "0x0cc9b2e2acd7bacff79eb7db48f5662b622e7777": {
+    "priceUsd": 1.3053907628767122e-05,
+    "change24h": -4.139660010358059,
+    "volume24h": 74
+   },
+   "0x61eed5ffbebc38be10b1565ea8f478f28cc57777": {
+    "priceUsd": 1.2736048052236382e-05,
+    "change24h": -1.8134557220420437
+   },
+   "0xde22b2d5b92364fec7065c638ad82509949f7777": {
+    "priceUsd": 1.21529498067402e-05,
+    "change24h": -5.029977546475553,
+    "volume24h": 69
+   },
+   "0xc09c8242eb21b24298303799bb5af402a2957777": {
+    "priceUsd": 1.034621269126926e-05,
+    "change24h": 1.4021417806969205,
+    "volume24h": 81
+   },
+   "0xdb85854437030dc327100dd6942f21a27a2c7777": {
+    "priceUsd": 9.947798451026365e-06,
+    "change24h": -1.81420874156074,
+    "volume24h": 0
+   },
+   "0x11ed3b12d99d508f926c870fb44f472001842c96": {
+    "priceUsd": 0.0002981259287446677,
+    "change24h": -1.6449862577753511,
+    "volume24h": 2
+   },
+   "0xfe171c7be5bf3bcc9d7253452934ae3a582d7777": {
+    "priceUsd": 7.619206457827092e-06,
+    "change24h": -2.80966352192731,
+    "volume24h": 23
+   },
+   "0x5c2513cf169530117efe219e62c91f7b72487777": {
+    "priceUsd": 7.688296680436262e-06,
+    "change24h": -1.8143650759466698,
+    "volume24h": 0
+   },
+   "0xa7b3f394b9aaba67f2543a8c1a0f753cc68d7777": {
+    "priceUsd": 7.558279996088088e-06,
+    "change24h": -2.9857827430701005,
+    "volume24h": 26
+   },
+   "0x23c26bd5d55e0d3c1985e23ef2a377c0e2547777": {
+    "priceUsd": 7.566864686839164e-06,
+    "change24h": -3.0562255415777893,
+    "volume24h": 19
+   },
+   "0xaca86430cccedbedb35910fc8a5afef07da37777": {
+    "priceUsd": 6.340534738411034e-06,
+    "change24h": -1.8134557220420393
+   },
+   "0x48223050fe5d96e55e56283de15504490d557777": {
+    "priceUsd": 8.133591673260174e-06,
+    "change24h": -1.8134557220420289
+   },
+   "0x5e1b1a14c8758104b8560514e94ab8320e587777": {
+    "priceUsd": 5.638425195721431e-06,
+    "change24h": -1.8134557220420333
+   },
+   "0x7131eca3401f58371cfb4c3b27aa07837cf77777": {
+    "priceUsd": 5.05650043732881e-06,
+    "change24h": -1.81345572204205
+   },
+   "0xb9ac937d8f915b0b73948551caae92232ed87777": {
+    "priceUsd": 5.0357786700438315e-06,
+    "change24h": -1.813455722042035
+   },
+   "0x8361a59d340466211ad4ab41c09a32e4530a7777": {
+    "priceUsd": 5.013301596341599e-06,
+    "change24h": -1.8134557220420293
+   },
+   "0x6a13bfcba882fb86e5820dc4d160460ad8827777": {
+    "priceUsd": 4.633589692568429e-06,
+    "change24h": -1.8134557220420306
+   },
+   "0x55ba9e2bdd1ecafa114b7d07f1bf92e82c9c7777": {
+    "priceUsd": 4.568741349073478e-06,
+    "change24h": -1.8134557220420413
+   },
+   "0x9f93da6f9202ff6566b35d4d1da6e1bb4a64eb56": {
+    "priceUsd": 8.261433947984844e-07,
+    "change24h": -1.8134557220420313
+   },
+   "0x89557551bb30e319bef69502ca50feda29cf7777": {
+    "priceUsd": 4.317685946128328e-06,
+    "change24h": -1.8134557220420404
+   },
+   "0x25d5934ce90228b9b7ce03999b81069ab6297777": {
+    "priceUsd": 4.060319765367004e-06,
+    "change24h": -1.8134557220420437
+   },
+   "0x28c8880ab8a0807d8aa786b353f214799bea7777": {
+    "priceUsd": 4.058846600299078e-06,
+    "change24h": -1.8134557220420469
+   },
+   "0x87deeb3696ec069d5460c389cc78925df50d7777": {
+    "priceUsd": 4.036671678689189e-06,
+    "change24h": -1.8134557220420244
+   },
+   "0x62f28f9d5b5fe1befa0060c54f6d157e80617777": {
+    "priceUsd": 3.952633082834678e-06,
+    "change24h": -1.8134557220420413
+   },
+   "0x94db948945da0b68a2c230488d33e8679e7a7777": {
+    "priceUsd": 3.881906318265437e-06,
+    "change24h": -1.8134557220420437
+   },
+   "0xda2a083164f58bafa8bb8e117da9d4d1e7e67777": {
+    "priceUsd": 5.640460099464052e-06,
+    "change24h": -1.813455722042033
+   },
+   "0x5dff3639e19d1c164aedf5affd1c049b5fe17777": {
+    "priceUsd": 3.6235714780717526e-06,
+    "change24h": -1.8134557220420333
+   },
+   "0x86c68d4fe7836a9fa13c88e8ed1b9a21f48e7777": {
+    "priceUsd": 5.442481552585313e-06,
+    "change24h": -1.81345572204204
+   },
+   "0xfdd1be6ed932fb5f98cfdc9e1d48662f89077777": {
+    "priceUsd": 5.401607572048142e-06,
+    "change24h": -1.8134557220420364
+   },
+   "0xb5f73846a656232d5d251ab1048bca88d1507777": {
+    "priceUsd": 3.535170652910541e-06,
+    "change24h": -1.8171212776168688,
+    "volume24h": 0
+   },
+   "0x9a17ad79acc180f911be1b89f6fd566597fd7777": {
+    "priceUsd": 3.4956819374192646e-06,
+    "change24h": -1.813456114258975,
+    "volume24h": 0
+   },
+   "0xb72e6262dae53caf167f0966421a0b9782977777": {
+    "priceUsd": 3.394294649620565e-06,
+    "change24h": -1.8134557220420278
+   },
+   "0xe6eddc07257c3bf8939b8af87acc54be94237777": {
+    "priceUsd": 3.407483306415038e-06,
+    "change24h": -1.8134557220420344
+   },
+   "0x6a7e3f839382fbb6a6131d4aae864aaeb362292d": {
+    "priceUsd": 0.1379097456999066,
+    "change24h": -1.8134557220420406
+   },
+   "0x91ce820dd39a2b5639251e8c7837998530fe7777": {
+    "priceUsd": 6.097256762150827e-06,
+    "change24h": -1.8134557220420355
+   },
+   "0x7a481e5565d7e05d13a0c6edf1c134e56a237777": {
+    "priceUsd": 3.24532630937661e-06,
+    "change24h": -1.81345572204203
+   },
+   "0x23ae8c092566f82dd214edf1bb3fd76c6bf17777": {
+    "priceUsd": 3.2381508115145807e-06,
+    "change24h": -1.814778568334088,
+    "volume24h": 0
+   },
+   "0x3744ac3489f22f7a6a99943abbc320b3609b7777": {
+    "priceUsd": 3.1020535453192936e-06,
+    "change24h": -1.8134557220420406
+   },
+   "0x96079813ddec84bb1747d8e180154d8e096e7777": {
+    "priceUsd": 3.0483192152444122e-06,
+    "change24h": -1.8134557220420469
+   },
+   "0x2cb31c268819ee133de378a3a2e087f0b0ec7777": {
+    "priceUsd": 4.935611241326356e-06,
+    "change24h": -1.81345572204204
+   },
+   "0x2c957534413f97d5b2a3e83a58df60e550317777": {
+    "priceUsd": 2.8992522174343226e-06,
+    "change24h": -1.8134557220420264
+   },
+   "0x5b48ddcbf6c58d9c708c2126a039a49c04417777": {
+    "priceUsd": 4.8059621595513616e-06,
+    "change24h": -1.813455722042033
+   },
+   "0x84e6d67e36618fb07ed78227743fd6c044927777": {
+    "priceUsd": 2.8543671700348184e-06,
+    "change24h": -1.8134557220420238
+   },
+   "0xbcd672aa5937120b039e18a86961ce54351e7777": {
+    "priceUsd": 2.8381783019688678e-06,
+    "change24h": -1.8134557220420253
+   },
+   "0xf383a61f1a68ee4a77a1b7f57d8f2d948b5f7777": {
+    "priceUsd": 4.769900354700568e-06,
+    "change24h": -1.8159223495843317,
+    "volume24h": 0
+   },
+   "0x5ae24d411b9ffbd98905a1d5878f424aebad7777": {
+    "priceUsd": 2.778777071124253e-06,
+    "change24h": -1.813455722042034
+   },
+   "0x88abe9fcd8ff6fe0eb594439b447fedead917777": {
+    "priceUsd": 2.7340608506744583e-06,
+    "change24h": -1.8134557220420375
+   },
+   "0x288be68cea9a5032f8d8deebc1561996d2017777": {
+    "priceUsd": 2.7157114796430127e-06,
+    "change24h": -1.8134557220420362
+   },
+   "0xc8797e10678b35dc8fef1aa9b1d242dfc1da7777": {
+    "priceUsd": 2.716553741370769e-06,
+    "change24h": -1.8134557220420358
+   },
+   "0x61be9058c1207fcb5488c545b9b79db011507777": {
+    "priceUsd": 2.6587623839405944e-06,
+    "change24h": -1.8134557220420413
+   },
+   "0x8488f6797a90ea492fad3c48172d3aa46bd734d0": {
+    "priceUsd": 3.538571856812808e-06,
+    "change24h": -1.8150270594224318
+   },
+   "0x8b194601e648bd96c13a8ddc4adb8cdfafc67777": {
+    "priceUsd": 2.5574434588862046e-06,
+    "change24h": -1.8134557220420437
+   },
+   "0x7e8e2859dce33438fb2642dba0d0655f6d3e7777": {
+    "priceUsd": 2.5606579558565303e-06,
+    "change24h": -1.813455722042043
+   },
+   "0x3b1b1f1827e345b27eda1a9e83fefc049fcb7777": {
+    "priceUsd": 2.546196468136551e-06,
+    "change24h": -1.813455722042027
+   },
+   "0x19490ece1ecbad13602822186a573a610c537777": {
+    "priceUsd": 2.545001934714236e-06,
+    "change24h": -1.8134557220420344
+   },
+   "0xbf092fbb7b577052cf419333ad63835ed4c07777": {
+    "priceUsd": 2.5314142419646053e-06,
+    "change24h": -1.813455722042037
+   },
+   "0xb4ee48fa7f45c501f72ce09c5de39fde8b337777": {
+    "priceUsd": 2.5094987813339533e-06,
+    "change24h": -1.8134557220420295
+   },
+   "0xcba0ea6c7b93f35d7246911137ef46ec5b957777": {
+    "priceUsd": 2.496959658385469e-06,
+    "change24h": -1.8134557220420406
+   },
+   "0x11ea57121082bd4377a009ead53430e44d5a7777": {
+    "priceUsd": 2.475749649653237e-06,
+    "change24h": -1.8134557220420393
+   },
+   "0xaa53a04be07b814ef0dabdd1b2d14b4d36d17777": {
+    "priceUsd": 2.4243079183667707e-06,
+    "change24h": -1.8134557220420395
+   },
+   "0x3f9b782489c8098e225633a28a765b9b9b677777": {
+    "priceUsd": 2.4213768376963665e-06,
+    "change24h": -1.8134557220420369
+   },
+   "0x7de6432b490bbc00c8e14550f1098bb607bc7777": {
+    "priceUsd": 2.366420839306196e-06,
+    "change24h": -1.8134557220420395
+   },
+   "0xaa2ac88424397e6fb92da5f8da9e0c237f837777": {
+    "priceUsd": 2.3616794870917214e-06,
+    "change24h": -1.8134557220420389
+   },
+   "0x00d22b6c72bfecaef0069f39ff0dea50a2eb7777": {
+    "priceUsd": 2.357238654550527e-06,
+    "change24h": -1.813455722042024
+   },
+   "0xacd152e42b49ee431898fcc2d0cc2a128f657777": {
+    "priceUsd": 2.346395411479286e-06,
+    "change24h": -1.8134557220420382
+   },
+   "0xa1741620b6fbd617f0d70d92d5964d43daad7777": {
+    "priceUsd": 2.3253876635609955e-06,
+    "change24h": -1.8134557220420309
+   },
+   "0x335428a9ff52cee23dc4a9e0539f31b8ce757777": {
+    "priceUsd": 2.3237071713155077e-06,
+    "change24h": -1.813455722042049
+   },
+   "0x1d39bb55200d9c7dc0696a0904b74d5652677777": {
+    "priceUsd": 2.2876334260908712e-06,
+    "change24h": -1.8134557220420258
+   },
+   "0x4cf8668102bd9cd464450e19701f9dbc03fb7777": {
+    "priceUsd": 2.2793799030233093e-06,
+    "change24h": -1.8134557220420302
+   },
+   "0x2428ef207b30a1520cb42459edd24d9a8b4c7777": {
+    "priceUsd": 2.264782488148847e-06,
+    "change24h": -1.8134557220420364
+   },
+   "0x3b56bd5d73bf1bc296cc70a0ce222796029d7777": {
+    "priceUsd": 2.2534937677940464e-06,
+    "change24h": -1.8134557220420469
+   },
+   "0x2de7a1f001f47292d6d275ec66b9e0b4af277777": {
+    "priceUsd": 2.2349468534913524e-06,
+    "change24h": -1.8134557220420278
+   },
+   "0x3a4607301ec20a52e0df067357f5a9dd13297777": {
+    "priceUsd": 2.23429292641706e-06,
+    "change24h": -1.813455722042019
+   },
+   "0x0c925ebdfdd2b93984bfae55c4efee6bc7b27777": {
+    "priceUsd": 2.2043135179517567e-06,
+    "change24h": -1.8134557220420318
+   },
+   "0x704ea30406134056647b2883eba7220349e17777": {
+    "priceUsd": 2.203361000522488e-06,
+    "change24h": -1.8134557220420497
+   },
+   "0xae611e29a8260627f492ce357883c3f4959a7777": {
+    "priceUsd": 2.195337093015588e-06,
+    "change24h": -1.8134557220420309
+   },
+   "0x9e2d51d1cd38c66eec667fa69bf3de2299827777": {
+    "priceUsd": 2.1879921200490206e-06,
+    "change24h": -1.8134557220420475
+   },
+   "0xb02d20e04f6a30e558c16c693e17ccc4ef9d7777": {
+    "priceUsd": 2.184946142929208e-06,
+    "change24h": -1.8134557220420444
+   },
+   "0x1fcbbed9993b58c6e7f6a4354ca2e27b84ef7777": {
+    "priceUsd": 2.169265650031036e-06,
+    "change24h": -1.813455722042043
+   },
+   "0xaa21177d12639d8c61e4d0122ed63f078cf97777": {
+    "priceUsd": 2.169280821318206e-06,
+    "change24h": -1.8134557220420395
+   },
+   "0xc27a31f34427377b308322fda5fc0f232e957777": {
+    "priceUsd": 2.1396853602849697e-06,
+    "change24h": -1.8134557220420282
+   },
+   "0x90b969c9ec56490b17594bfef3bd4c33b84f7777": {
+    "priceUsd": 2.1375462711678935e-06,
+    "change24h": -1.8134557220420393
+   },
+   "0x95e6a9c620083cf17adb3205cc0a2ce996597777": {
+    "priceUsd": 2.1184037778759476e-06,
+    "change24h": -1.8134557220420282
+   },
+   "0x973eb1f3b2c2881ace37ee7e957e595a23ae7777": {
+    "priceUsd": 2.115271455203444e-06,
+    "change24h": -1.8134557220420349
+   },
+   "0x3e0fe8284ac4b5b00048c0d54226651c95c37777": {
+    "priceUsd": 2.1102270479524556e-06,
+    "change24h": -1.8134557220420269
+   },
+   "0x0555b6bea44daa120021ace2067c09560c497777": {
+    "priceUsd": 2.1092986267596155e-06,
+    "change24h": -1.813455722042034
+   },
+   "0x9de3968e5f5fd5115d47a9a1f2128c4d008b7777": {
+    "priceUsd": 2.089903031252691e-06,
+    "change24h": -1.8134557220420318
+   },
+   "0x96e88191f7356135f1b4abb9fef6d1813fff7777": {
+    "priceUsd": 2.090349410596763e-06,
+    "change24h": -1.8134557220420382
+   },
+   "0x4ec2cb4a621945e3b1bba662dde28a718bf77777": {
+    "priceUsd": 2.07336929917888e-06,
+    "change24h": -1.8134557220420324
+   },
+   "0x73818c9d61264a2723a42dc59244f5a13ce47777": {
+    "priceUsd": 2.067718584388074e-06,
+    "change24h": -1.813455722042022
+   },
+   "0x99fbd28a70f548cdac48f8d232e75bb5792a7777": {
+    "priceUsd": 2.0629572102692823e-06,
+    "change24h": -1.8134557220420306
+   },
+   "0x657a3edd0fecc2b935f187a0bf3c9920e22f7777": {
+    "priceUsd": 2.0548677275434935e-06,
+    "change24h": -1.8134557220420386
+   },
+   "0x00b684ce62906ae3d3036fe384aec6f216657777": {
+    "priceUsd": 2.0544498029862066e-06,
+    "change24h": -1.8134557220420318
+   },
+   "0x92692af07e61fbeb0aef822fb336c60f66767777": {
+    "priceUsd": 2.027068688672704e-06,
+    "change24h": -1.8134557220420418
+   },
+   "0x2e59001a19aade679f2c4ef09df340bf9dc97777": {
+    "priceUsd": 2.001072712551163e-06,
+    "change24h": -1.8134557220420424
+   },
+   "0x0a3dd9eef386ee847981eaf04836c667dd217777": {
+    "priceUsd": 1.9952734207033337e-06,
+    "change24h": -1.813455722042025
+   },
+   "0x18c6fed811d157914277a0a191b7c3e43eba7777": {
+    "priceUsd": 1.9809027981458453e-06,
+    "change24h": -1.8134557220420375
+   },
+   "0xbadfb857a69aff0449204aa769373f8599007777": {
+    "priceUsd": 1.978355565479964e-06,
+    "change24h": -1.8134557220420497
+   },
+   "0x83ab0d7170bd052db773220cdb22175e3fef7777": {
+    "priceUsd": 4.933179103843094e-06,
+    "change24h": -1.8134557220420442
+   },
+   "0xaeb0d77f9f972a269d21e5e6d9f3445a6a047777": {
+    "priceUsd": 1.970460119758786e-06,
+    "change24h": -1.8134557220420449
+   },
+   "0x1111b3ded9f1fe1801ad4ebef8e2788183a24111": {
+    "priceUsd": 1.14,
+    "change24h": -0.04,
+    "volume24h": 662936.83
+   },
+   "0x44812436147d162ce0a6b573dbcc7492ef117777": {
+    "priceUsd": 1.6e-05,
+    "change24h": -11.09,
+    "volume24h": 259.1
+   },
+   "0x7b6ec4ff353583807f3478900d7eaede430c7777": {
+    "priceUsd": 5.391e-06,
+    "volume24h": 6.92
+   },
+   "0x5e48f911a52ac40cb9c3c3743a69777236497777": {
+    "priceUsd": 3.409e-06,
+    "change24h": -2.16,
+    "volume24h": 418.9
+   },
+   "0x284f45faa075333acaf3e75cad3001d8dade7777": {
+    "priceUsd": 3.433e-06,
+    "volume24h": 3.37
+   }
+  }
+ },
+ "/v1/tokens/search?q=argus&chain=5042": {
+  "tokens": []
+ },
+ "/v1/tokens/chart/0x171a4217b86a807a64eb94757db6849fb4bdbaa0?tf=1h": {
+  "candles": [
+   {
+    "t": 1789520400,
+    "o": 76161.46230007616,
+    "h": 93752.28222071448,
+    "l": 73286.91828508611,
+    "c": 73301.06410779823,
+    "v": 22676.53
+   },
+   {
+    "t": 1789524000,
+    "o": 73332.39663202444,
+    "h": 75694.61170208515,
+    "l": 73332.39663202444,
+    "c": 75694.61170208515,
+    "v": 173955.23
+   }
+  ],
+  "tf": "1h",
+  "source": "db"
+ },
+ "/v1/tokens/trades/0x171a4217b86a807a64eb94757db6849fb4bdbaa0?limit=2": {
+  "trades": [
+   {
+    "tx": "0x4e0bda6af0d4e75c98049cc7c64c5fb9112dcb7e397d68f851cfc01406df33db",
+    "logIndex": 41,
+    "dex": "uniswap_v3",
+    "side": "buy",
+    "tokenAmt": 0.00587394,
+    "usd": 472.372001,
+    "priceUsd": 80418.25435738193,
+    "ts": 1789891817,
+    "wallet": "0x0e177f6758872e474c8adb191fbd33352495911d"
+   },
+   {
+    "tx": "0xac5d6408c433ced6e93e0b5d4118f5f726511c0e0514f4ea6a9a7cb98552cde4",
+    "logIndex": 3,
+    "dex": "uniswap_v3",
+    "side": "buy",
+    "tokenAmt": 0.01154339,
+    "usd": 928.183258,
+    "priceUsd": 80408.20400246374,
+    "ts": 1789891817,
+    "wallet": "0x870c73c98a14b6956b79247e1a1cdc68ba0060ee"
+   }
+  ],
+  "total": 2001,
+  "page": 1,
+  "pageSize": 2,
+  "dexes": [
+   "slipstream_fork",
+   "uniswap_v3"
+  ],
+  "stats24h": {
+   "buys": 11127,
+   "sells": 9332,
+   "buyUsd": 2902488.248025012,
+   "sellUsd": 3019938.981532
+  }
+ },
+ "/v1/tokens/stats/0x171a4217b86a807a64eb94757db6849fb4bdbaa0": {
+  "priceUsd": 80418.25435738193,
+  "windows": {
+   "m5": {
+    "change": 0,
+    "txns": 26,
+    "buys": 12,
+    "sells": 14,
+    "buyVol": 3176.8774229999995,
+    "sellVol": 3214.276456,
+    "makers": 16,
+    "buyers": 10,
+    "sellers": 8
+   },
+   "h1": {
+    "change": 0.12,
+    "txns": 405,
+    "buys": 217,
+    "sells": 188,
+    "buyVol": 64728.724117999926,
+    "sellVol": 46488.608315000005,
+    "makers": 149,
+    "buyers": 95,
+    "sellers": 79
+   },
+   "h6": {
+    "change": -0.81,
+    "txns": 5797,
+    "buys": 2956,
+    "sells": 2841,
+    "buyVol": 877524.8736700043,
+    "sellVol": 985143.4303749993,
+    "makers": 850,
+    "buyers": 530,
+    "sellers": 535
+   },
+   "h24": {
+    "change": -0.87,
+    "txns": 20459,
+    "buys": 11127,
+    "sells": 9332,
+    "buyVol": 2902488.2480250364,
+    "sellVol": 3019938.9815319907,
+    "makers": 2942,
+    "buyers": 2228,
+    "sellers": 1933
+   }
+  },
+  "liquidityUsd": null,
+  "ath": {
+   "priceUsd": 93752.28222071448,
+   "ts": 1789520400
+  },
+  "range24h": {
+   "high": 81967.21311475411,
+   "low": 79796.7741935484
+  },
+  "firstTradeTs": 1789520400,
+  "totalTxns": 78768,
+  "markets": [
+   {
+    "dex": "uniswap_v3",
+    "pool": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+    "txns24h": 17884,
+    "vol24h": 5118587.965404977,
+    "makers24h": 2673
+   },
+   {
+    "dex": "slipstream_fork",
+    "pool": "0xd945caee4635bcd7fb8a9fa74dc1d0c4c1472782",
+    "txns24h": 1744,
+    "vol24h": 787999.6481669984,
+    "makers24h": 347
+   }
+  ]
+ },
+ "/v1/tokens/traders/0x171a4217b86a807a64eb94757db6849fb4bdbaa0?limit=2": {
+  "_status": 404,
+  "error": "UNKNOWN_TOKEN"
+ },
+ "/v1/quote?chain=5042&inputMint=0x3600000000000000000000000000000000000000&outputMint=0x171a4217b86a807a64eb94757db6849fb4bdbaa0&amount=5000000&slippageBps=100": {
+  "inputMint": "0x3600000000000000000000000000000000000000",
+  "outputMint": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+  "inputAmount": "5000000",
+  "outputAmount": "465",
+  "otherAmountThreshold": "460",
+  "slippageBps": 100,
+  "priceImpactPct": "92.51",
+  "routePlan": [
+   {
+    "percent": 100,
+    "swapInfo": {
+     "dex": "uniswap_v4",
+     "pool": "0xdd9da42901118c475e6efb78117100e611c675e2c53bc801c4d2bfdd504b2e8d",
+     "inputMint": "0x3600000000000000000000000000000000000000",
+     "outputMint": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+     "inputAmount": "5000000",
+     "outputAmount": "465",
+     "adapter": "0xd1d86d370f40471B79D9938B27F6ea040EbD6888",
+     "extraData": "0x000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa00000000000000000000000003600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000017700000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000"
+    }
+   }
+  ],
+  "gasEstimate": "318189",
+  "gasCostUSD": "0",
+  "blockNumber": 21808240,
+  "timeTaken": 0.643,
+  "feeBps": 25,
+  "feeAmount": "1",
+  "feeMint": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+  "feeTier": "meme"
+ },
+ "/v1/smart-money/top?chain=5042&source=onchain&window=7d&limit=2": {
+  "wallets": [
+   {
+    "wallet": "0xb145400da27a2497d9fc2cd5621f2bfd37617af4",
+    "pnlUsd": 85260.25886163529,
+    "realizedUsd": 28166.924288181075,
+    "unrealizedUsd": 57093.33457345421,
+    "volumeUsd": 68986.38694614707,
+    "trades": 49,
+    "tokensTraded": 5,
+    "winningTokens": 3,
+    "winRate": 0.6,
+    "topToken": {
+     "symbol": "ARGUS",
+     "pnlUsd": 85345.61369765387
+    },
+    "lastActiveTs": 1789890946,
+    "pnlMeme": 85260.25886163529,
+    "pnlMajor": 0,
+    "memeVol": 68986.38694614707,
+    "archetype": "degen",
+    "memeShare": 1,
+    "winRateAdj": 0.5294117647058824,
+    "smartScore": 43067.763434718785
+   },
+   {
+    "wallet": "0xf8218b98f49b86c7e491079591acc08ee4fd6e7e",
+    "pnlUsd": 53891.271617383565,
+    "realizedUsd": 26940.46261686956,
+    "unrealizedUsd": 26950.809000514004,
+    "volumeUsd": 150140.03604099998,
+    "trades": 70,
+    "tokensTraded": 11,
+    "winningTokens": 9,
+    "winRate": 0.8181818181818182,
+    "topToken": {
+     "symbol": "ARGUS",
+     "pnlUsd": 22862.25828632662
+    },
+    "lastActiveTs": 1789890046,
+    "pnlMeme": 53891.271617383565,
+    "pnlMajor": 0,
+    "memeVol": 150140.03604099998,
+    "archetype": "degen",
+    "memeShare": 1,
+    "winRateAdj": 0.6521739130434783,
+    "smartScore": 32966.26695083121
+   }
+  ],
+  "totalWallets": 92826,
+  "window": "7d",
+  "category": "all",
+  "chain": 5042,
+  "source": "onchain",
+  "indexedToBlock": 21808217,
+  "updatedAt": 1789891859855,
+  "live": {
+   "rollStamp": 1789891728,
+   "buckets": 21,
+   "rows": 253,
+   "seen": 1261,
+   "ingested": 1261,
+   "skippedDup": 0,
+   "computedAt": 0
+  },
+  "botsRemoved": {
+   "cadence": 325,
+   "nonceOrDenylist": 5,
+   "behavior": 37
+  },
+  "note": "ranked by Smart Score \u2014 skill-adjusted, realized-weighted profit (est. at current prices)"
+ },
+ "/v1/lp/overview?chain=5042": {
+  "chain": 5042,
+  "pools24h": 416,
+  "tvlUsd": 59062379.766785584,
+  "vol24hUsd": 32606366.761442985,
+  "fees24hUsd": 108337.05880814306,
+  "feesPoolsCounted": 31,
+  "lpAdd24hUsd": 18682513.45246684,
+  "lpRemove24hUsd": 26568879.80331895,
+  "providers24h": 1750,
+  "best": {
+   "pool": "0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09",
+   "pair": "USDC / MURMUR",
+   "token0": {
+    "address": "0x3600000000000000000000000000000000000000",
+    "symbol": "USDC",
+    "decimals": 6,
+    "logo": "https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602",
+    "impostor": false
+   },
+   "token1": {
+    "address": "0x8faae5592b9acc27a79fca745c6b872adf514a5d",
+    "symbol": "MURMUR",
+    "decimals": 18,
+    "logo": "https://cdn.dexscreener.com/cms/images/QUq-IqT1GLQNkxMx?width=800&height=800&quality=95&format=auto",
+    "impostor": false
+   },
+   "dex": "uniswap_v4",
+   "feeTvlPct": 14.40921999562047,
+   "aprPct": 5259.365298401472,
+   "tvlUsd": 12650.66
+  },
+  "hot": [
+   {
+    "pool": "0x6a3bacaa6493734c1ac221ebf42cf530a96c1e02",
+    "pair": "USDC / ARGUS",
+    "token0": {
+     "address": "0x3600000000000000000000000000000000000000",
+     "symbol": "USDC",
+     "decimals": 6,
+     "logo": "https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602",
+     "impostor": false
+    },
+    "token1": {
+     "address": "0xece5ca8bf9220718e5727754026757512212cb3c",
+     "symbol": "ARGUS",
+     "decimals": 18,
+     "logo": "https://cdn.dexscreener.com/cms/images/0lkViejHOEfB3StE?width=800&height=800&quality=95&format=auto",
+     "impostor": false
+    },
+    "dex": "uniswap_v3",
+    "feeBps": 100,
+    "fees24hUsd": 21874.53260752,
+    "feeTvlPct": 2.0870143590342853,
+    "tvlUsd": 1048125.64,
+    "vol24hUsd": 2187453.260752,
+    "wallets24h": 598
+   },
+   {
+    "pool": "0xb3f441e8871840ecfcb284e5cbb5b9c21a50e961e1c50109bdced25e429f00cc",
+    "pair": "USDC / ARGUS",
+    "token0": {
+     "address": "0x3600000000000000000000000000000000000000",
+     "symbol": "USDC",
+     "decimals": 6,
+     "logo": "https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602",
+     "impostor": false
+    },
+    "token1": {
+     "address": "0xece5ca8bf9220718e5727754026757512212cb3c",
+     "symbol": "ARGUS",
+     "decimals": 18,
+     "logo": "https://cdn.dexscreener.com/cms/images/0lkViejHOEfB3StE?width=800&height=800&quality=95&format=auto",
+     "impostor": false
+    },
+    "dex": "uniswap_v4",
+    "feeBps": 98.5,
+    "fees24hUsd": 14338.80123860194,
+    "feeTvlPct": 4.759044987124094,
+    "tvlUsd": 301295.77,
+    "vol24hUsd": 1455715.861786999,
+    "wallets24h": 313
+   }
+  ],
+  "inflow": [
+   {
+    "pool": "0xd945caee4635bcd7fb8a9fa74dc1d0c4c1472782",
+    "pair": "cirBTC / USDC",
+    "token0": {
+     "address": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+     "symbol": "cirBTC",
+     "decimals": 8,
+     "logo": "https://coin-images.coingecko.com/coins/images/102172745/large/cirbtc.jpg?1775204071",
+     "impostor": false
+    },
+    "token1": {
+     "address": "0x3600000000000000000000000000000000000000",
+     "symbol": "USDC",
+     "decimals": 6,
+     "logo": "https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602",
+     "impostor": false
+    },
+    "dex": "slipstream_fork",
+    "netUsd": 44469.43327364928,
+    "tvlUsd": 570213.05
+   },
+   {
+    "pool": "0xa2ed014384e061ec2aaccea186d41798dcf4da29264c44a676d3006fdc252ae0",
+    "pair": "USDC / ARCOON",
+    "token0": {
+     "address": "0x3600000000000000000000000000000000000000",
+     "symbol": "USDC",
+     "decimals": 6,
+     "logo": "https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602",
+     "impostor": false
+    },
+    "token1": {
+     "address": "0x4621a0baa0b5d97aae77704cf2a84dabe78a4fed",
+     "symbol": "ARCOON",
+     "decimals": 18,
+     "logo": "https://ipfs.filebase.io/ipfs/bafybeiecv2b5gkrr5q4cesftgirntp4roqixhcily6ynfjitgdcunxm3x4",
+     "impostor": false
+    },
+    "dex": "uniswap_v4",
+    "netUsd": 24000.000013,
+    "tvlUsd": 142471.24
+   }
+  ],
+  "updatedAt": 1789891860138
+ },
+ "/v1/lp/pools?chain=5042&limit=2": {
+  "chain": 5042,
+  "sort": "fee_tvl",
+  "interval": "24h",
+  "minTvl": 10000,
+  "flagged": false,
+  "hidden": 148,
+  "total": 1207,
+  "limit": 2,
+  "offset": 0,
+  "pools": [
+   {
+    "pool": "0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09",
+    "dex": "uniswap_v4",
+    "kind": "v4",
+    "feeBps": 98.8,
+    "hooks": null,
+    "lpAccess": "open",
+    "tickSpacing": 99,
+    "token0": {
+     "address": "0x3600000000000000000000000000000000000000",
+     "symbol": "USDC",
+     "decimals": 6,
+     "logo": "https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602",
+     "impostor": false
+    },
+    "token1": {
+     "address": "0x8faae5592b9acc27a79fca745c6b872adf514a5d",
+     "symbol": "MURMUR",
+     "decimals": 18,
+     "logo": "https://cdn.dexscreener.com/cms/images/QUq-IqT1GLQNkxMx?width=800&height=800&quality=95&format=auto",
+     "impostor": false
+    },
+    "tokenSide": 1,
+    "tvlUsd": 12650.66,
+    "tvlSrc": "dexscreener",
+    "tvlAt": 1789891603,
+    "vol": {
+     "h1": 176.542824,
+     "h6": 38476.48885700001,
+     "h24": 184500.14476700005,
+     "d7": 279614.0964730001
+    },
+    "fees": {
+     "h1": 1.74424310112,
+     "h6": 380.1477099071601,
+     "h24": 1822.8614302979606
+    },
+    "feeTvlPct": {
+     "h1": 0.01378776365122452,
+     "h6": 3.0049634557182006,
+     "h24": 14.40921999562047
+    },
+    "aprPct": 5259.365298401472,
+    "trades24h": 3050,
+    "wallets24h": 131,
+    "priceUsd": 0.0007671677499328048,
+    "lpAdd24h": 10038.913414765322,
+    "lpRemove24h": 7583.743885515528,
+    "providers24h": 25,
+    "firstSeenTs": 1789693200,
+    "createdTs": 1789695461,
+    "lastTradeHour": 1789891200,
+    "turnover24h": 14.584230764798047,
+    "suspect": false,
+    "score": 54
+   },
+   {
+    "pool": "0x5e794e5d3d01c045ddfb2448c4afd557ec297d1dee49b28923dc0ada3425f780",
+    "dex": "uniswap_v4",
+    "kind": "v4",
+    "feeBps": 100,
+    "hooks": "0x863233bec01b92f137677e0cdf69bce697a26044",
+    "lpAccess": "open",
+    "tickSpacing": 200,
+    "token0": {
+     "address": "0x3600000000000000000000000000000000000000",
+     "symbol": "USDC",
+     "decimals": 6,
+     "logo": "https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602",
+     "impostor": false
+    },
+    "token1": {
+     "address": "0xb7c934ff18730c24e6113bb4bc5a68feef16fd29",
+     "symbol": "ARCUS",
+     "decimals": 18,
+     "logo": "https://cdn.dexscreener.com/cms/images/5y5kHHeZlCoSxlaq?width=800&height=800&quality=95&format=auto",
+     "impostor": false
+    },
+    "tokenSide": 1,
+    "tvlUsd": 67762.97,
+    "tvlSrc": "dexscreener",
+    "tvlAt": 1789891603,
+    "vol": {
+     "h1": 1737.729194,
+     "h6": 98528.85847099999,
+     "h24": 738635.9835579997,
+     "d7": 1514816.5901679986
+    },
+    "fees": {
+     "h1": 17.377291940000003,
+     "h6": 985.2885847099998,
+     "h24": 7386.359835579997
+    },
+    "feeTvlPct": {
+     "h1": 0.025644230086137018,
+     "h6": 1.454022137326625,
+     "h24": 10.90028939932827
+    },
+    "aprPct": 3978.605630754819,
+    "trades24h": 5942,
+    "wallets24h": 353,
+    "priceUsd": 0.0004984252802693936,
+    "lpAdd24h": 960.0917324579016,
+    "lpRemove24h": 872.6609130846944,
+    "providers24h": 11,
+    "firstSeenTs": 1789567200,
+    "createdTs": 1789570672,
+    "lastTradeHour": 1789891200,
+    "turnover24h": 10.900289399328273,
+    "suspect": false,
+    "score": 62
+   }
+  ],
+  "updatedAt": 1789891860349
+ },
+ "/v1/lp/leaderboard?chain=5042&limit=2": {
+  "chain": 5042,
+  "sort": "profit",
+  "minIn": 20,
+  "filters": {},
+  "rows": [
+   {
+    "wallet": "0x50550bf5c09b38e5c574c190cef88b859694a44a",
+    "winRatePct": 75,
+    "feesUsd": 13516.447234,
+    "pools": 5,
+    "evUsd": 55.95264399437404,
+    "avgAgeHours": 53.940039682539684,
+    "avgInvestedUsd": 8802.035202296884,
+    "avgMonthlyProfitUsd": 54574.16597590998,
+    "windows": {
+     "d7": {
+      "positions": 7,
+      "profitUsd": 13643.541493977495
+     },
+     "d30": {
+      "positions": 7,
+      "profitUsd": 13643.541493977495
+     },
+     "all": {
+      "positions": 7,
+      "profitUsd": 13643.541493977495
+     }
+    },
+    "open": 3,
+    "closed": 4,
+    "wins": 3,
+    "firstTs": 1789524227,
+    "lastTs": 1789695131,
+    "daily": [
+     {
+      "day": "2026-09-14",
+      "profitUsd": 0
+     },
+     {
+      "day": "2026-09-15",
+      "profitUsd": 0
+     }
+    ],
+    "tokens": [
+     {
+      "address": "0xbc43ce8dec648ea298c4275559b81d6261c90b67",
+      "symbol": "TOLLY",
+      "logo": "https://cdn.dexscreener.com/cms/images/LquZIzWeLJoeUE4x?width=800&height=800&quality=95&format=auto",
+      "inUsd": 56621.88931640096,
+      "positions": 4
+     },
+     {
+      "address": "0xa163d7624da3b5d9182c50eab5b8cd247ae861bb",
+      "symbol": "Minara",
+      "logo": "https://static.minara.ai/minara-fun/token-logos/1a464bd3cbb6e0db661556f18b784344754785730da3bf9752e383e7e5a2605a.png",
+      "inUsd": 13303.485575872332,
+      "positions": 1
+     }
+    ]
+   },
+   {
+    "wallet": "0x4705173e07dc8acde8a826a96883848d0a4bb2cf",
+    "winRatePct": null,
+    "feesUsd": 12121.658648,
+    "pools": 1,
+    "evUsd": null,
+    "avgAgeHours": 50.736111111111114,
+    "avgInvestedUsd": 1585.3021168837654,
+    "avgMonthlyProfitUsd": 48486.634592,
+    "windows": {
+     "d7": {
+      "positions": 5,
+      "profitUsd": 12121.658648
+     },
+     "d30": {
+      "positions": 5,
+      "profitUsd": 12121.658648
+     },
+     "all": {
+      "positions": 5,
+      "profitUsd": 12121.658648
+     }
+    },
+    "open": 5,
+    "closed": 0,
+    "wins": 0,
+    "firstTs": 1789644774,
+    "lastTs": 1789742574,
+    "daily": [
+     {
+      "day": "2026-09-14",
+      "profitUsd": 0
+     },
+     {
+      "day": "2026-09-15",
+      "profitUsd": 0
+     }
+    ],
+    "tokens": [
+     {
+      "address": "0x2ba0f44bdfc17fba30eda9cdbecb908ca45b043b",
+      "symbol": "CRCL",
+      "logo": "https://cdn.dexscreener.com/cms/images/Y-swLma-R46hqFvc?width=800&height=800&quality=95&format=auto",
+      "inUsd": 7926.5105844188265,
+      "positions": 5
+     }
+    ]
+   }
+  ],
+  "updatedAt": 1789891861738
+ },
+ "/v1/lp/status": {
+  "enabled": true,
+  "chains": [
+   5042,
+   4663
+  ],
+  "lanes": {
+   "143": {
+    "cursor": 106412087,
+    "head": 106412087,
+    "chunk": 4000,
+    "rows": 2,
+    "lastTick": 1789891861000,
+    "last": {
+     "logs": 0,
+     "rows": 0,
+     "unknownPools": 0,
+     "resolved": 0,
+     "nonAnchored": 0,
+     "noDecimals": 0,
+     "noRate": 0,
+     "noSqrt": 0,
+     "tokenOnly": 0,
+     "managed": 0,
+     "collects": 0,
+     "transfers": 0
+    },
+    "tickStartedAt": 1789891860977,
+    "attrib": {
+     "txs": 0,
+     "set": 0,
+     "floor": 1789891861,
+     "idle": true,
+     "at": 1789891861000
+    },
+    "behind": 0,
+    "running": true
+   },
+   "4663": {
+    "cursor": 67785681,
+    "head": 67785681,
+    "chunk": 4000,
+    "rows": 1322,
+    "lastTick": 1789891861864,
+    "last": {
+     "logs": 115,
+     "rows": 24,
+     "unknownPools": 0,
+     "resolved": 3,
+     "nonAnchored": 44,
+     "noDecimals": 0,
+     "noRate": 0,
+     "noSqrt": 0,
+     "tokenOnly": 3,
+     "managed": 19,
+     "collects": 11,
+     "transfers": 10
+    },
+    "tickStartedAt": 1789891861137,
+    "attrib": {
+     "txs": 0,
+     "set": 0,
+     "floor": 1789891861,
+     "idle": true,
+     "at": 1789891861866
+    },
+    "behind": 0,
+    "running": true
+   },
+   "5042": {
+    "cursor": 21808258,
+    "head": 21808258,
+    "chunk": 4000,
+    "rows": 77,
+    "lastTick": 1789891858995,
+    "last": {
+     "logs": 3,
+     "rows": 2,
+     "unknownPools": 2,
+     "resolved": 0,
+     "nonAnchored": 0,
+     "noDecimals": 0,
+     "noRate": 0,
+     "noSqrt": 0,
+     "tokenOnly": 0,
+     "managed": 1,
+     "collects": 1,
+     "transfers": 2
+    },
+    "tickStartedAt": 1789891858105,
+    "attrib": {
+     "txs": 300,
+     "set": 0,
+     "floor": 1789538828,
+     "idle": false,
+     "at": 1789891860035
+    },
+    "behind": 0,
+    "running": true
+   }
+  },
+  "pools": {
+   "143": {
+    "floor": 1789146000,
+    "tvlRows": 164,
+    "hourlyRows": 14539
+   },
+   "4663": {
+    "floor": 1789146000,
+    "tvlRows": 879,
+    "hourlyRows": 154120
+   },
+   "5042": {
+    "floor": 1789146000,
+    "tvlRows": 1816,
+    "hourlyRows": 245072
+   }
+  },
+  "positions": {
+   "143": {
+    "cursor": "106411386:64",
+    "positions": 982,
+    "open": 326
+   },
+   "4663": {
+    "cursor": "67785366:7",
+    "positions": 161730,
+    "open": 44557
+   },
+   "5042": {
+    "cursor": "21808179:20",
+    "positions": 249663,
+    "open": 195886
+   }
+  }
+ },
+ "/v1/lp/token/0x171a4217b86a807a64eb94757db6849fb4bdbaa0?chain=5042&hours=24": {
+  "chain": 5042,
+  "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+  "hours": 24,
+  "adds": 200,
+  "addUsd": 274228.1437317083,
+  "removes": 176,
+  "removeUsd": 2291418.4063887238,
+  "netUsd": -2017190.2626570156,
+  "tokenOnlyAdds": 5,
+  "tokenOnlyRemoves": 30,
+  "jitTxs": 18,
+  "jitUsd": 39153.40135616365,
+  "providers": 51,
+  "top": [
+   {
+    "wallet": "0xa77401a1640e4f090fd5d08b7350b59d6a99b0fd",
+    "netUsd": -2064877.6495731266,
+    "addedUsd": 0,
+    "removedUsd": 2063818.8216671266,
+    "events": 2,
+    "lastTs": 1789845091
+   },
+   {
+    "wallet": "0x08d0d1d9d58675fea6e36670d85a9e8dad89f465",
+    "netUsd": 21439.05777238525,
+    "addedUsd": 21439.05777238525,
+    "removedUsd": 0,
+    "events": 1,
+    "lastTs": 1789817213
+   }
+  ],
+  "pools": [
+   {
+    "pool": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+    "dex": "uniswap_v3",
+    "netUsd": -2065710.8817895816,
+    "events": 88
+   },
+   {
+    "pool": "0xd945caee4635bcd7fb8a9fa74dc1d0c4c1472782",
+    "dex": "slipstream_fork",
+    "netUsd": 44581.441725988414,
+    "events": 282
+   }
+  ],
+  "updatedAt": 1789891863259
+ },
+ "/v1/lp/token/0x171a4217b86a807a64eb94757db6849fb4bdbaa0/pools?chain=5042": {
+  "chain": 5042,
+  "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+  "pools": [
+   {
+    "pool": "0xd945caee4635bcd7fb8a9fa74dc1d0c4c1472782",
+    "dex": "slipstream_fork",
+    "kind": "clmm",
+    "feeBps": 6,
+    "tvlUsd": 570213.05,
+    "vol24h": 772749.320668,
+    "aprPct": 29.678749237025,
+    "score": 75,
+    "reasons": [],
+    "launch": null
+   },
+   {
+    "pool": "0xc955cbfb9d03cde6f78901a81740264f895b9c00025beb9115cf2d7b86b3ee5a",
+    "dex": "uniswap_v4",
+    "kind": "v4",
+    "feeBps": 30,
+    "tvlUsd": 14896.68,
+    "vol24h": 13956.785425999999,
+    "aprPct": 102.59118166913699,
+    "score": 47,
+    "reasons": [
+     "the launcher holds 100% of the liquidity added"
+    ],
+    "launch": {
+     "launcher": "0x6049c9a0e26405c0985f9e3685c87d0ae917f82b",
+     "launcherName": "Uniswap Liquidity Launcher",
+     "creator": "0x8007221ab6bdb20496eb74d038cbc5d590d1bea9",
+     "hooks": null,
+     "launchedTs": 1789559316,
+     "launcherLpAddedUsd": 69592.12438223744,
+     "totalLpAddedUsd": 69592.12438223744,
+     "launcherSharePct": 100,
+     "launcherLastRemoveTs": 1789838701,
+     "launcherRemovedUsd": 51498.944581131305
+    }
+   }
+  ],
+  "updatedAt": 1789891866065
+ },
+ "/v1/lp/plan?chain=5042&token=0x171a4217b86a807a64eb94757db6849fb4bdbaa0&amountUsd=1000&days=7": {
+  "chain": 5042,
+  "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+  "amountUsd": 1000,
+  "days": 7,
+  "bands": {
+   "priceUsd": 80418.25,
+   "hourlyVolPct": 0.44,
+   "dailyVolPct": 2.1,
+   "candles": 104,
+   "young": false,
+   "profiles": [
+    {
+     "profile": "tight",
+     "horizonHours": 24,
+     "lower": 78711.94,
+     "upper": 82161.56,
+     "widthPct": 2.2,
+     "last7dInsidePct": 42
+    },
+    {
+     "profile": "balanced",
+     "horizonHours": 72,
+     "lower": 76059.95,
+     "upper": 85026.29,
+     "widthPct": 5.7,
+     "last7dInsidePct": 82
+    }
+   ],
+   "histogram": [
+    {
+     "lo": 73301.06,
+     "hi": 73799.8,
+     "hours": 1
+    },
+    {
+     "lo": 73799.8,
+     "hi": 74301.94,
+     "hours": 0
+    }
+   ]
+  },
+  "sims": [
+   {
+    "profile": "tight",
+    "lower": 78711.94,
+    "upper": 82161.56,
+    "sim": {
+     "pool": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+     "dex": "uniswap_v3",
+     "feeBps": 1,
+     "tvlUsd": 11239238.75,
+     "days": 7,
+     "hours": 104,
+     "hoursInRange": 1,
+     "inRangePct": 1,
+     "exits": 1,
+     "lower": 71745.77,
+     "upper": 74890.09,
+     "unreliable": null,
+     "entryPrice": 73301.06,
+     "exitPrice": 80418.25,
+     "priceChangePct": 9.7,
+     "feesUsd": 0.01,
+     "lpValueEndUsd": 1005.39,
+     "holdValueEndUsd": 1048.55,
+     "ilUsd": -43.16,
+     "netVsHoldUsd": -43.15,
+     "totalReturnUsd": 5.4,
+     "totalReturnPct": 0.54,
+     "feeAprPct": 0.1,
+     "capitalEfficiency": 50,
+     "shareOfPoolPct": 0.443,
+     "note": "Backtest on the last 7 days of Chord's own candles and this pool's hourly volume at today's TVL \u2014 what would have happened, not what will."
+    }
+   },
+   {
+    "profile": "balanced",
+    "lower": 76059.95,
+    "upper": 85026.29,
+    "sim": {
+     "pool": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+     "dex": "uniswap_v3",
+     "feeBps": 1,
+     "tvlUsd": 11239238.75,
+     "days": 7,
+     "hours": 104,
+     "hoursInRange": 53,
+     "inRangePct": 51,
+     "exits": 1,
+     "lower": 69328.48,
+     "upper": 77501.28,
+     "unreliable": null,
+     "entryPrice": 73301.06,
+     "exitPrice": 80418.25,
+     "priceChangePct": 9.7,
+     "feesUsd": 3.03,
+     "lpValueEndUsd": 1014.13,
+     "holdValueEndUsd": 1048.55,
+     "ilUsd": -34.42,
+     "netVsHoldUsd": -31.39,
+     "totalReturnUsd": 17.16,
+     "totalReturnPct": 1.72,
+     "feeAprPct": 15.8,
+     "capitalEfficiency": 36.4,
+     "shareOfPoolPct": 0.323,
+     "note": "Backtest on the last 7 days of Chord's own candles and this pool's hourly volume at today's TVL \u2014 what would have happened, not what will."
+    }
+   }
+  ],
+  "updatedAt": 1789891866541
+ },
+ "/v1/points/rules": {
+  "chain": 5042,
+  "season": 1,
+  "seasonStart": 1789516800,
+  "currentWeek": 1,
+  "weekLengthSec": 604800,
+  "pointsPerUsd": 0.1,
+  "minTradeUsd": 1,
+  "weekPool": 1000000,
+  "dayCapUsd": 50000,
+  "referredBonusPct": 10,
+  "referralBonusPct": 10,
+  "streak": [
+   {
+    "days": 5,
+    "multiplier": 1.25
+   },
+   {
+    "days": 3,
+    "multiplier": 1.1
+   }
+  ],
+  "counts": "Swaps executed through Chord on Arc (chain 5042). Swaps made elsewhere on Arc, or on any other chain, do not count.",
+  "size": "The dollar size of the trade as priced by Chord's own index (one route leg, never the sum of hops).",
+  "pool": "Each week a fixed pool of points is split among traders in proportion to their weighted volume. Your points for a week settle when the week closes.",
+  "tiers": [
+   {
+    "name": "Challenger",
+    "topRanks": 10,
+    "topPct": null,
+    "note": "top 10 of the season"
+   },
+   {
+    "name": "Diamond",
+    "topRanks": null,
+    "topPct": 1,
+    "note": "top 1% of scored wallets"
+   }
+  ],
+  "provisional": "Points are provisional until the week closes and can be voided for wash trading or self-dealing. Routers, bots and relayers are never scored."
+ },
+ "/v1/points/leaderboard?limit=2": {
+  "_status": 503,
+  "error": "NOT_ENABLED",
+  "message": "the points program is not running on this deployment"
+ },
+ "/v1/ask/status": {
+  "enabled": true,
+  "chain": 5042,
+  "guest": true,
+  "budget": {
+   "used": 41707,
+   "total": 4000000
+  }
+ },
+ "/v1/ask/picks": {
+  "chain": 5042,
+  "computedAt": 1789891756,
+  "picks": [
+   {
+    "ts": 1789891743,
+    "token": "0xbc43ce8dec648ea298c4275559b81d6261c90b67",
+    "symbol": "TOLLY",
+    "side": "bullish",
+    "score": 3.93,
+    "confidence": "medium",
+    "priceUsd": 0.0044422,
+    "target": 0.0051085,
+    "invalidation": 0.0040578,
+    "levels": {
+     "target": 0.0051085,
+     "targetFrom": "mechanical +15%",
+     "invalidation": 0.0040578,
+     "invalidationFrom": "5% under the nearest support"
+    },
+    "why": [
+     "buyers 64% of the last hour (156 trades)",
+     "59.8% of buying from wallets that are not bots or routers"
+    ],
+    "against": [],
+    "facts": {
+     "change24hPct": 3.451327756586764,
+     "buyShare1h": 64,
+     "buyShare24h": 53,
+     "realBuyerPct": 59.8,
+     "top10Pct": 22.6,
+     "vsVwapPct": 1.3,
+     "lastHourVsPriorPct": 44,
+     "lastHourUsd": 27067,
+     "lastHourTrades": 156,
+     "volume24h": 633338,
+     "traders": 1919
+    }
+   },
+   {
+    "ts": 1789891755,
+    "token": "0x70857041fef0ced97f9e01e7ccc21889afe3f6f4",
+    "symbol": "CRA",
+    "side": "bullish",
+    "score": 3.71,
+    "confidence": "medium",
+    "priceUsd": 0.00014232,
+    "target": 0.00015394,
+    "invalidation": 0.00012419,
+    "levels": {
+     "target": 0.00015394,
+     "targetFrom": "resistance",
+     "invalidation": 0.00012419,
+     "invalidationFrom": "5% under the nearest support"
+    },
+    "why": [
+     "volume 284% above the prior six hours",
+     "70.3% of buying from wallets that are not bots or routers"
+    ],
+    "against": [],
+    "facts": {
+     "change24hPct": -27.189832782274127,
+     "buyShare1h": 43,
+     "buyShare24h": 49,
+     "realBuyerPct": 70.3,
+     "top10Pct": 11.81,
+     "vsVwapPct": -21.6,
+     "lastHourVsPriorPct": 284,
+     "lastHourUsd": 6334,
+     "lastHourTrades": 71,
+     "volume24h": 104328,
+     "traders": 587
+    }
+   }
+  ],
+  "trackRecord7d": {
+   "graded": 120,
+   "targetHits": 36,
+   "stopHits": 46,
+   "expired": 0,
+   "open": 38,
+   "avgMovePct": 2.4,
+   "hitRatePct": 44
+  }
+ },
+ "/v1/bridge2/config": {
+  "provider": "cctp-v2",
+  "fastFinalityThreshold": 1000,
+  "arcDomain": 26,
+  "contracts": {
+   "tokenMessengerV2": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+   "messageTransmitterV2": "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64"
+  },
+  "chains": [
+   {
+    "chainId": 5042,
+    "domain": 26,
+    "name": "Arc",
+    "usdc": "0x3600000000000000000000000000000000000000"
+   },
+   {
+    "chainId": 143,
+    "domain": 15,
+    "name": "Monad",
+    "usdc": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+   }
+  ],
+  "relayer": {
+   "address": "0x66449F79050828abb7A205434C0971dBA7a44C38",
+   "arcBalance": "1646165237063978241",
+   "enabled": true
+  }
+ },
+ "/v1/crosschain/config?provider=lifi": {
+  "enabled": true,
+  "provider": "lifi",
+  "appFeeBps": 5,
+  "origins": [
+   143,
+   4663
+  ],
+  "origin": null,
+  "chains": [
+   {
+    "id": 4663,
+    "name": "out",
+    "displayName": "Robinhood Chain",
+    "nativeSymbol": "ETH",
+    "explorerUrl": "https://robin.etherscan.io",
+    "featured": true,
+    "iconUrl": "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/robinhood.svg"
+   },
+   {
+    "id": 5042,
+    "name": "arc",
+    "displayName": "Arc",
+    "nativeSymbol": "USDC",
+    "explorerUrl": "https://explorer.arc.io",
+    "featured": true,
+    "iconUrl": "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/arc.svg"
+   }
+  ]
+ },
+ "/v1/rh/status": {
+  "chain": 4663,
+  "enabled": true,
+  "recentAt": 1789891427,
+  "staleSec": 441,
+  "floorHour": 1781197200,
+  "genesisHour": 1785974400,
+  "backfillComplete": true,
+  "updatedAt": 1789891868582
+ },
+ "/v1/rh/overview": {
+  "chain": 4663,
+  "last24h": {
+   "volUsd": 550299744.1561619,
+   "swaps": 1079429,
+   "tokens": 1248,
+   "sinceHour": 1789808400
+  },
+  "venues24h": [
+   {
+    "dex": "uniswap_v3",
+    "volUsd": 398446666.0763337,
+    "trades": 793745,
+    "tokens": 976,
+    "sharePct": 72.40538821025947
+   },
+   {
+    "dex": "nadfun_dex",
+    "volUsd": 86870804.38588408,
+    "trades": 94710,
+    "tokens": 205,
+    "sharePct": 15.786088456045553
+   }
+  ],
+  "hourly24": [
+   {
+    "hour": 1789808400,
+    "volUsd": 20860178.787550393,
+    "swaps": 29122
+   },
+   {
+    "hour": 1789812000,
+    "volUsd": 16607559.066086678,
+    "swaps": 28538
+   }
+  ],
+  "daily": [
+   {
+    "day": 1787356800,
+    "swaps": 706077,
+    "volUsd": 248035051.5861872,
+    "tokens": 1056,
+    "wallets": 32922,
+    "venues": 8
+   },
+   {
+    "day": 1787443200,
+    "swaps": 760930,
+    "volUsd": 261936195.3020307,
+    "tokens": 1065,
+    "wallets": 26961,
+    "venues": 9
+   }
+  ],
+  "coverage": {
+   "recentAt": 1789891427,
+   "stale": false,
+   "floorHour": 1781197200,
+   "genesisHour": 1785974400,
+   "backfillComplete": true
+  },
+  "updatedAt": 1789891794537
+ },
+ "/v1/rh/tokens?limit=2": {
+  "chain": 4663,
+  "sinceHour": 1789808400,
+  "tradersSince": 1789776000,
+  "sort": "volume",
+  "tokens": [
+   {
+    "address": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+    "symbol": "WETH",
+    "name": "WETH",
+    "decimals": 18,
+    "logoURI": "https://assets.coingecko.com/coins/images/2518/small/weth.png?1696503332",
+    "tags": [
+     "bridged"
+    ],
+    "listed": true,
+    "priceUsd": 2580.1259797979797,
+    "change24hPct": -2.421961053968613,
+    "liquidityUsd": null,
+    "volume24h": 305214685.46276,
+    "buyVolume24h": 150250793.83089906,
+    "sellVolume24h": 154963891.63186103,
+    "trades24h": 431734,
+    "buys24h": 221381,
+    "sells24h": 210353,
+    "traders": 19755,
+    "lastTradeTs": 1789891402
+   },
+   {
+    "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+    "symbol": "NVDA",
+    "name": "NVIDIA \u2022 Robinhood Token",
+    "decimals": 18,
+    "logoURI": "https://cdn.robinhood.com/ncw_assets/logos/0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec.png",
+    "tags": [
+     "stock"
+    ],
+    "listed": true,
+    "priceUsd": 220.97693371148938,
+    "change24hPct": -0.7107543259553206,
+    "liquidityUsd": 7508320,
+    "volume24h": 34504046.378991455,
+    "buyVolume24h": 16798001.15787153,
+    "sellVolume24h": 17706045.221119925,
+    "trades24h": 103172,
+    "buys24h": 52577,
+    "sells24h": 50595,
+    "traders": 5056,
+    "lastTradeTs": 1789891401
+   }
+  ],
+  "total": 357,
+  "updatedAt": 1789891868895
+ },
+ "/v1/rh/stocks": {
+  "chain": 4663,
+  "sinceHour": 1789808400,
+  "tradersSince": 1789776000,
+  "stocks": [
+   {
+    "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+    "symbol": "NVDA",
+    "name": "NVIDIA \u2022 Robinhood Token",
+    "decimals": 18,
+    "logoURI": "https://cdn.robinhood.com/ncw_assets/logos/0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec.png",
+    "tags": [
+     "stock"
+    ],
+    "listed": true,
+    "priceUsd": 220.97693371148938,
+    "change24hPct": -0.7107543259553206,
+    "liquidityUsd": 7508320,
+    "volume24h": 34504046.378991455,
+    "buyVolume24h": 16798001.15787153,
+    "sellVolume24h": 17706045.221119925,
+    "trades24h": 103172,
+    "buys24h": 52577,
+    "sells24h": 50595,
+    "traders": 5056,
+    "lastTradeTs": 1789891401,
+    "navUsd": null,
+    "basisPct": null,
+    "offHours7d": {
+     "volUsd": 122712280.03735964,
+     "trades": 365579,
+     "sharePct": 57.75403042239189
+    }
+   },
+   {
+    "address": "0x4a0E65A3EcceC6dBe60AE065F2e7bb85Fae35eEa",
+    "symbol": "SPCX",
+    "name": "Space Exploration Technologies Corp \u2022 Robinhood Token",
+    "decimals": 18,
+    "logoURI": "https://cdn.robinhood.com/ncw_assets/logos/0x4a0e65a3eccec6dbe60ae065f2e7bb85fae35eea.png",
+    "tags": [
+     "stock"
+    ],
+    "listed": true,
+    "priceUsd": 152.33158650694747,
+    "change24hPct": -0.278639004753245,
+    "liquidityUsd": 4756081,
+    "volume24h": 14186052.186705315,
+    "buyVolume24h": 7064922.470980956,
+    "sellVolume24h": 7121129.715724356,
+    "trades24h": 41993,
+    "buys24h": 22090,
+    "sells24h": 19903,
+    "traders": 3138,
+    "lastTradeTs": 1789891402,
+    "navUsd": null,
+    "basisPct": null,
+    "offHours7d": {
+     "volUsd": 75910449.80504468,
+     "trades": 277274,
+     "sharePct": 42.37032851899335
+    }
+   }
+  ],
+  "note": "offHours7d = volume in hour buckets outside the NYSE regular session (09:30-16:00 New York, Mon-Fri, DST-aware; exchange holidays not modelled). navUsd = Blockscout exchange_rate at last catalogue refresh.",
+  "updatedAt": 1789891849578
+ },
+ "/v1/lp/pools/0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09?chain=5042": {
+  "chain": 5042,
+  "pool": "0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09",
+  "dex": "uniswap_v4",
+  "kind": "v4",
+  "feeBps": 98.8,
+  "hooks": null,
+  "lpAccess": "open",
+  "tickSpacing": 99,
+  "token0": {
+   "address": "0x3600000000000000000000000000000000000000",
+   "symbol": "USDC",
+   "decimals": 6,
+   "logo": "https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602",
+   "impostor": false
+  },
+  "token1": {
+   "address": "0x8faae5592b9acc27a79fca745c6b872adf514a5d",
+   "symbol": "MURMUR",
+   "decimals": 18,
+   "logo": "https://cdn.dexscreener.com/cms/images/QUq-IqT1GLQNkxMx?width=800&height=800&quality=95&format=auto",
+   "impostor": false
+  },
+  "tokenSide": 1,
+  "tvlUsd": 12650.66,
+  "tvlSrc": "dexscreener",
+  "tvlAt": 1789891603,
+  "vol": {
+   "h1": 176.542824,
+   "h6": 38476.48885700001,
+   "h24": 184500.14476700005,
+   "d7": 279614.0964730001
+  },
+  "fees": {
+   "h1": 1.74424310112,
+   "h6": 380.1477099071601,
+   "h24": 1822.8614302979606
+  },
+  "feeTvlPct": {
+   "h1": 0.01378776365122452,
+   "h6": 3.0049634557182006,
+   "h24": 14.40921999562047
+  },
+  "aprPct": 5259.365298401472,
+  "trades24h": 3050,
+  "wallets24h": 131,
+  "priceUsd": 0.0007671677499328048,
+  "lpAdd24h": 8037.861902775549,
+  "lpRemove24h": 7583.743885515529,
+  "providers24h": 25,
+  "firstSeenTs": 1789693200,
+  "createdTs": 1789695461,
+  "lastTradeHour": 1789891200,
+  "turnover24h": 14.584230764798047,
+  "suspect": false,
+  "hourly": [
+   {
+    "hour": 1789693200,
+    "vol": 398.305695,
+    "trades": 24,
+    "price": 8.817848931962542e-05
+   },
+   {
+    "hour": 1789696800,
+    "vol": 1958.7937559999996,
+    "trades": 77,
+    "price": 0.00010307489720874844
+   }
+  ],
+  "topLps": [
+   {
+    "wallet": "0x25cacb704ed0852428e7cc0687bca45ee8c21848",
+    "addUsd": 5763.889211498252,
+    "removeUsd": 0,
+    "netUsd": 5763.889211498252,
+    "events": 1,
+    "lastTs": 1789695461
+   },
+   {
+    "wallet": "0x5db28691cbfc2ceeca1d919f0749b64013c25432",
+    "addUsd": 3885.2424150632846,
+    "removeUsd": 1296.008402,
+    "netUsd": 2589.2340130632847,
+    "events": 254,
+    "lastTs": 1789886789
+   }
+  ],
+  "health": {
+   "score": 34,
+   "parts": {
+    "traders": 17.6,
+    "tvl": 13.7,
+    "yieldSanity": 4,
+    "lpFlow": 15,
+    "age": 3.2,
+    "penalties": 20
+   },
+   "reasons": [
+    "the launcher holds 100% of the liquidity added",
+    "fee/TVL over 10 %/day: volume is not organic or TVL is not the whole picture"
+   ]
+  },
+  "launch": {
+   "launcher": "0x6049c9a0e26405c0985f9e3685c87d0ae917f82b",
+   "launcherName": "Uniswap Liquidity Launcher",
+   "creator": "0x25cacb704ed0852428e7cc0687bca45ee8c21848",
+   "hooks": null,
+   "launchedTs": 1789695461,
+   "launcherLpAddedUsd": 15907.554822267326,
+   "totalLpAddedUsd": 15907.554822267326,
+   "launcherSharePct": 100,
+   "launcherLastRemoveTs": 1789888952,
+   "launcherRemovedUsd": 7697.230608504608
+  },
+  "mint": {
+   "kind": "v4",
+   "manager": "0x6049c9a0e26405c0985f9e3685c87d0ae917f82b",
+   "permit2": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+   "token0": "0x3600000000000000000000000000000000000000",
+   "token1": "0x8faae5592b9acc27a79fca745c6b872adf514a5d",
+   "feePips": 9880,
+   "tickSpacing": 99,
+   "hooks": "0x0000000000000000000000000000000000000000",
+   "feeRaw": 9880,
+   "nativeCurrency0": false
+  },
+  "updatedAt": 1789891869303
+ },
+ "/v1/lp/pools/0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09/positions?chain=5042&limit=2": {
+  "chain": 5042,
+  "pool": "0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09",
+  "positions": [
+   {
+    "manager": "0x6049c9a0e26405c0985f9e3685c87d0ae917f82b",
+    "tokenId": "187740",
+    "pool": "0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09",
+    "dex": "uniswap_v4",
+    "kind": "v4",
+    "owner": "0x25cacb704ed0852428e7cc0687bca45ee8c21848",
+    "token": "0x8faae5592b9acc27a79fca745c6b872adf514a5d",
+    "anchor": "0x3600000000000000000000000000000000000000",
+    "tickLower": 331254,
+    "tickUpper": 375408,
+    "symbol": "MURMUR",
+    "anchorSymbol": "USDC",
+    "logo": "https://cdn.dexscreener.com/cms/images/QUq-IqT1GLQNkxMx?width=800&height=800&quality=95&format=auto",
+    "inUsd": 5763.889211498252,
+    "outUsd": 0,
+    "feesUsd": 0,
+    "adds": 1,
+    "removes": 0,
+    "collects": 0,
+    "openedTs": 1789695461,
+    "lastTs": 1789695461,
+    "closedTs": null,
+    "burned": false,
+    "status": "open",
+    "valueUsd": 5408.735694717618,
+    "uncollectedUsd": 2141.275199916123,
+    "inRange": true,
+    "edgePct": 427.51,
+    "pnlUsd": 1786.1216831354886,
+    "pnlPct": 30.988133491053144,
+    "ageHours": 54.55777777777778,
+    "jit": false,
+    "unreconciled": false
+   },
+   {
+    "manager": "0x6049c9a0e26405c0985f9e3685c87d0ae917f82b",
+    "tokenId": "223792",
+    "pool": "0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09",
+    "dex": "uniswap_v4",
+    "kind": "v4",
+    "owner": "0x2e41ff7889197ceab7ca505fe08fb54a9da07ab8",
+    "token": "0x8faae5592b9acc27a79fca745c6b872adf514a5d",
+    "anchor": "0x3600000000000000000000000000000000000000",
+    "tickLower": 336204,
+    "tickUpper": 357291,
+    "symbol": "MURMUR",
+    "anchorSymbol": "USDC",
+    "logo": "https://cdn.dexscreener.com/cms/images/QUq-IqT1GLQNkxMx?width=800&height=800&quality=95&format=auto",
+    "inUsd": 797.4331141591955,
+    "outUsd": 0,
+    "feesUsd": 0,
+    "adds": 1,
+    "removes": 0,
+    "collects": 0,
+    "openedTs": 1789888226,
+    "lastTs": 1789888226,
+    "closedTs": null,
+    "burned": false,
+    "status": "open",
+    "valueUsd": 752.4410624979616,
+    "uncollectedUsd": 5.447723353719422,
+    "inRange": true,
+    "edgePct": 156.14,
+    "pnlUsd": -39.544328307514434,
+    "pnlPct": -4.958952369216512,
+    "ageHours": 1.0119444444444445,
+    "jit": false,
+    "unreconciled": false
+   }
+  ],
+  "updatedAt": 1789891870022
+ },
+ "/v1/lp/events?chain=5042&pool=0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09&limit=2": {
+  "chain": 5042,
+  "events": [
+   {
+    "tx": "0x74acfa695f6ea11770a2356a49b750c9c5e0685a8ee106ebfae67ccd049d4ba6",
+    "logIndex": 20,
+    "pool": "0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09",
+    "dex": "uniswap_v4",
+    "kind": "remove",
+    "wallet": "0xc85d3ed2dfa128888e658e3a947f24bfa96db654",
+    "token": "0x8faae5592b9acc27a79fca745c6b872adf514a5d",
+    "tokenAmt": 0,
+    "anchor": "0x3600000000000000000000000000000000000000",
+    "anchorAmt": 90.769723,
+    "usd": 90.769723,
+    "priced": true,
+    "tickLower": 352440,
+    "tickUpper": 354519,
+    "block": 21802531,
+    "ts": 1789888952
+   },
+   {
+    "tx": "0x74acfa695f6ea11770a2356a49b750c9c5e0685a8ee106ebfae67ccd049d4ba6",
+    "logIndex": 18,
+    "pool": "0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09",
+    "dex": "uniswap_v4",
+    "kind": "remove",
+    "wallet": "0xc85d3ed2dfa128888e658e3a947f24bfa96db654",
+    "token": "0x8faae5592b9acc27a79fca745c6b872adf514a5d",
+    "tokenAmt": 0,
+    "anchor": "0x3600000000000000000000000000000000000000",
+    "anchorAmt": 72.615778,
+    "usd": 72.615778,
+    "priced": true,
+    "tickLower": 350361,
+    "tickUpper": 352440,
+    "block": 21802531,
+    "ts": 1789888952
+   }
+  ],
+  "limit": 2,
+  "offset": 0,
+  "updatedAt": 1789891870679
+ },
+ "/v1/portfolio/0xb145400da27a2497d9fc2cd5621f2bfd37617af4/pnl?chain=5042": {
+  "tokens": [
+   {
+    "token": "0xece5ca8bf9220718e5727754026757512212cb3c",
+    "symbol": "ARGUS",
+    "logo": "https://coin-images.coingecko.com/coins/images/102178392/large/argus-token.png?1789463380",
+    "realizedUsd": 30462.864779627198,
+    "unrealizedUsd": 11700.939232721703,
+    "totalUsd": 42163.804012348905,
+    "costRemaining": 1286.137220108177,
+    "curValue": 12987.07645282988,
+    "curAmount": 744055.9147763874,
+    "avgCost": 0.0017285491514366933,
+    "roiPct": 909.7737822825419,
+    "untrackedAmount": 0,
+    "untrackedValue": 0
+   },
+   {
+    "token": "0x66927743a8a841ca09575a4ccdcd090c761adcec",
+    "symbol": "HYCI",
+    "logo": "https://ipfs.filebase.io/ipfs/bafybeiezh2g4uhqy2bzdq4elwkzek55q5ccs4gpyyki672a4i3olf3u224",
+    "realizedUsd": 181.713005,
+    "unrealizedUsd": 0,
+    "totalUsd": 181.713005,
+    "costRemaining": 0,
+    "curValue": 0,
+    "curAmount": 0,
+    "avgCost": 4.2576384935211256e-05,
+    "roiPct": null,
+    "untrackedAmount": 0,
+    "untrackedValue": 0
+   }
+  ],
+  "realized": 30488.101882774274,
+  "unrealized": 11700.939232721703,
+  "total": 42189.04111549597,
+  "updatedAt": 1789809277093
+ },
+ "/v1/portfolio/0xb145400da27a2497d9fc2cd5621f2bfd37617af4/trades?chain=5042": {
+  "trades": [
+   {
+    "t": 1789890946,
+    "side": "buy",
+    "usd": 198,
+    "tokenAmt": 5293562.144446149,
+    "token": "0x08adbf431569a1aacac2606d2adcd18f4ebf2a71",
+    "symbol": "GLITCH",
+    "tx": "0x25c5fd4de14a7592e39f0b803538cdbe1601a927f630da46fe9107c3afc89f83"
+   },
+   {
+    "t": 1789890762,
+    "side": "buy",
+    "usd": 297,
+    "tokenAmt": 8471531.758406071,
+    "token": "0x08adbf431569a1aacac2606d2adcd18f4ebf2a71",
+    "symbol": "GLITCH",
+    "tx": "0xf261bcb6c8d8bf3fe9debbd9f012396c8e025eafbcb047d40c5ee66013df9ef9"
+   }
+  ],
+  "updatedAt": 1789891871018
+ },
+ "/v1/portfolio/0xb145400da27a2497d9fc2cd5621f2bfd37617af4/pnl-calendar?chain=5042": {
+  "days": [
+   {
+    "date": "2026-08-19",
+    "realizedUsd": 0,
+    "trades": 6
+   },
+   {
+    "date": "2026-08-20",
+    "realizedUsd": 0,
+    "trades": 2
+   }
+  ],
+  "firstDate": "2026-08-19",
+  "realizedTotal": 34046.5607144201,
+  "updatedAt": 1789891871239
+ },
+ "/v1/lp/positions?chain=5042&owner=0xb145400da27a2497d9fc2cd5621f2bfd37617af4&limit=2": {
+  "chain": 5042,
+  "owner": "0xb145400da27a2497d9fc2cd5621f2bfd37617af4",
+  "status": "all",
+  "positions": [],
+  "summary": {
+   "open": 0,
+   "closed": 0,
+   "wins": 0,
+   "winRatePct": null,
+   "realizedPnlUsd": 0,
+   "feesUsd": 0,
+   "openValueUsd": 0
+  },
+  "updatedAt": 1789891871406
+ }
+}
