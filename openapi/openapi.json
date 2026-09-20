@@ -9761,6 +9761,1827 @@
         }
       }
     },
+    "/xswap/plan": {
+      "post": {
+        "tags": [
+          "Bridge"
+        ],
+        "operationId": "xswapPlan",
+        "summary": "Cross-chain swap plan",
+        "description": "Quotes a token on one chain into a token on another two ways at once — **composed** (Chord's router on the origin → USDC/USDG rail → Chord's router on the destination) and **direct** (Relay end to end) — and names the one that lands more. Long-tail tokens on Arc / Monad / Robinhood only route on the composed path. Fees come back as three lines (protocol · bridge · network) and `gas` says who pays on each side. `MIN_SIZE` below 10 USD of the bridged stable.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "chainIn": {
+                    "type": "integer",
+                    "enum": [
+                      143,
+                      4663,
+                      5042
+                    ]
+                  },
+                  "chainOut": {
+                    "type": "integer",
+                    "enum": [
+                      143,
+                      4663,
+                      5042
+                    ]
+                  },
+                  "tokenIn": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "tokenOut": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "amount": {
+                    "type": "string",
+                    "pattern": "^\\d+$",
+                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                  },
+                  "slippageBps": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 500,
+                    "default": 100
+                  },
+                  "recipient": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "rail": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "relay",
+                      "cctp"
+                    ],
+                    "default": "auto",
+                    "description": "Force a rail; `auto` applies the corridor rules (Robinhood → Relay; Monad ↔ Arc → CCTP when the mint relayer is funded; else Relay)."
+                  }
+                },
+                "required": [
+                  "user",
+                  "chainIn",
+                  "chainOut",
+                  "tokenIn",
+                  "tokenOut",
+                  "amount"
+                ]
+              },
+              "example": {
+                "user": "0xb145400da27a2497d9fc2cd5621f2bfd37617af4",
+                "chainIn": 5042,
+                "chainOut": 143,
+                "tokenIn": "0x3600000000000000000000000000000000000000",
+                "tokenOut": "0x350035555e10d9afaf1566aaebfced5ba6c27777",
+                "amount": "1000000000",
+                "slippageBps": 100
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "best": {
+                      "type": "string",
+                      "enum": [
+                        "composed",
+                        "direct"
+                      ]
+                    },
+                    "composed": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "chainIn": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "chainOut": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "tokenIn": {
+                          "type": "string",
+                          "pattern": "^0x[a-fA-F0-9]{40}$",
+                          "description": "EVM address, hex, case-insensitive."
+                        },
+                        "tokenOut": {
+                          "type": "string",
+                          "pattern": "^0x[a-fA-F0-9]{40}$",
+                          "description": "EVM address, hex, case-insensitive."
+                        },
+                        "amountIn": {
+                          "type": "string",
+                          "pattern": "^\\d+$",
+                          "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                        },
+                        "amountOut": {
+                          "type": "string",
+                          "pattern": "^\\d+$",
+                          "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                        },
+                        "legs": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "swap"
+                                  },
+                                  "chainId": {
+                                    "type": "integer",
+                                    "description": ""
+                                  },
+                                  "tokenIn": {
+                                    "type": "string",
+                                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                                    "description": "EVM address, hex, case-insensitive."
+                                  },
+                                  "tokenOut": {
+                                    "type": "string",
+                                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                                    "description": "EVM address, hex, case-insensitive."
+                                  },
+                                  "amountIn": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  },
+                                  "amountOut": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  },
+                                  "priceImpactPct": {
+                                    "type": "number",
+                                    "description": ""
+                                  },
+                                  "feeBps": {
+                                    "type": "integer",
+                                    "description": "Our tier fee on this leg's output."
+                                  },
+                                  "dexIds": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "bridge"
+                                  },
+                                  "rail": {
+                                    "type": "string",
+                                    "enum": [
+                                      "relay",
+                                      "cctp"
+                                    ]
+                                  },
+                                  "chainIdIn": {
+                                    "type": "integer",
+                                    "description": ""
+                                  },
+                                  "chainIdOut": {
+                                    "type": "integer",
+                                    "description": ""
+                                  },
+                                  "tokenIn": {
+                                    "type": "string",
+                                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                                    "description": "EVM address, hex, case-insensitive."
+                                  },
+                                  "tokenOut": {
+                                    "type": "string",
+                                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                                    "description": "EVM address, hex, case-insensitive."
+                                  },
+                                  "amountIn": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  },
+                                  "amountOut": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  },
+                                  "timeEstimateSec": {
+                                    "type": "number",
+                                    "description": ""
+                                  },
+                                  "requestId": {
+                                    "type": "string",
+                                    "description": "Relay intent id; empty on CCTP until the burn is sent."
+                                  },
+                                  "srcDomain": {
+                                    "type": "integer",
+                                    "description": "CCTP only."
+                                  },
+                                  "dstDomain": {
+                                    "type": "integer",
+                                    "description": "CCTP only."
+                                  },
+                                  "feeBps": {
+                                    "type": "number",
+                                    "description": "Circle's fast-transfer fee, CCTP only."
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "timeEstimateSec": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "rail": {
+                          "type": "string",
+                          "enum": [
+                            "relay",
+                            "cctp"
+                          ]
+                        },
+                        "railReason": {
+                          "type": "string",
+                          "description": "Why this rail."
+                        },
+                        "fees": {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "object",
+                              "properties": {
+                                "originBps": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "destBps": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "usd": {
+                                  "type": "number",
+                                  "description": ""
+                                }
+                              },
+                              "description": "Our on-chain tier fee per swap leg."
+                            },
+                            "bridge": {
+                              "type": "object",
+                              "properties": {
+                                "rail": {
+                                  "type": "string",
+                                  "description": ""
+                                },
+                                "usd": {
+                                  "type": "number",
+                                  "description": ""
+                                },
+                                "bps": {
+                                  "type": "number",
+                                  "description": ""
+                                },
+                                "appFeeBps": {
+                                  "type": "integer",
+                                  "description": "App fee added on Relay."
+                                }
+                              },
+                              "description": "The bridge's own cut."
+                            },
+                            "network": {
+                              "type": "object",
+                              "properties": {
+                                "usd": {
+                                  "type": "number",
+                                  "description": "Flat per relayer-paid transaction."
+                                },
+                                "covered": {
+                                  "type": "boolean",
+                                  "description": "true = we eat it (Arc mint)."
+                                },
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "user",
+                                    "usdc-gas",
+                                    "gasless",
+                                    "solver",
+                                    "none"
+                                  ]
+                                }
+                              },
+                              "description": "Gas we front on the destination."
+                            },
+                            "totalUsd": {
+                              "type": "number",
+                              "description": ""
+                            }
+                          }
+                        },
+                        "gas": {
+                          "type": "object",
+                          "properties": {
+                            "origin": {
+                              "type": "string",
+                              "description": ""
+                            },
+                            "dest": {
+                              "type": "string",
+                              "description": ""
+                            }
+                          },
+                          "description": "Who pays gas on each side."
+                        },
+                        "minAnchorUnits": {
+                          "type": "string",
+                          "pattern": "^\\d+$",
+                          "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                        },
+                        "bridge": {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "description": "Rail-shaped: `{ rail, requestId, checkEndpoint, steps[], fees, details }` — sign `steps` in order on the origin chain (an `approval` item may be skipped when the allowance covers it)."
+                        }
+                      }
+                    },
+                    "direct": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "chainIn": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "chainOut": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "tokenIn": {
+                          "type": "string",
+                          "pattern": "^0x[a-fA-F0-9]{40}$",
+                          "description": "EVM address, hex, case-insensitive."
+                        },
+                        "tokenOut": {
+                          "type": "string",
+                          "pattern": "^0x[a-fA-F0-9]{40}$",
+                          "description": "EVM address, hex, case-insensitive."
+                        },
+                        "amountIn": {
+                          "type": "string",
+                          "pattern": "^\\d+$",
+                          "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                        },
+                        "amountOut": {
+                          "type": "string",
+                          "pattern": "^\\d+$",
+                          "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                        },
+                        "legs": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "swap"
+                                  },
+                                  "chainId": {
+                                    "type": "integer",
+                                    "description": ""
+                                  },
+                                  "tokenIn": {
+                                    "type": "string",
+                                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                                    "description": "EVM address, hex, case-insensitive."
+                                  },
+                                  "tokenOut": {
+                                    "type": "string",
+                                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                                    "description": "EVM address, hex, case-insensitive."
+                                  },
+                                  "amountIn": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  },
+                                  "amountOut": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  },
+                                  "priceImpactPct": {
+                                    "type": "number",
+                                    "description": ""
+                                  },
+                                  "feeBps": {
+                                    "type": "integer",
+                                    "description": "Our tier fee on this leg's output."
+                                  },
+                                  "dexIds": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "bridge"
+                                  },
+                                  "rail": {
+                                    "type": "string",
+                                    "enum": [
+                                      "relay",
+                                      "cctp"
+                                    ]
+                                  },
+                                  "chainIdIn": {
+                                    "type": "integer",
+                                    "description": ""
+                                  },
+                                  "chainIdOut": {
+                                    "type": "integer",
+                                    "description": ""
+                                  },
+                                  "tokenIn": {
+                                    "type": "string",
+                                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                                    "description": "EVM address, hex, case-insensitive."
+                                  },
+                                  "tokenOut": {
+                                    "type": "string",
+                                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                                    "description": "EVM address, hex, case-insensitive."
+                                  },
+                                  "amountIn": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  },
+                                  "amountOut": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  },
+                                  "timeEstimateSec": {
+                                    "type": "number",
+                                    "description": ""
+                                  },
+                                  "requestId": {
+                                    "type": "string",
+                                    "description": "Relay intent id; empty on CCTP until the burn is sent."
+                                  },
+                                  "srcDomain": {
+                                    "type": "integer",
+                                    "description": "CCTP only."
+                                  },
+                                  "dstDomain": {
+                                    "type": "integer",
+                                    "description": "CCTP only."
+                                  },
+                                  "feeBps": {
+                                    "type": "number",
+                                    "description": "Circle's fast-transfer fee, CCTP only."
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "timeEstimateSec": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "rail": {
+                          "type": "string",
+                          "enum": [
+                            "relay",
+                            "cctp"
+                          ]
+                        },
+                        "railReason": {
+                          "type": "string",
+                          "description": "Why this rail."
+                        },
+                        "fees": {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "object",
+                              "properties": {
+                                "originBps": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "destBps": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "usd": {
+                                  "type": "number",
+                                  "description": ""
+                                }
+                              },
+                              "description": "Our on-chain tier fee per swap leg."
+                            },
+                            "bridge": {
+                              "type": "object",
+                              "properties": {
+                                "rail": {
+                                  "type": "string",
+                                  "description": ""
+                                },
+                                "usd": {
+                                  "type": "number",
+                                  "description": ""
+                                },
+                                "bps": {
+                                  "type": "number",
+                                  "description": ""
+                                },
+                                "appFeeBps": {
+                                  "type": "integer",
+                                  "description": "App fee added on Relay."
+                                }
+                              },
+                              "description": "The bridge's own cut."
+                            },
+                            "network": {
+                              "type": "object",
+                              "properties": {
+                                "usd": {
+                                  "type": "number",
+                                  "description": "Flat per relayer-paid transaction."
+                                },
+                                "covered": {
+                                  "type": "boolean",
+                                  "description": "true = we eat it (Arc mint)."
+                                },
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "user",
+                                    "usdc-gas",
+                                    "gasless",
+                                    "solver",
+                                    "none"
+                                  ]
+                                }
+                              },
+                              "description": "Gas we front on the destination."
+                            },
+                            "totalUsd": {
+                              "type": "number",
+                              "description": ""
+                            }
+                          }
+                        },
+                        "gas": {
+                          "type": "object",
+                          "properties": {
+                            "origin": {
+                              "type": "string",
+                              "description": ""
+                            },
+                            "dest": {
+                              "type": "string",
+                              "description": ""
+                            }
+                          },
+                          "description": "Who pays gas on each side."
+                        },
+                        "minAnchorUnits": {
+                          "type": "string",
+                          "pattern": "^\\d+$",
+                          "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                        },
+                        "bridge": {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "description": "Rail-shaped: `{ rail, requestId, checkEndpoint, steps[], fees, details }` — sign `steps` in order on the origin chain (an `approval` item may be skipped when the allowance covers it)."
+                        }
+                      }
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Per-path failure `{ code, message }` when a path could not be quoted."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing at this identity (`NOT_FOUND`, `UNKNOWN_TOKEN`, `NO_ROUTE`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The routing engine or an upstream did not answer (`ENGINE_ERROR`, `ROUTE_ERROR`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/xswap/quote": {
+      "post": {
+        "tags": [
+          "Bridge"
+        ],
+        "operationId": "xswapQuote",
+        "summary": "Composed cross-chain quote",
+        "description": "The composed path only (see `/xswap/plan`).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "chainIn": {
+                    "type": "integer",
+                    "enum": [
+                      143,
+                      4663,
+                      5042
+                    ]
+                  },
+                  "chainOut": {
+                    "type": "integer",
+                    "enum": [
+                      143,
+                      4663,
+                      5042
+                    ]
+                  },
+                  "tokenIn": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "tokenOut": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "amount": {
+                    "type": "string",
+                    "pattern": "^\\d+$",
+                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                  },
+                  "slippageBps": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 500,
+                    "default": 100
+                  },
+                  "recipient": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "rail": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "relay",
+                      "cctp"
+                    ],
+                    "default": "auto",
+                    "description": "Force a rail; `auto` applies the corridor rules (Robinhood → Relay; Monad ↔ Arc → CCTP when the mint relayer is funded; else Relay)."
+                  }
+                },
+                "required": [
+                  "user",
+                  "chainIn",
+                  "chainOut",
+                  "tokenIn",
+                  "tokenOut",
+                  "amount"
+                ]
+              },
+              "example": {
+                "user": "0xb145400da27a2497d9fc2cd5621f2bfd37617af4",
+                "chainIn": 5042,
+                "chainOut": 143,
+                "tokenIn": "0x3600000000000000000000000000000000000000",
+                "tokenOut": "0x350035555e10d9afaf1566aaebfced5ba6c27777",
+                "amount": "1000000000",
+                "slippageBps": 100
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chainIn": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "chainOut": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "tokenIn": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "tokenOut": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "amountIn": {
+                      "type": "string",
+                      "pattern": "^\\d+$",
+                      "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                    },
+                    "amountOut": {
+                      "type": "string",
+                      "pattern": "^\\d+$",
+                      "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                    },
+                    "legs": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "swap"
+                              },
+                              "chainId": {
+                                "type": "integer",
+                                "description": ""
+                              },
+                              "tokenIn": {
+                                "type": "string",
+                                "pattern": "^0x[a-fA-F0-9]{40}$",
+                                "description": "EVM address, hex, case-insensitive."
+                              },
+                              "tokenOut": {
+                                "type": "string",
+                                "pattern": "^0x[a-fA-F0-9]{40}$",
+                                "description": "EVM address, hex, case-insensitive."
+                              },
+                              "amountIn": {
+                                "type": "string",
+                                "pattern": "^\\d+$",
+                                "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                              },
+                              "amountOut": {
+                                "type": "string",
+                                "pattern": "^\\d+$",
+                                "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                              },
+                              "priceImpactPct": {
+                                "type": "number",
+                                "description": ""
+                              },
+                              "feeBps": {
+                                "type": "integer",
+                                "description": "Our tier fee on this leg's output."
+                              },
+                              "dexIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "bridge"
+                              },
+                              "rail": {
+                                "type": "string",
+                                "enum": [
+                                  "relay",
+                                  "cctp"
+                                ]
+                              },
+                              "chainIdIn": {
+                                "type": "integer",
+                                "description": ""
+                              },
+                              "chainIdOut": {
+                                "type": "integer",
+                                "description": ""
+                              },
+                              "tokenIn": {
+                                "type": "string",
+                                "pattern": "^0x[a-fA-F0-9]{40}$",
+                                "description": "EVM address, hex, case-insensitive."
+                              },
+                              "tokenOut": {
+                                "type": "string",
+                                "pattern": "^0x[a-fA-F0-9]{40}$",
+                                "description": "EVM address, hex, case-insensitive."
+                              },
+                              "amountIn": {
+                                "type": "string",
+                                "pattern": "^\\d+$",
+                                "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                              },
+                              "amountOut": {
+                                "type": "string",
+                                "pattern": "^\\d+$",
+                                "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                              },
+                              "timeEstimateSec": {
+                                "type": "number",
+                                "description": ""
+                              },
+                              "requestId": {
+                                "type": "string",
+                                "description": "Relay intent id; empty on CCTP until the burn is sent."
+                              },
+                              "srcDomain": {
+                                "type": "integer",
+                                "description": "CCTP only."
+                              },
+                              "dstDomain": {
+                                "type": "integer",
+                                "description": "CCTP only."
+                              },
+                              "feeBps": {
+                                "type": "number",
+                                "description": "Circle's fast-transfer fee, CCTP only."
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "timeEstimateSec": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "rail": {
+                      "type": "string",
+                      "enum": [
+                        "relay",
+                        "cctp"
+                      ]
+                    },
+                    "railReason": {
+                      "type": "string",
+                      "description": "Why this rail."
+                    },
+                    "fees": {
+                      "type": "object",
+                      "properties": {
+                        "protocol": {
+                          "type": "object",
+                          "properties": {
+                            "originBps": {
+                              "type": "integer",
+                              "description": ""
+                            },
+                            "destBps": {
+                              "type": "integer",
+                              "description": ""
+                            },
+                            "usd": {
+                              "type": "number",
+                              "description": ""
+                            }
+                          },
+                          "description": "Our on-chain tier fee per swap leg."
+                        },
+                        "bridge": {
+                          "type": "object",
+                          "properties": {
+                            "rail": {
+                              "type": "string",
+                              "description": ""
+                            },
+                            "usd": {
+                              "type": "number",
+                              "description": ""
+                            },
+                            "bps": {
+                              "type": "number",
+                              "description": ""
+                            },
+                            "appFeeBps": {
+                              "type": "integer",
+                              "description": "App fee added on Relay."
+                            }
+                          },
+                          "description": "The bridge's own cut."
+                        },
+                        "network": {
+                          "type": "object",
+                          "properties": {
+                            "usd": {
+                              "type": "number",
+                              "description": "Flat per relayer-paid transaction."
+                            },
+                            "covered": {
+                              "type": "boolean",
+                              "description": "true = we eat it (Arc mint)."
+                            },
+                            "mode": {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "usdc-gas",
+                                "gasless",
+                                "solver",
+                                "none"
+                              ]
+                            }
+                          },
+                          "description": "Gas we front on the destination."
+                        },
+                        "totalUsd": {
+                          "type": "number",
+                          "description": ""
+                        }
+                      }
+                    },
+                    "gas": {
+                      "type": "object",
+                      "properties": {
+                        "origin": {
+                          "type": "string",
+                          "description": ""
+                        },
+                        "dest": {
+                          "type": "string",
+                          "description": ""
+                        }
+                      },
+                      "description": "Who pays gas on each side."
+                    },
+                    "minAnchorUnits": {
+                      "type": "string",
+                      "pattern": "^\\d+$",
+                      "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                    },
+                    "bridge": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Rail-shaped: `{ rail, requestId, checkEndpoint, steps[], fees, details }` — sign `steps` in order on the origin chain (an `approval` item may be skipped when the allowance covers it)."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing at this identity (`NOT_FOUND`, `UNKNOWN_TOKEN`, `NO_ROUTE`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The routing engine or an upstream did not answer (`ENGINE_ERROR`, `ROUTE_ERROR`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/xswap/order": {
+      "post": {
+        "tags": [
+          "Bridge"
+        ],
+        "operationId": "xswapOrder",
+        "summary": "Register a cross-chain order",
+        "description": "Quotes and records the order the wallet is about to sign so it can be resumed after a refresh: the server tracks the bridge (Relay status or Circle attestation), mints CCTP transfers on Arc, and re-quotes the final leg at the amount that actually arrived. Poll `GET /xswap/order?id=`. `path: \"direct\"` registers the Relay end-to-end candidate instead.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "chainIn": {
+                    "type": "integer",
+                    "enum": [
+                      143,
+                      4663,
+                      5042
+                    ]
+                  },
+                  "chainOut": {
+                    "type": "integer",
+                    "enum": [
+                      143,
+                      4663,
+                      5042
+                    ]
+                  },
+                  "tokenIn": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "tokenOut": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "amount": {
+                    "type": "string",
+                    "pattern": "^\\d+$",
+                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                  },
+                  "slippageBps": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 500,
+                    "default": 100
+                  },
+                  "recipient": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "rail": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "relay",
+                      "cctp"
+                    ],
+                    "default": "auto",
+                    "description": "Force a rail; `auto` applies the corridor rules (Robinhood → Relay; Monad ↔ Arc → CCTP when the mint relayer is funded; else Relay)."
+                  },
+                  "path": {
+                    "type": "string",
+                    "enum": [
+                      "composed",
+                      "direct"
+                    ],
+                    "default": "composed"
+                  }
+                },
+                "required": [
+                  "user",
+                  "chainIn",
+                  "chainOut",
+                  "tokenIn",
+                  "tokenOut",
+                  "amount"
+                ]
+              },
+              "example": {
+                "user": "0xb145400da27a2497d9fc2cd5621f2bfd37617af4",
+                "chainIn": 5042,
+                "chainOut": 143,
+                "tokenIn": "0x3600000000000000000000000000000000000000",
+                "tokenOut": "0x350035555e10d9afaf1566aaebfced5ba6c27777",
+                "amount": "1000000000",
+                "slippageBps": 100
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "`{ id, state, rail, chainIn, chainOut, tokenIn, tokenOut, amountIn, quotedOut, requestId, originTxHash?, destTxHash?, bridgedAmount?, destQuote?, claim?, note? }` — states: pending_origin · bridging · pending_dest · done · stuck_dest · failed_origin."
+                    },
+                    "quote": {
+                      "type": "object",
+                      "properties": {
+                        "chainIn": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "chainOut": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "tokenIn": {
+                          "type": "string",
+                          "pattern": "^0x[a-fA-F0-9]{40}$",
+                          "description": "EVM address, hex, case-insensitive."
+                        },
+                        "tokenOut": {
+                          "type": "string",
+                          "pattern": "^0x[a-fA-F0-9]{40}$",
+                          "description": "EVM address, hex, case-insensitive."
+                        },
+                        "amountIn": {
+                          "type": "string",
+                          "pattern": "^\\d+$",
+                          "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                        },
+                        "amountOut": {
+                          "type": "string",
+                          "pattern": "^\\d+$",
+                          "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                        },
+                        "legs": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "swap"
+                                  },
+                                  "chainId": {
+                                    "type": "integer",
+                                    "description": ""
+                                  },
+                                  "tokenIn": {
+                                    "type": "string",
+                                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                                    "description": "EVM address, hex, case-insensitive."
+                                  },
+                                  "tokenOut": {
+                                    "type": "string",
+                                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                                    "description": "EVM address, hex, case-insensitive."
+                                  },
+                                  "amountIn": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  },
+                                  "amountOut": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  },
+                                  "priceImpactPct": {
+                                    "type": "number",
+                                    "description": ""
+                                  },
+                                  "feeBps": {
+                                    "type": "integer",
+                                    "description": "Our tier fee on this leg's output."
+                                  },
+                                  "dexIds": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "bridge"
+                                  },
+                                  "rail": {
+                                    "type": "string",
+                                    "enum": [
+                                      "relay",
+                                      "cctp"
+                                    ]
+                                  },
+                                  "chainIdIn": {
+                                    "type": "integer",
+                                    "description": ""
+                                  },
+                                  "chainIdOut": {
+                                    "type": "integer",
+                                    "description": ""
+                                  },
+                                  "tokenIn": {
+                                    "type": "string",
+                                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                                    "description": "EVM address, hex, case-insensitive."
+                                  },
+                                  "tokenOut": {
+                                    "type": "string",
+                                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                                    "description": "EVM address, hex, case-insensitive."
+                                  },
+                                  "amountIn": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  },
+                                  "amountOut": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  },
+                                  "timeEstimateSec": {
+                                    "type": "number",
+                                    "description": ""
+                                  },
+                                  "requestId": {
+                                    "type": "string",
+                                    "description": "Relay intent id; empty on CCTP until the burn is sent."
+                                  },
+                                  "srcDomain": {
+                                    "type": "integer",
+                                    "description": "CCTP only."
+                                  },
+                                  "dstDomain": {
+                                    "type": "integer",
+                                    "description": "CCTP only."
+                                  },
+                                  "feeBps": {
+                                    "type": "number",
+                                    "description": "Circle's fast-transfer fee, CCTP only."
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "timeEstimateSec": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "rail": {
+                          "type": "string",
+                          "enum": [
+                            "relay",
+                            "cctp"
+                          ]
+                        },
+                        "railReason": {
+                          "type": "string",
+                          "description": "Why this rail."
+                        },
+                        "fees": {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "object",
+                              "properties": {
+                                "originBps": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "destBps": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "usd": {
+                                  "type": "number",
+                                  "description": ""
+                                }
+                              },
+                              "description": "Our on-chain tier fee per swap leg."
+                            },
+                            "bridge": {
+                              "type": "object",
+                              "properties": {
+                                "rail": {
+                                  "type": "string",
+                                  "description": ""
+                                },
+                                "usd": {
+                                  "type": "number",
+                                  "description": ""
+                                },
+                                "bps": {
+                                  "type": "number",
+                                  "description": ""
+                                },
+                                "appFeeBps": {
+                                  "type": "integer",
+                                  "description": "App fee added on Relay."
+                                }
+                              },
+                              "description": "The bridge's own cut."
+                            },
+                            "network": {
+                              "type": "object",
+                              "properties": {
+                                "usd": {
+                                  "type": "number",
+                                  "description": "Flat per relayer-paid transaction."
+                                },
+                                "covered": {
+                                  "type": "boolean",
+                                  "description": "true = we eat it (Arc mint)."
+                                },
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "user",
+                                    "usdc-gas",
+                                    "gasless",
+                                    "solver",
+                                    "none"
+                                  ]
+                                }
+                              },
+                              "description": "Gas we front on the destination."
+                            },
+                            "totalUsd": {
+                              "type": "number",
+                              "description": ""
+                            }
+                          }
+                        },
+                        "gas": {
+                          "type": "object",
+                          "properties": {
+                            "origin": {
+                              "type": "string",
+                              "description": ""
+                            },
+                            "dest": {
+                              "type": "string",
+                              "description": ""
+                            }
+                          },
+                          "description": "Who pays gas on each side."
+                        },
+                        "minAnchorUnits": {
+                          "type": "string",
+                          "pattern": "^\\d+$",
+                          "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                        },
+                        "bridge": {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "description": "Rail-shaped: `{ rail, requestId, checkEndpoint, steps[], fees, details }` — sign `steps` in order on the origin chain (an `approval` item may be skipped when the allowance covers it)."
+                        }
+                      }
+                    },
+                    "requoteToleranceBps": {
+                      "type": "integer",
+                      "description": ""
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing at this identity (`NOT_FOUND`, `UNKNOWN_TOKEN`, `NO_ROUTE`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The routing engine or an upstream did not answer (`ENGINE_ERROR`, `ROUTE_ERROR`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Bridge"
+        ],
+        "operationId": "xswapOrderGet",
+        "summary": "Advance and read an order",
+        "description": "Asks the bridge where the money is and, once it landed, returns a fresh destination-leg quote (`destQuote`) to sign. Polling this is what moves the order.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            },
+            "description": "Order id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": ""
+                    },
+                    "requoteToleranceBps": {
+                      "type": "integer",
+                      "description": ""
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing at this identity (`NOT_FOUND`, `UNKNOWN_TOKEN`, `NO_ROUTE`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The routing engine or an upstream did not answer (`ENGINE_ERROR`, `ROUTE_ERROR`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/xswap/orders": {
+      "get": {
+        "tags": [
+          "Bridge"
+        ],
+        "operationId": "xswapOrders",
+        "summary": "A wallet's in-flight orders",
+        "description": "Newest first — how a client recovers cross-chain state it never held locally.",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orders": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": ""
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The routing engine or an upstream did not answer (`ENGINE_ERROR`, `ROUTE_ERROR`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/relayers": {
+      "get": {
+        "tags": [
+          "Account and health"
+        ],
+        "operationId": "relayers",
+        "summary": "Relayer gas health",
+        "description": "For each chain Chord's relayer pays gas on (Monad gasless swaps, Robinhood Permit2 swaps, Arc CCTP mints): its address, native balance, current gas price and the estimated transactions that balance still covers. `ok` = above the floor; the cross-chain planner stops routing through a relayer that is not ok.",
+        "parameters": [
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Re-read now instead of the 60 s cache."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "minTx": {
+                      "type": "integer",
+                      "description": "The floor."
+                    },
+                    "relayers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "chainId": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "symbol": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "role": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "configured": {
+                            "type": "boolean",
+                            "description": ""
+                          },
+                          "address": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "balance": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^\\d+$",
+                            "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                          },
+                          "gasPrice": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^\\d+$",
+                            "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                          },
+                          "gasPerTx": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "txRemaining": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "ok": {
+                            "type": "boolean",
+                            "description": ""
+                          },
+                          "checkedAt": {
+                            "type": "integer",
+                            "description": "Unix time, milliseconds — when the server built this answer."
+                          },
+                          "error": {
+                            "type": "string",
+                            "description": ""
+                          }
+                        }
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/crosschain/config": {
       "get": {
         "tags": [
