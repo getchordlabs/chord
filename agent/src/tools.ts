@@ -216,6 +216,36 @@ export const tools = [
       return { chain: d.chain, days: d.days, since: d.since, totals: d.totals, venues: (d.venues ?? []).map((v: any) => ({ dex: v.dex, volUsd: Math.round(v.volUsd), trades: v.trades, sharePct: +v.sharePct.toFixed(2), series: v.series })) };
     },
   }),
+  // ── LP agent (chain 5042 by default; 4663 / 143 accepted) — the pools + positions ledger (docs/lp-indexer.md).
+  tool({
+    name: "chord_lp_pools",
+    description: "Pools ranked for a liquidity provider on Arc (or Robinhood Chain 4663 / Monad 143): TVL, volume by window, fees earned by LPs, fee/TVL and its annualised APR, 24h LP adds/removes, providers, whether a V4 hook can gate adds. Suspect pools (wash turnover, dust TVL) are flagged and hidden unless asked. Use for 'where to LP', 'best fee APR', 'is pool X worth providing to'.",
+    input: z.object({ chain: z.number().int().refine((c) => c === 5042 || c === 4663 || c === 143).default(5042), sort: z.enum(["fee_tvl", "vol_24h", "vol_1h", "tvl", "fees_24h", "first_seen", "lp_net_24h", "trades_24h", "score"]).default("fee_tvl"), interval: z.enum(["1h", "6h", "24h"]).default("24h"), minTvl: z.number().min(0).optional(), quote: z.string().max(64).optional().describe("restrict to pools quoted in this token (symbol or address)"), limit: z.number().int().min(1).max(50).default(20), flagged: z.boolean().default(false).describe("include suspect pools") }),
+    run: async ({ chain, sort, interval, minTvl, quote, limit, flagged }) => {
+      const qs = new URLSearchParams({ chain: String(chain), sort, interval, limit: String(limit), flagged: flagged ? "1" : "0", ...(minTvl != null ? { minTvl: String(minTvl) } : {}), ...(quote ? { quote } : {}) });
+      const d = await api<any>(`/v1/lp/pools?${qs}`);
+      return { chain: d.chain, total: d.total, hidden: d.hidden, sort: d.sort, rows: (d.pools ?? []).map((p: any) => ({ pool: p.pool, pair: `${p.token0?.symbol ?? p.token0?.address?.slice(0, 8)}/${p.token1?.symbol ?? p.token1?.address?.slice(0, 8)}`, dex: p.dex, kind: p.kind, feeBps: p.feeBps, lpAccess: p.lpAccess, tvlUsd: p.tvlUsd == null ? null : Math.round(p.tvlUsd), vol24hUsd: Math.round(p.vol?.h24 ?? 0), fees24hUsd: p.fees?.h24 == null ? null : Math.round(p.fees.h24), feeTvlPct24h: p.feeTvlPct?.h24 ?? null, aprPct: p.aprPct ?? null, score: p.score ?? null, lpAdd24hUsd: Math.round(p.lpAdd24h ?? 0), lpRemove24hUsd: Math.round(p.lpRemove24h ?? 0), providers24h: p.providers24h ?? null, trades24h: p.trades24h, wallets24h: p.wallets24h, turnover24h: p.turnover24h, suspect: !!p.suspect })) };
+    },
+  }),
+  tool({
+    name: "chord_lp_positions",
+    description: "A wallet's liquidity positions (Uniswap V3/V4 position NFTs) from Chord's LP ledger: pool, venue, fee tier, range, in range now and distance to the edge, dollars in/out, value now, fees earned and uncollected, PnL, age, JIT flag; plus a summary (open/closed, win rate, realized PnL, fees).",
+    input: z.object({ wallet: z.string().regex(/^0x[0-9a-fA-F]{40}$/), chain: z.number().int().refine((c) => c === 5042 || c === 4663 || c === 143).default(5042), status: z.enum(["open", "closed", "all"]).default("open"), limit: z.number().int().min(1).max(100).default(50) }),
+    run: async ({ wallet, chain, status, limit }) => {
+      const d = await api<any>(`/v1/lp/positions?chain=${chain}&owner=${wallet.toLowerCase()}&status=${status}&limit=${limit}`);
+      return { chain: d.chain, owner: d.owner, summary: d.summary, positions: (d.positions ?? []).map((p: any) => ({ manager: p.manager, tokenId: p.tokenId, pool: p.pool, pair: `${p.symbol ?? "?"}/${p.anchorSymbol ?? "?"}`, dex: p.dex, kind: p.kind, status: p.status, inRange: p.inRange, edgePct: p.edgePct, inUsd: Math.round(p.inUsd), outUsd: Math.round(p.outUsd), valueUsd: p.valueUsd == null ? null : Math.round(p.valueUsd), feesUsd: Math.round(p.feesUsd), uncollectedUsd: p.uncollectedUsd == null ? null : Math.round(p.uncollectedUsd), pnlUsd: p.pnlUsd == null ? null : Math.round(p.pnlUsd), pnlPct: p.pnlPct, ageHours: p.ageHours == null ? null : Math.round(p.ageHours), openedTs: p.openedTs, closedTs: p.closedTs, jit: p.jit, unreconciled: p.unreconciled })) };
+    },
+  }),
+  tool({
+    name: "chord_lp_leaderboard",
+    description: "Top liquidity providers from the position ledger (LP Agent style): profit 7d/30d/all, win rate, fees, positions, pools, average age and invested size, what they provide to. JIT and same-operator clusters are excluded; filters mirror LP Agent's panel.",
+    input: z.object({ chain: z.number().int().refine((c) => c === 5042 || c === 4663 || c === 143).default(5042), sort: z.enum(["profit", "win_rate", "avg_age", "positions", "pools", "ev", "avg_invested", "monthly_profit", "fees", "last_activity"]).default("profit"), limit: z.number().int().min(1).max(100).default(25), minPositions: z.number().int().min(0).optional(), minAgeHours: z.number().min(0).optional(), minWinRate: z.number().min(0).max(100).optional() }),
+    run: async ({ chain, sort, limit, minPositions, minAgeHours, minWinRate }) => {
+      const qs = new URLSearchParams({ chain: String(chain), sort, limit: String(limit), ...(minPositions != null ? { minPositions: String(minPositions) } : {}), ...(minAgeHours != null ? { minAgeHours: String(minAgeHours) } : {}), ...(minWinRate != null ? { minWinRate: String(minWinRate) } : {}) });
+      const d = await api<any>(`/v1/lp/leaderboard?${qs}`);
+      return { chain: d.chain, sort: d.sort, rows: (d.rows ?? []).map((r: any) => ({ wallet: r.wallet, profit7dUsd: Math.round(r.windows?.d7?.profitUsd ?? 0), profit30dUsd: Math.round(r.windows?.d30?.profitUsd ?? 0), profitAllUsd: Math.round(r.windows?.all?.profitUsd ?? 0), winRatePct: r.winRatePct, feesUsd: Math.round(r.feesUsd ?? 0), positions: r.windows?.all?.positions ?? null, open: r.open, pools: r.pools, avgAgeHours: r.avgAgeHours, avgInvestedUsd: r.avgInvestedUsd, tokens: (r.tokens ?? []).slice(0, 5).map((t: any) => t.symbol ?? t.address), lastTs: r.lastTs })) };
+    },
+  }),
   tool({
     name: "chord_ask",
     description: "Ask Chord's analyst about Arc (chain 5042) in plain language and get a researched answer: trending, a token's flow/holders/risk, support and resistance with an entry ladder, top traders on a token, a wallet's PnL and trades, largest prints, launches, depth, a bridge quote, position sizing, or an ad-hoc SQL question over the index. Returns the answer text, source links, an optional route card and any tables the analysis produced. Needs a Chord API key (CHORD_API_KEY). Slower than the data tools (5–40 s); use it for judgement, use the other tools for raw numbers.",

@@ -290,6 +290,142 @@
     {
       "type": "function",
       "function": {
+        "name": "chord_lp_pools",
+        "description": "Pools ranked for a liquidity provider on Arc (or Robinhood Chain 4663 / Monad 143): TVL, volume by window, fees earned by LPs, fee/TVL and its annualised APR, 24h LP adds/removes, providers, whether a V4 hook can gate adds. Suspect pools (wash turnover, dust TVL) are flagged and hidden unless asked. Use for 'where to LP', 'best fee APR', 'is pool X worth providing to'.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "default": 5042
+            },
+            "sort": {
+              "type": "string",
+              "enum": [
+                "fee_tvl",
+                "vol_24h",
+                "vol_1h",
+                "tvl",
+                "fees_24h",
+                "first_seen",
+                "lp_net_24h",
+                "trades_24h",
+                "score"
+              ],
+              "default": "fee_tvl"
+            },
+            "interval": {
+              "type": "string",
+              "enum": [
+                "1h",
+                "6h",
+                "24h"
+              ],
+              "default": "24h"
+            },
+            "minTvl": {
+              "type": "number"
+            },
+            "quote": {
+              "type": "string",
+              "description": "restrict to pools quoted in this token (symbol or address)"
+            },
+            "limit": {
+              "type": "integer",
+              "default": 20
+            },
+            "flagged": {
+              "type": "boolean",
+              "default": false,
+              "description": "include suspect pools"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_lp_positions",
+        "description": "A wallet's liquidity positions (Uniswap V3/V4 position NFTs) from Chord's LP ledger: pool, venue, fee tier, range, in range now and distance to the edge, dollars in/out, value now, fees earned and uncollected, PnL, age, JIT flag; plus a summary (open/closed, win rate, realized PnL, fees).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "wallet": {
+              "type": "string"
+            },
+            "chain": {
+              "default": 5042
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ],
+              "default": "open"
+            },
+            "limit": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          "required": [
+            "wallet"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_lp_leaderboard",
+        "description": "Top liquidity providers from the position ledger (LP Agent style): profit 7d/30d/all, win rate, fees, positions, pools, average age and invested size, what they provide to. JIT and same-operator clusters are excluded; filters mirror LP Agent's panel.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "default": 5042
+            },
+            "sort": {
+              "type": "string",
+              "enum": [
+                "profit",
+                "win_rate",
+                "avg_age",
+                "positions",
+                "pools",
+                "ev",
+                "avg_invested",
+                "monthly_profit",
+                "fees",
+                "last_activity"
+              ],
+              "default": "profit"
+            },
+            "limit": {
+              "type": "integer",
+              "default": 25
+            },
+            "minPositions": {
+              "type": "integer"
+            },
+            "minAgeHours": {
+              "type": "number"
+            },
+            "minWinRate": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
         "name": "chord_ask",
         "description": "Ask Chord's analyst about Arc (chain 5042) in plain language and get a researched answer: trending, a token's flow/holders/risk, support and resistance with an entry ladder, top traders on a token, a wallet's PnL and trades, largest prints, launches, depth, a bridge quote, position sizing, or an ad-hoc SQL question over the index. Returns the answer text, source links, an optional route card and any tables the analysis produced. Needs a Chord API key (CHORD_API_KEY). Slower than the data tools (5–40 s); use it for judgement, use the other tools for raw numbers.",
         "parameters": {
