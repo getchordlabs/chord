@@ -3106,5 +3106,65 @@
    "openValueUsd": 0
   },
   "updatedAt": 1789891871406
+ },
+ "/v1/candles?chain=5042&token=0x171a4217b86a807a64eb94757db6849fb4bdbaa0&tf=1h&limit=2": {
+  "chain": 5042,
+  "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+  "tf": "1h",
+  "source": "index",
+  "from": 1790704800,
+  "to": 1790712000,
+  "forming": true,
+  "candles": [
+   {
+    "t": 1790704800,
+    "o": 83084.16874661468,
+    "h": 83761.32352941176,
+    "l": 82504.09836065574,
+    "c": 83716.00512163893,
+    "v": 236698.5,
+    "n": 976
+   },
+   {
+    "t": 1790708400,
+    "o": 83676.16747181964,
+    "h": 83758.25396825396,
+    "l": 82970.76923076923,
+    "c": 83590.35733333333,
+    "v": 28901.4,
+    "n": 212
+   }
+  ]
+ },
+ "/v1/arc/token/0x171a4217b86a807a64eb94757db6849fb4bdbaa0/trades?limit=2": {
+  "chain": 5042,
+  "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+  "trades": [
+   {
+    "tx": "0xbebd037b84ae0fba9229fb3e01f983833cbd637983ba254d4dba71ddad861764",
+    "logIndex": 22,
+    "dex": "uniswap_v3",
+    "side": "buy",
+    "tokenAmt": 8.43e-06,
+    "usd": 0.70542,
+    "priceUsd": 83679.71530249111,
+    "ts": 1790709599,
+    "wallet": "0x7fe73969faf9d867ac49add1860bc121ff199272",
+    "pool": "0x82916bee18fcef517b26c72d7cb5f13694e1db41"
+   },
+   {
+    "tx": "0xbdd5f399dd4ead2281042560db54dbfa13c6b44c4ed873baad4daea84dfed472",
+    "logIndex": 3,
+    "dex": "uniswap_v3",
+    "side": "buy",
+    "tokenAmt": 0.003,
+    "usd": 250.846064,
+    "priceUsd": 83615.35466666667,
+    "ts": 1790709590,
+    "wallet": "0xee93f91e457522d89ee19c2affba87352c365465",
+    "pool": "0x82916bee18fcef517b26c72d7cb5f13694e1db41"
+   }
+  ],
+  "updatedAt": 1790709635583
  }
 }

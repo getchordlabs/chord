@@ -2889,6 +2889,174 @@
         }
       }
     },
+    "/arc/token/{address}/trades": {
+      "get": {
+        "tags": [
+          "Arc data"
+        ],
+        "operationId": "arcTokenTrades",
+        "summary": "Latest prints",
+        "description": "The last N swaps of one token straight from Chord's own Arc tape (newest first): venue, side, size, USD, price, wallet (`null` until resolved) and pool. Bounded and index-served — the mobile token page's Feed tab.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": ""
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": "Newest rows."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "const": 5042
+                    },
+                    "token": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "trades": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tx": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "logIndex": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "buy",
+                              "sell"
+                            ]
+                          },
+                          "tokenAmt": {
+                            "type": "number",
+                            "description": "Whole tokens."
+                          },
+                          "usd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "priceUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "ts": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "wallet": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "pool": {
+                            "type": "string",
+                            "description": "Pool address or V4 poolId."
+                          }
+                        }
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 5042,
+                  "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                  "trades": [
+                    {
+                      "tx": "0xbebd037b84ae0fba9229fb3e01f983833cbd637983ba254d4dba71ddad861764",
+                      "logIndex": 22,
+                      "dex": "uniswap_v3",
+                      "side": "buy",
+                      "tokenAmt": 0.00000843,
+                      "usd": 0.70542,
+                      "priceUsd": 83679.71530249111,
+                      "ts": 1790709599,
+                      "wallet": "0x7fe73969faf9d867ac49add1860bc121ff199272",
+                      "pool": "0x82916bee18fcef517b26c72d7cb5f13694e1db41"
+                    },
+                    {
+                      "tx": "0xbdd5f399dd4ead2281042560db54dbfa13c6b44c4ed873baad4daea84dfed472",
+                      "logIndex": 3,
+                      "dex": "uniswap_v3",
+                      "side": "buy",
+                      "tokenAmt": 0.003,
+                      "usd": 250.846064,
+                      "priceUsd": 83615.35466666667,
+                      "ts": 1790709590,
+                      "wallet": "0xee93f91e457522d89ee19c2affba87352c365465",
+                      "pool": "0x82916bee18fcef517b26c72d7cb5f13694e1db41"
+                    }
+                  ],
+                  "updatedAt": 1790709635583
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tokens": {
       "get": {
         "tags": [
@@ -3072,7 +3240,7 @@
                           },
                           "volume24h": {
                             "type": "number",
-                            "description": ""
+                            "description": "Includes trades the hourly rollup has not counted yet."
                           },
                           "txns24h": {
                             "type": "integer",
@@ -3087,6 +3255,10 @@
                           }
                         }
                       }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Server time (ms) the live overlay was applied — compare with a WebSocket `prices` frame's `at`."
                     }
                   }
                 },
@@ -3103,7 +3275,8 @@
                         220.9
                       ]
                     }
-                  }
+                  },
+                  "updatedAt": 1790708400000
                 }
               }
             }
@@ -3294,6 +3467,249 @@
                   ],
                   "tf": "1h",
                   "source": "db"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing at this identity (`NOT_FOUND`, `UNKNOWN_TOKEN`, `NO_ROUTE`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/candles": {
+      "get": {
+        "tags": [
+          "Tokens and charts"
+        ],
+        "operationId": "candles",
+        "summary": "Candles (data API)",
+        "description": "OHLCV for any token Chord indexes on Arc, Robinhood Chain or Monad, built only from Chord's own index — never a third-party feed, so `source` is always `index`. 1m / 5m / 15m come from a 1-minute rollup that keeps history after raw trades are retired; 1h and above from the hourly rollup; the newest minutes straight from the tape. Each candle carries `n`, the trades in the bucket. Buckets without a trade are absent unless `fill=1`, which carries the previous close through them.\n\nPaging: the default window ends with the still-open bucket (`forming: true`) and holds `limit` buckets. A `from`–`to` range wider than `limit` keeps the newest buckets; ask for the previous page with `to` = this page's `from`. The token must trade on the chain you name — `404 UNKNOWN_TOKEN` says which chain it trades on when it is another one. The zero address stands for the chain's native asset. For live candles subscribe on `/v1/ws/live` (see Streaming).",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "enum": [
+                5042,
+                4663,
+                143
+              ],
+              "default": 143
+            },
+            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad. Omitted = 143."
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": "Token address."
+          },
+          {
+            "name": "tf",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d",
+                "1w"
+              ],
+              "default": "1h"
+            },
+            "description": "Timeframe."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "Unix time, seconds, UTC."
+            },
+            "description": "Start, inclusive. Default: `to` minus `limit` buckets."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "Unix time, seconds, UTC."
+            },
+            "description": "End, exclusive, snapped up to a bucket edge. Default: the end of the open bucket."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 300
+            },
+            "description": "Buckets per page."
+          },
+          {
+            "name": "fill",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Carry the previous close through empty buckets (v = 0, n = 0)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "token": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "tf": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "source": {
+                      "type": "string",
+                      "description": "Always `index`."
+                    },
+                    "from": {
+                      "type": "integer",
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "to": {
+                      "type": "integer",
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "forming": {
+                      "type": "boolean",
+                      "description": "The last candle is the still-open bucket."
+                    },
+                    "candles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "t": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "o": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "h": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "l": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "c": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "v": {
+                            "type": "number",
+                            "description": "USD volume in the bucket."
+                          },
+                          "n": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Trades in the bucket."
+                          }
+                        }
+                      },
+                      "description": "Oldest first."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 5042,
+                  "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                  "tf": "1h",
+                  "source": "index",
+                  "from": 1790704800,
+                  "to": 1790712000,
+                  "forming": true,
+                  "candles": [
+                    {
+                      "t": 1790704800,
+                      "o": 83084.16874661468,
+                      "h": 83761.32352941176,
+                      "l": 82504.09836065574,
+                      "c": 83716.00512163893,
+                      "v": 236698.5,
+                      "n": 976
+                    },
+                    {
+                      "t": 1790708400,
+                      "o": 83676.16747181964,
+                      "h": 83758.25396825396,
+                      "l": 82970.76923076923,
+                      "c": 83590.35733333333,
+                      "v": 28901.4,
+                      "n": 212
+                    }
+                  ]
                 }
               }
             }
@@ -8662,6 +9078,10 @@
                       "type": "boolean",
                       "description": ""
                     },
+                    "privy": {
+                      "type": "boolean",
+                      "description": "The server accepts Privy sign-in (the Ask wallet)"
+                    },
                     "budget": {
                       "type": "object",
                       "properties": {
@@ -8709,8 +9129,8 @@
                 "properties": {
                   "question": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1000
+                    "maxLength": 1000,
+                    "description": "May be empty when `images` is set."
                   },
                   "stream": {
                     "type": "boolean",
@@ -8731,6 +9151,13 @@
                         "content": {
                           "type": "string",
                           "maxLength": 4000
+                        },
+                        "images": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Image ids that user turn carried — their reading comes back as context."
                         }
                       }
                     },
@@ -8740,6 +9167,14 @@
                     "type": "string",
                     "pattern": "^0x[a-fA-F0-9]{40}$",
                     "description": "The caller's wallet, so \"my PnL\" resolves."
+                  },
+                  "images": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{32}$"
+                    },
+                    "description": "Up to 4 ids from `POST /v1/ask/image` (your own, 30 days). The analyst reads each image — chart, positions, a swap or wallet screenshot — before it answers, and can zoom into one."
                   }
                 },
                 "required": [
@@ -9236,6 +9671,167 @@
             "Session": []
           }
         ]
+      }
+    },
+    "/ask/image": {
+      "post": {
+        "tags": [
+          "Ask agent"
+        ],
+        "operationId": "askImageUpload",
+        "summary": "Attach an image",
+        "description": "Uploads one image for a question (PNG, JPEG, WebP, GIF first frame; ≤ 12 MB). It is re-encoded as a JPEG no wider or taller than 2048 px, with its metadata (EXIF, GPS) removed, and kept 30 days. Send the returned `id` in `images` of `POST /v1/ask`. 30 uploads per 10 minutes per caller.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            },
+            "image/*": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "32 hex characters."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "`/v1/ask/image/{id}`."
+                    },
+                    "width": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "height": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "description": ""
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unknown credential (`UNAUTHORIZED`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ]
+      }
+    },
+    "/ask/image/{id}": {
+      "get": {
+        "tags": [
+          "Ask agent"
+        ],
+        "operationId": "askImage",
+        "summary": "Fetch an attached image",
+        "description": "The stored JPEG. Public by unguessable id (an `<img>` sends no bearer), 30 days.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Image id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`image/jpeg`.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing at this identity (`NOT_FOUND`, `UNKNOWN_TOKEN`, `NO_ROUTE`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/ask/report/{id}": {
@@ -11878,6 +12474,10 @@
                       "lifi",
                       "relay"
                     ]
+                  },
+                  "usePermit": {
+                    "type": "boolean",
+                    "description": "Relay only: a permit (signature) deposit instead of a transaction, for tokens that support it (native USDC on Arbitrum)."
                   }
                 },
                 "required": [
@@ -11910,6 +12510,110 @@
                   "type": "object",
                   "additionalProperties": true,
                   "description": "`{ provider, requestId, steps[], fees, details, checkEndpoint, txns[] }` — provider-shaped; sign `txns` in order."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The routing engine or an upstream did not answer (`ENGINE_ERROR`, `ROUTE_ERROR`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crosschain/permit": {
+      "post": {
+        "tags": [
+          "Bridge"
+        ],
+        "operationId": "crosschainPermit",
+        "summary": "Submit a signed permit deposit",
+        "description": "Hands a signed `signature` step from a `usePermit` quote back to the provider (Relay only): send the step's `post.body` fields plus the EIP-712 signature. Then poll `/crosschain/status`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{64}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "description": "e.g. `eip3009`"
+                  },
+                  "api": {
+                    "type": "string",
+                    "description": "e.g. `swap`"
+                  },
+                  "signature": {
+                    "type": "string",
+                    "description": "0x… EIP-712 signature"
+                  }
+                },
+                "required": [
+                  "requestId",
+                  "kind",
+                  "api",
+                  "signature"
+                ]
+              },
+              "example": {
+                "requestId": "0x17900816413eb4c1d4ec4b00d0be87c6b60872ed43d103eb87dc22a0b80ff325",
+                "kind": "eip3009",
+                "api": "swap",
+                "signature": "0x…"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Provider-shaped acknowledgement."
                 }
               }
             }
@@ -12985,7 +13689,7 @@
         ],
         "operationId": "streamMarket",
         "summary": "Server-sent events: prices",
-        "description": "One `text/event-stream` feed, no key, EventSource-friendly with automatic reconnect. Events: `rh-ticker` (fresh prices for chain 4663, about every 10 s, only addresses whose price moved), `ticker` / `whales` / `defi` (Monad), `ping` every 5 s. Capacity 500 clients (`503` beyond). Arc prices stream over the WebSocket `prices` channel instead — see Concepts → Streaming.",
+        "description": "One `text/event-stream` feed, no key, EventSource-friendly with automatic reconnect. Events: `rh-ticker` (fresh prices for chain 4663, about every 10 s, only addresses whose price moved), `ticker` / `whales` / `defi` (Monad), `ping` every 5 s. Capacity 500 clients (`503` beyond). Arc and Robinhood Chain boards stream faster over the WebSocket `prices` channel — see Concepts → Streaming.",
         "responses": {
           "200": {
             "description": "`text/event-stream`",
@@ -13017,11 +13721,21 @@
           "Streaming"
         ],
         "operationId": "wsLive",
-        "summary": "WebSocket: live candles, trades and Arc prices",
-        "description": "Upgrade to a WebSocket. No key, rate-limit exempt, up to 8 channels per connection. Subscribe with `{op:\"sub\", channel:\"candles\", token, tf}`, `{op:\"sub\", channel:\"trades\", token}` or `{op:\"sub\", channel:\"prices\", chain:5042}`; the server pushes `candle`, `trades` and `prices` frames, `ping` every 25 s, and `error` with a code (`bad_op` · `bad_token` · `bad_tf` · `bad_chain` · `channel_cap`). Full protocol under Concepts → Streaming.",
+        "summary": "WebSocket: live candles, trades and board feeds",
+        "description": "Upgrade to a WebSocket. No key needed, rate-limit exempt, up to 8 channels per connection. With an API key (`X-API-Key`, or `?apiKey=` from a browser) the connection joins a separate pool: up to 64 channels per connection and 20 connections per key (`429` beyond). Subscribe with `{op:\"sub\", channel:\"candles\", token, tf}`, `{op:\"sub\", channel:\"trades\", token}` or `{op:\"sub\", channel:\"prices\", chain}` (chain `5042`, `4663` or `143`); the server pushes `candle`, `trades` and `prices` frames (every print within ~400 ms; on 5042 / 4663 each item also carries the token's live 24h volume and trade counts), `new` frames for tokens trading for the first time (5042 / 4663), `ping` every 25 s, and `error` with a code (`bad_op` · `bad_token` · `bad_tf` · `bad_chain` · `channel_cap`). Full protocol under Concepts → Streaming.",
         "responses": {
           "101": {
             "description": "Switching protocols."
+          },
+          "429": {
+            "description": "This API key already holds its maximum of live connections.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
             "description": "`WS_LIVE_DISABLED` or at capacity.",
