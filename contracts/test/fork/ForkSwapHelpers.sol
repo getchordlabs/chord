@@ -20,6 +20,12 @@ interface IV3PoolView {
     function token0() external view returns (address);
 }
 
+interface ILBPairView {
+    function getTokenX() external view returns (address);
+    function getActiveId() external view returns (uint24);
+    function getPriceFromId(uint24 id) external view returns (uint256); // 128.128: price of X in Y (raw)
+}
+
 interface IStateView {
     function getSlot0(bytes32 poolId) external view returns (uint160, int24, uint24, uint24);
 }
@@ -36,7 +42,7 @@ abstract contract ForkSwapHelpers is Test {
         V3, // Uniswap V3 / Slipstream / PancakeSwap V3 / Algebra — spot from slot0 / globalState
         V2, // constant product — spot from reserves
         V4, // Uniswap V4 PoolManager — spot from StateView
-        LB // Liquidity Book — spot supplied by the chain test (active bin price)
+        LB // Liquidity Book — spot from the active bin price
     }
 
     struct Venue {
@@ -103,6 +109,18 @@ abstract contract ForkSwapHelpers is Test {
         v.extraData = abi.encode(key);
     }
 
+    function _lb(string memory label, address adapter, address pair, uint256 binStep)
+        internal
+        pure
+        returns (Venue memory v)
+    {
+        v.label = label;
+        v.adapter = adapter;
+        v.kind = Kind.LB;
+        v.pool = pair;
+        v.extraData = abi.encode(binStep); // LFJAdapter: extraData = abi.encode(uint256 binStep)
+    }
+
     // ── swaps ────────────────────────────────────────────────────────────────────────────────────
 
     /// @dev One router.swap from `user`, who must already hold `amountIn` of `tokenIn`.
@@ -149,7 +167,13 @@ abstract contract ForkSwapHelpers is Test {
             bool zeroForOne = v.key.currency0 == tokenIn || (v.key.currency0 == address(0) && tokenIn == wrapped);
             return _spotFromSqrt(sqrtP, zeroForOne, amountIn);
         }
-        revert("spot: override for this kind");
+        if (v.kind == Kind.LB) {
+            uint256 price = ILBPairView(v.pool).getPriceFromId(ILBPairView(v.pool).getActiveId());
+            return tokenIn == ILBPairView(v.pool).getTokenX()
+                ? Math.mulDiv(amountIn, price, 1 << 128)
+                : Math.mulDiv(amountIn, 1 << 128, price);
+        }
+        revert("spot: unknown kind");
     }
 
     /// @dev V3 / Slipstream / PancakeSwap V3 (`slot0()`) and Algebra (`globalState()`) both put the
