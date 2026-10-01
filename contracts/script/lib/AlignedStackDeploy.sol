@@ -6,6 +6,9 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {AdapterRegistry} from "../../src/AdapterRegistry.sol";
 import {FeeCollector} from "../../src/FeeCollector.sol";
 import {NullRouter} from "../../src/NullRouter.sol";
+import {ChordAdapterRegistry} from "../../src/chord/ChordAdapterRegistry.sol";
+import {ChordFeeCollector} from "../../src/chord/ChordFeeCollector.sol";
+import {ChordRouter} from "../../src/chord/ChordRouter.sol";
 
 /// @dev The one property every H1-hardened adapter shares (BaseAdapter): the router it pins.
 interface IPinnedAdapter {
@@ -38,6 +41,12 @@ interface IPinnedAdapter {
 ///
 ///      Adapters are H1-hardened (`BaseAdapter`): each pins the NullRouter PROXY as an immutable and
 ///      reverts `NotRouter` (0x91655201) for every other caller.
+///
+///      Names (owner 2026-10-01): the implementations deploy as ChordAdapterRegistry / ChordFeeCollector /
+///      ChordRouter (src/chord — the same code under the Chord name, no new state) and the per-chain scripts use the
+///      Chord* adapters. CREATE addresses depend on deployer + nonce only, so the nonce map above is unchanged.
+///      Avalanche (2026-10-01) was deployed just before the rename and moved to these impls by
+///      script/UpgradeChordNames.s.sol.
 abstract contract AlignedStackDeploy is Script {
     // ── aligned core (same on Monad 143 / RH 4663 / Arc 5042) ───────────────────────────────────
     address internal constant EXPECTED_DEPLOYER = 0x0f1171209dAD379AF0E486f2c77D275D6E0a4f79;
@@ -116,19 +125,19 @@ abstract contract AlignedStackDeploy is Script {
 
     function _deploy(address deployer, address treasury) internal returns (Stack memory s) {
         // nonce 0, 1 — AdapterRegistry
-        AdapterRegistry registryImpl = new AdapterRegistry();
+        AdapterRegistry registryImpl = new ChordAdapterRegistry();
         ERC1967Proxy registryProxy =
             new ERC1967Proxy(address(registryImpl), abi.encodeCall(AdapterRegistry.initialize, (deployer)));
         s.registry = AdapterRegistry(address(registryProxy));
         s.registryImpl = address(registryImpl);
 
         // nonce 2 — FeeCollector impl (constructor-only, fills the first "any contract" slot)
-        FeeCollector feeCollectorImpl = new FeeCollector();
+        FeeCollector feeCollectorImpl = new ChordFeeCollector();
         s.feeCollectorImpl = address(feeCollectorImpl);
 
         // nonce 3, 4 — NullRouter. Placeholder collector (wired at nonce 7). `executor` is a
         // deprecated storage-layout slot: address(0), never re-add (packages/contracts/CLAUDE.md).
-        NullRouter routerImpl = new NullRouter();
+        NullRouter routerImpl = new ChordRouter();
         ERC1967Proxy routerProxy = new ERC1967Proxy(
             address(routerImpl),
             abi.encodeCall(
@@ -164,7 +173,7 @@ abstract contract AlignedStackDeploy is Script {
         s.adapters = new address[](others.length + 1);
         s.names = new string[](others.length + 1);
         s.adapters[0] = s.v3Adapter;
-        s.names[0] = "V3-family adapter";
+        s.names[0] = "ChordV3Adapter";
         for (uint256 i = 0; i < others.length; i++) {
             s.adapters[i + 1] = others[i];
             s.names[i + 1] = otherNames[i];
@@ -229,14 +238,14 @@ abstract contract AlignedStackDeploy is Script {
     }
 
     function _log(Stack memory s, address treasury) internal view {
-        console2.log(string.concat("=== NullTerminal on ", chainName(), " ==="));
+        console2.log(string.concat("=== Chord on ", chainName(), " ==="));
         console2.log("chainId:              ", block.chainid);
-        console2.log("AdapterRegistry proxy:", address(s.registry));
-        console2.log("AdapterRegistry impl: ", s.registryImpl);
-        console2.log("NullRouter proxy:     ", address(s.router));
-        console2.log("NullRouter impl:      ", s.routerImpl);
-        console2.log("FeeCollector proxy:   ", address(s.feeCollector));
-        console2.log("FeeCollector impl:    ", s.feeCollectorImpl);
+        console2.log("ChordAdapterRegistry proxy:", address(s.registry));
+        console2.log("ChordAdapterRegistry impl: ", s.registryImpl);
+        console2.log("ChordRouter proxy:         ", address(s.router));
+        console2.log("ChordRouter impl:          ", s.routerImpl);
+        console2.log("ChordFeeCollector proxy:   ", address(s.feeCollector));
+        console2.log("ChordFeeCollector impl:    ", s.feeCollectorImpl);
         console2.log("Treasury:             ", treasury);
         for (uint256 i = 0; i < s.adapters.length; i++) {
             console2.log(string.concat(s.names[i], ":"), s.adapters[i]);

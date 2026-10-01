@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {AlignedStackDeploy} from "./lib/AlignedStackDeploy.sol";
+import {ChordV3Adapter, ChordV2FeeAdapter, ChordV4Adapter} from "../src/chord/ChordAdapters.sol";
 import {UniV3AnyForkAdapter} from "../src/adapters/UniV3AnyForkAdapter.sol";
 import {UniV2FeeTaxSafeAdapter} from "../src/adapters/UniV2FeeTaxSafeAdapter.sol";
 import {UniswapV4Adapter} from "../src/adapters/UniswapV4Adapter.sol";
@@ -91,7 +92,7 @@ contract DeployBnbScript is AlignedStackDeploy {
     }
 
     function _deployV3Adapter(address router) internal override returns (address) {
-        return address(new UniV3AnyForkAdapter(router, v3Factories(), v3InitCodeHashes(), v3FeeTiers()));
+        return address(new ChordV3Adapter(router, v3Factories(), v3InitCodeHashes(), v3FeeTiers()));
     }
 
     function _deployOtherAdapters(address router)
@@ -102,10 +103,10 @@ contract DeployBnbScript is AlignedStackDeploy {
         (address[] memory f, uint16[] memory fees) = v2Factories();
         adapters = new address[](2);
         names = new string[](2);
-        adapters[0] = address(new UniV2FeeTaxSafeAdapter(router, f, fees)); // nonce 9
-        names[0] = "UniV2FeeTaxSafeAdapter";
-        adapters[1] = address(new UniswapV4Adapter(router, V4_POOL_MANAGER, WBNB)); // nonce 10
-        names[1] = "UniswapV4Adapter";
+        adapters[0] = address(new ChordV2FeeAdapter(router, f, fees)); // nonce 9
+        names[0] = "ChordV2FeeAdapter";
+        adapters[1] = address(new ChordV4Adapter(router, V4_POOL_MANAGER, WBNB)); // nonce 10
+        names[1] = "ChordV4Adapter";
     }
 
     /// @dev OWNER GATE — docs/fee-tiers.md "stable" + "major" rows (0 bps on the OUTPUT token). NOT included: the
