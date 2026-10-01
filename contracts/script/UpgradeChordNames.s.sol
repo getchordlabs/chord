@@ -18,7 +18,9 @@ import {ChordRouter} from "../src/chord/ChordRouter.sol";
 ///         Written for Avalanche (deployed 2026-10-01 minutes before the rename); runs on any chain whose three
 ///         proxies the broadcasting key owns.
 /// @dev  DEPLOYER_PRIVATE_KEY = the proxies' owner (0x0f11…4f79). Dry run: `--sig 'upgradeAs(address)' <owner>` on an
-///       anvil fork (no key).
+///       anvil fork (no key). CHORD_UPGRADE_REGISTRY / _COLLECTOR / _ROUTER (default true) pick the proxies: Monad / RH /
+///       Arc moved the ROUTER only (owner 2026-10-02 — the one contract that carried the NullTerminal name; Monad's
+///       AdapterRegistry impl 0x9121aff4 is an older 3,604 B build, not today's source, so it is never swapped for it).
 contract UpgradeChordNames is Script {
     address internal constant REGISTRY_PROXY = 0x6Cf25d2af1A58d7094B0ac253aE616A8e1F2Ea3f;
     address internal constant ROUTER_PROXY = 0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a;
@@ -49,30 +51,37 @@ contract UpgradeChordNames is Script {
     }
 
     function _upgrade(address owner, uint256 pk) internal {
+        bool doRegistry = vm.envOr("CHORD_UPGRADE_REGISTRY", true);
+        bool doCollector = vm.envOr("CHORD_UPGRADE_COLLECTOR", true);
+        bool doRouter = vm.envOr("CHORD_UPGRADE_ROUTER", true);
+        require(doRegistry || doCollector || doRouter, "nothing selected");
         require(NullRouter(payable(ROUTER_PROXY)).owner() == owner, "not the router owner");
         require(AdapterRegistry(REGISTRY_PROXY).owner() == owner, "not the registry owner");
         require(FeeCollector(COLLECTOR_PROXY).owner() == owner, "not the collector owner");
         Snapshot memory before = _snapshot();
+        address registryBefore = _impl(REGISTRY_PROXY);
+        address collectorBefore = _impl(COLLECTOR_PROXY);
+        address routerBefore = _impl(ROUTER_PROXY);
 
         if (pk != 0) vm.startBroadcast(pk);
         else vm.startBroadcast(owner);
-        address registryImpl = address(new ChordAdapterRegistry());
-        address collectorImpl = address(new ChordFeeCollector());
-        address routerImpl = address(new ChordRouter());
-        UUPSUpgradeable(REGISTRY_PROXY).upgradeToAndCall(registryImpl, "");
-        UUPSUpgradeable(COLLECTOR_PROXY).upgradeToAndCall(collectorImpl, "");
-        UUPSUpgradeable(ROUTER_PROXY).upgradeToAndCall(routerImpl, "");
+        address registryImpl = doRegistry ? address(new ChordAdapterRegistry()) : registryBefore;
+        address collectorImpl = doCollector ? address(new ChordFeeCollector()) : collectorBefore;
+        address routerImpl = doRouter ? address(new ChordRouter()) : routerBefore;
+        if (doRegistry) UUPSUpgradeable(REGISTRY_PROXY).upgradeToAndCall(registryImpl, "");
+        if (doCollector) UUPSUpgradeable(COLLECTOR_PROXY).upgradeToAndCall(collectorImpl, "");
+        if (doRouter) UUPSUpgradeable(ROUTER_PROXY).upgradeToAndCall(routerImpl, "");
         vm.stopBroadcast();
 
-        require(_impl(REGISTRY_PROXY) == registryImpl, "registry impl not moved");
-        require(_impl(COLLECTOR_PROXY) == collectorImpl, "collector impl not moved");
-        require(_impl(ROUTER_PROXY) == routerImpl, "router impl not moved");
+        require(_impl(REGISTRY_PROXY) == registryImpl, "registry impl not where it should be");
+        require(_impl(COLLECTOR_PROXY) == collectorImpl, "collector impl not where it should be");
+        require(_impl(ROUTER_PROXY) == routerImpl, "router impl not where it should be");
         _requireSame(before, _snapshot());
 
         console2.log(string.concat("=== Chord names on chain ", vm.toString(block.chainid), " ==="));
-        console2.log("ChordAdapterRegistry impl:", registryImpl);
-        console2.log("ChordFeeCollector impl:   ", collectorImpl);
-        console2.log("ChordRouter impl:         ", routerImpl);
+        console2.log(doRegistry ? "ChordAdapterRegistry impl:" : "AdapterRegistry impl (kept):", registryImpl);
+        console2.log(doCollector ? "ChordFeeCollector impl:   " : "FeeCollector impl (kept):  ", collectorImpl);
+        console2.log(doRouter ? "ChordRouter impl:         " : "router impl (kept):        ", routerImpl);
     }
 
     function _impl(address proxy) internal view returns (address) {
