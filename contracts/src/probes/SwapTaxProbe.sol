@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 /// @notice NEVER deployed. The engine's fallback when `TaxProbe` (which runs AS the pair and transfers out
 ///         directly) reverts. Many BNB meme tokens refuse any transfer out of their pair that is not part
 ///         of a swap — they read it as liquidity removal ("b", "撤池" guards) — so the transfer probe left
-///         tokens like 奶龙 (0x99332d02…, $31M/24h, buys and sells fine through the router) unquoted
+///         tokens like 奶龙 (0x99332d02…, $31M/24h; router buy + injected-balance sell simulations pass — not proof) unquoted
 ///         (2026-10-02). This probe sits at a scratch address with a NATIVE balance override and:
 ///           1. wraps `nativeIn` (deposit — no storage-slot knowledge needed);
 ///           2. if the pair's other side is not the wrapped native, buys it on factory.getPair(wrapped, anchor);
