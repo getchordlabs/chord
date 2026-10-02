@@ -4,6 +4,11 @@ pragma solidity ^0.8.24;
 import {Test, console2} from "forge-std/Test.sol";
 import {ChordAlgebraIntegralAdapter} from "../../src/chord/ChordAlgebraIntegralAdapter.sol";
 import {AlgebraIntegralAdapter} from "../../src/adapters/AlgebraIntegralAdapter.sol";
+import {IntegralQuoteProbe} from "../../src/probes/IntegralQuoteProbe.sol";
+
+interface IIntegralPoolTokens {
+    function token0() external view returns (address);
+}
 
 interface IERC20AI {
     function balanceOf(address) external view returns (uint256);
@@ -30,11 +35,17 @@ contract AlgebraIntegralForkTest is Test {
         internal
     {
         address user = address(0xB0B);
+        // The engine's quote: the probe's simulated swap must equal what the adapter then delivers.
+        IntegralQuoteProbe probe = new IntegralQuoteProbe();
+        bool z = IIntegralPoolTokens(pool).token0() == tin;
+        (int256 q0, int256 q1) = probe.quote(pool, z, int256(amt));
+        uint256 quoted = uint256(-(z ? q1 : q0));
         deal(tin, address(a), amt);
         uint256 b0 = IERC20AI(tout).balanceOf(user);
         vm.prank(ROUTER);
         uint256 got = a.swap(tin, tout, amt, user, abi.encode(pool));
         assertEq(IERC20AI(tout).balanceOf(user) - b0, got, "delivered != returned");
+        assertEq(got, quoted, "delivered != probe quote");
         vm.prank(user);
         IERC20AI(tout).transfer(address(a), got);
         uint256 c0 = IERC20AI(tin).balanceOf(user);

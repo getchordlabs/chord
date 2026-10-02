@@ -21,7 +21,7 @@ contract DeployAlgebraIntegralAdapterScript is Script {
     // Base
     address constant HYDREX_FACTORY = 0x36077D39cdC65E1e3FB65810430E5b2c4D5fA29E;
     address constant QUICKSWAP_V4_FACTORY = 0xC5396866754799B9720125B104AE01d935Ab9C7b;
-    // BNB — THENA V3 (Algebra, default pools only)
+    // BNB — THENA V3 (Algebra Integral: default pools + one custom deployer)
     address constant THENA_V3_FACTORY = 0x30055F87716d3DFD0E5198C27024481099fB4A98;
 
     function venues() public view returns (address[] memory fs, address[] memory ds) {
@@ -44,9 +44,13 @@ contract DeployAlgebraIntegralAdapterScript is Script {
             fs[2] = QUICKSWAP_V4_FACTORY;
             ds[2] = 0xdA97EfAa1576FA251D18dcdddFC51A1dE218189f; // 8 custom pools
         } else if (block.chainid == 56) {
-            fs = new address[](1);
-            ds = new address[](1);
+            // r2 (2026-10-02): THENA V3 creates most pools through custom deployer 0xf807462b… (201 pools, ~$481k of anchor
+            // balance — as much as the 103 default pools; top pool 0xd1d3b615… $244k). r1 0x1713684E… pinned default only.
+            fs = new address[](2);
+            ds = new address[](2);
             fs[0] = THENA_V3_FACTORY;
+            fs[1] = THENA_V3_FACTORY;
+            ds[1] = 0xF807462b5ce54A89e2F5B847D8281030eAfE241B;
         } else {
             revert("wrong chain: Avalanche, Base or BNB only");
         }
