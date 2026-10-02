@@ -87,6 +87,21 @@ contract SolidlyFactoryMock {
     }
 }
 
+/// @dev Velodrome / Aerodrome V2 factory shape: `getPool`, and `getPair` reverts.
+contract VeloFactoryMock {
+    mapping(bytes32 => address) internal pools;
+    function set(address a, address b, bool st, address pool) external {
+        pools[keccak256(abi.encode(a, b, st))] = pool;
+        pools[keccak256(abi.encode(b, a, st))] = pool;
+    }
+    function getPool(address a, address b, bool st) external view returns (address) {
+        return pools[keccak256(abi.encode(a, b, st))];
+    }
+    function getPair(address, address, bool) external pure returns (address) {
+        revert("no getPair");
+    }
+}
+
 contract SolidlyPairAdapterTest is Test {
     address constant ROUTER = address(0xA11CE);
     PlainTokenS a;
@@ -163,6 +178,27 @@ contract SolidlyPairAdapterTest is Test {
         uint256 expected = tp.getAmountOut(990e18, address(t)); // 1 % stays with the token
         uint256 out = _swap(address(t), address(b), 1_000e18, address(tp));
         assertEq(out, expected);
+    }
+
+    function test_veloFactory_getPoolIsAcceptedAndStillPinned() public {
+        VeloFactoryMock vf = new VeloFactoryMock();
+        SolidlyVolatilePair vp = new SolidlyVolatilePair(address(a), address(b), 30);
+        a.mint(address(vp), 1_000_000e18);
+        b.mint(address(vp), 250_000e6);
+        vp.sync();
+        vf.set(address(a), address(b), false, address(vp));
+        address[] memory f = new address[](1);
+        f[0] = address(vf);
+        SolidlyPairAdapter va = new SolidlyPairAdapter(ROUTER, f);
+        a.mint(address(va), 1_000e18);
+        uint256 expected = vp.getAmountOut(1_000e18, address(a));
+        vm.prank(ROUTER);
+        assertEq(va.swap(address(a), address(b), 1_000e18, address(this), abi.encode(address(vp))), expected);
+        // the Solidly-V1 pool is not in this factory → refused
+        a.mint(address(va), 1e18);
+        vm.prank(ROUTER);
+        vm.expectRevert(abi.encodeWithSelector(SolidlyPairAdapter.PoolNotCanonical.selector, address(pair)));
+        va.swap(address(a), address(b), 1e18, address(this), abi.encode(address(pair)));
     }
 
     function test_constructorGuards() public {

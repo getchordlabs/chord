@@ -14,7 +14,10 @@ interface ISolidlyPair {
 }
 
 interface ISolidlyFactory {
+    /// @dev Solidly V1 / Blackhole V1 name.
     function getPair(address tokenA, address tokenB, bool stable) external view returns (address);
+    /// @dev Velodrome V2 / Aerodrome V2 name (their factories have no `getPair`).
+    function getPool(address tokenA, address tokenB, bool stable) external view returns (address);
 }
 
 interface IERC20BalS {
@@ -82,17 +85,26 @@ contract SolidlyPairAdapter is IAdapter, BaseAdapter {
         pair.swap(amount0Out, amount1Out, to, "");
     }
 
-    /// @dev Reverts unless a PINNED factory returns `pool` for (tokenA, tokenB, stable). A staticcall failure is a
-    ///      no-match, never a veto of later factories.
+    /// @dev Reverts unless a PINNED factory returns `pool` for (tokenA, tokenB, stable) — through `getPair` (Solidly V1,
+    ///      Blackhole) or `getPool` (Velodrome / Aerodrome V2, whose factories revert on `getPair`). Both are registry
+    ///      lookups on a pinned factory, so trying the second name widens nothing. A staticcall failure is a no-match,
+    ///      never a veto of later factories.
     function _requireCanonical(address pool, address tokenA, address tokenB, bool stable) internal view {
         if (pool == address(0)) revert PoolNotCanonical(pool);
         uint256 n = factories.length;
         for (uint256 i = 0; i < n; i++) {
-            (bool ok, bytes memory ret) = factories[i].staticcall(
-                abi.encodeWithSelector(ISolidlyFactory.getPair.selector, tokenA, tokenB, stable)
-            );
-            if (ok && ret.length >= 32 && abi.decode(ret, (address)) == pool) return;
+            if (_lookup(factories[i], ISolidlyFactory.getPair.selector, tokenA, tokenB, stable) == pool) return;
+            if (_lookup(factories[i], ISolidlyFactory.getPool.selector, tokenA, tokenB, stable) == pool) return;
         }
         revert PoolNotCanonical(pool);
+    }
+
+    function _lookup(address factory, bytes4 selector, address tokenA, address tokenB, bool stable)
+        internal
+        view
+        returns (address)
+    {
+        (bool ok, bytes memory ret) = factory.staticcall(abi.encodeWithSelector(selector, tokenA, tokenB, stable));
+        return ok && ret.length >= 32 ? abi.decode(ret, (address)) : address(0);
     }
 }
