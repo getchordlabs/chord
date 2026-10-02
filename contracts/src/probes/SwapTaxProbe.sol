@@ -13,6 +13,10 @@ pragma solidity ^0.8.24;
 ///           4. sends the tokens back to the pair → sellRecvBps = what the pair received / what was sent.
 ///         Both in bps; 10_000 = no tax. A token that blocks a step reverts the call = unquoted (the caller
 ///         treats a revert as "unmeasurable"), exactly like the transfer probe.
+/// @dev NOT SUFFICIENT ON ITS OWN (2026-10-02): buying and selling inside one call cannot see a token that keeps
+///      the buyer's tokens after the router → wallet hop — 空龙抗狼康 0x36ee9ec6 read 9999 / 10000 here and a real
+///      buy left the wallet holding 0. The engine (decide_tax) never routes on this reading alone; it needs a
+///      code-less wallet that holds the tokens and sells them in a later block (eth_simulateV1, not built yet).
 interface IERC20P {
     function balanceOf(address) external view returns (uint256);
     function transfer(address, uint256) external returns (bool);
