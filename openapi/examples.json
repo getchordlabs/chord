@@ -1416,9 +1416,6 @@
    }
   }
  },
- "/v1/tokens/search?q=argus&chain=5042": {
-  "tokens": []
- },
  "/v1/tokens/chart/0x171a4217b86a807a64eb94757db6849fb4bdbaa0?tf=1h": {
   "candles": [
    {
@@ -3166,5 +3163,453 @@
    }
   ],
   "updatedAt": 1790709635583
+ },
+ "/v1/chains/bnb/status": {
+  "chain": 56,
+  "enabled": true,
+  "tape": true,
+  "public": true,
+  "recentAt": 1791020996,
+  "staleSec": 460,
+  "floorHour": 1790787600,
+  "genesisHour": null,
+  "backfillComplete": true,
+  "retentionCutoffDay": 1790726400,
+  "ingestFloor": {
+   "minTradeUsd": 100,
+   "history": [
+    {
+     "usd": 100,
+     "fromTs": 1790789196
+    }
+   ]
+  },
+  "updatedAt": 1791021456137
+ },
+ "/v1/chains/bnb/overview": {
+  "chain": 56,
+  "last24h": {
+   "volUsd": 1014438316.7825807,
+   "swaps": 1725125,
+   "tokens": 4466,
+   "venues": 57,
+   "sinceHour": 1790935200
+  },
+  "wallets": {
+   "day": 1790985600,
+   "today": 52979,
+   "yesterday": 110488
+  },
+  "venues24h": [
+   {
+    "dex": "pancake_v3",
+    "volUsd": 507002171.3116286,
+    "trades": 802437,
+    "tokens": 581,
+    "sharePct": 49.97861012581327
+   },
+   {
+    "dex": "pancake_v2",
+    "volUsd": 243172605.08525935,
+    "trades": 299915,
+    "tokens": 2950,
+    "sharePct": 23.971157345131836
+   }
+  ],
+  "hourly24": [
+   {
+    "hour": 1790935200,
+    "volUsd": 32855754.23107098,
+    "swaps": 62895
+   },
+   {
+    "hour": 1790938800,
+    "volUsd": 37902743.56465449,
+    "swaps": 74862
+   }
+  ],
+  "daily": [
+   {
+    "day": 1790726400,
+    "swaps": 352759,
+    "volUsd": 201620870.33918935,
+    "tokens": 1711,
+    "wallets": 24991,
+    "venues": 31
+   },
+   {
+    "day": 1790812800,
+    "swaps": 2017913,
+    "volUsd": 1025889560.5733465,
+    "tokens": 4523,
+    "wallets": 95849,
+    "venues": 55
+   }
+  ],
+  "coverage": {
+   "recentAt": 1791020331,
+   "stale": false
+  },
+  "ingestFloor": {
+   "minTradeUsd": 100,
+   "history": [
+    {
+     "usd": 100,
+     "fromTs": 1790789196
+    }
+   ]
+  },
+  "updatedAt": 1791020818773
+ },
+ "/v1/chains/bnb/tokens?limit=2": {
+  "chain": 56,
+  "sinceHour": 1790935200,
+  "sort": "volume",
+  "total": 4477,
+  "tokens": [
+   {
+    "address": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+    "symbol": "WBNB",
+    "name": "Wrapped BNB",
+    "decimals": 18,
+    "logoURI": null,
+    "priceUsd": 767.6455496451134,
+    "change24hPct": -1.2492564760959057,
+    "volume24h": 166967025.3366614,
+    "buyVolume24h": 82320162.1387899,
+    "sellVolume24h": 84646863.19787142,
+    "trades24h": 249872,
+    "buys24h": 126268,
+    "sells24h": 123604,
+    "dominantDex": "pancake_v3",
+    "lastTradeTs": 1791020960
+   },
+   {
+    "address": "0x4fa7c69a7b69f8bc48233024d546bc299d6b03bf",
+    "symbol": "quq",
+    "name": "quq",
+    "decimals": 18,
+    "logoURI": null,
+    "priceUsd": 0.0016094473421225778,
+    "change24hPct": -0.02009274621601609,
+    "volume24h": 117639331.46884526,
+    "buyVolume24h": 58830955.6143909,
+    "sellVolume24h": 58808375.85445432,
+    "trades24h": 23746,
+    "buys24h": 11867,
+    "sells24h": 11879,
+    "dominantDex": "pancake_v3",
+    "lastTradeTs": 1791020960
+   }
+  ],
+  "coverage": {
+   "recentAt": 1791020996,
+   "stale": false
+  },
+  "ingestFloor": {
+   "minTradeUsd": 100,
+   "history": [
+    {
+     "usd": 100,
+     "fromTs": 1790789196
+    }
+   ]
+  },
+  "updatedAt": 1791021450415
+ },
+ "/v1/chains/bnb/prints?limit=2": {
+  "chain": 56,
+  "prints": [
+   {
+    "tx": "0xfd35e2957d9660bddbef974222d8f4cf0960aa00ffbb560b437eeda98921124d",
+    "logIndex": 322,
+    "block": 125464252,
+    "dex": "uniswap_v4",
+    "token": "0xca750ef65f295bbecd685abf54e82caf297bdb61",
+    "side": "sell",
+    "usd": 374.6517520746725,
+    "priceUsd": 196.98795013758274,
+    "ts": 1791021448,
+    "symbol": "SKHYB"
+   },
+   {
+    "tx": "0x8eb8fb435526573f238417c155ebd7ad95ff73dae108eed0965db4bb7d84f7f3",
+    "logIndex": 175,
+    "block": 125464252,
+    "dex": "pancake_infinity_cl",
+    "token": "0x7ec43cf65f1663f820427c62a5780b8f2e25593a",
+    "side": "buy",
+    "usd": 109.53620868310122,
+    "priceUsd": 0.052400254396345075,
+    "ts": 1791021448,
+    "symbol": "LAB"
+   }
+  ],
+  "updatedAt": 1791021450656
+ },
+ "/v1/chains/bnb/token/0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c?hours=2": {
+  "chain": 56,
+  "token": {
+   "address": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+   "symbol": "BTCB",
+   "name": "BTCB Token",
+   "decimals": 18,
+   "logoURI": null
+  },
+  "hours": 2,
+  "stats24h": {
+   "volUsd": 60117802.11906611,
+   "buyUsd": 28027904.632707972,
+   "sellUsd": 32089897.486358132,
+   "trades": 43182,
+   "buys": 20811,
+   "sells": 22371,
+   "lastTs": 1791020918,
+   "dominantDex": "pancake_v3",
+   "priceUsd": 84842.07226361385,
+   "priceThen": 86518.97620817002,
+   "change24hPct": -1.93819207999113,
+   "sinceHour": 1790935200
+  },
+  "series": [
+   {
+    "hour": 1791014400,
+    "volUsd": 335885.749755259,
+    "buyUsd": 157624.90195060932,
+    "sellUsd": 178260.84780464956,
+    "trades": 500,
+    "buys": 259,
+    "sells": 241,
+    "priceLast": 84615.63679704415
+   },
+   {
+    "hour": 1791018000,
+    "volUsd": 499369.02600572666,
+    "buyUsd": 84656.32485821295,
+    "sellUsd": 414712.70114751335,
+    "trades": 636,
+    "buys": 166,
+    "sells": 470,
+    "priceLast": 84842.07226361385
+   }
+  ],
+  "byDex": [
+   {
+    "dex": "pancake_v3",
+    "volUsd": 712878.8358403383,
+    "trades": 920,
+    "sharePct": 85.34866923578463
+   },
+   {
+    "dex": "uniswap_v3",
+    "volUsd": 100444.15196685962,
+    "trades": 98,
+    "sharePct": 12.025570506357985
+   }
+  ],
+  "coverage": {
+   "recentAt": 1791020996,
+   "stale": false
+  },
+  "ingestFloor": {
+   "minTradeUsd": 100,
+   "history": [
+    {
+     "usd": 100,
+     "fromTs": 1790789196
+    }
+   ]
+  },
+  "updatedAt": 1791021450886
+ },
+ "/v1/chains/bnb/token/0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c/ref-price": {
+  "chain": 56,
+  "address": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+  "priceUsd": 84397,
+  "change24hPct": -2.11,
+  "source": "coingecko",
+  "ageS": 0
+ },
+ "/v1/chains/bnb/token/0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c/trades?limit=2": {
+  "chain": 56,
+  "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+  "trades": [
+   {
+    "tx": "0x92fdb5120761de73892df232e459c1e93bd540160abf8123235d24b6a7544f65",
+    "logIndex": 116,
+    "block": 125464201,
+    "dex": "pancake_v3",
+    "side": "buy",
+    "tokenAmt": 0.003505439793265937,
+    "usd": 296.55131688178034,
+    "priceUsd": 84597.46404758256,
+    "ts": 1791021425,
+    "wallet": "0x7d63e553f87e560528ecd18e3d801ef4c7144313",
+    "pool": "0x247f51881d1e3ae0f759afb801413a6c948ef442"
+   },
+   {
+    "tx": "0xbc749bf541475ff782ea186a076614a6634ace0abe6f855d1b4f6f7ff871055f",
+    "logIndex": 138,
+    "block": 125464200,
+    "dex": "pancake_v3",
+    "side": "sell",
+    "tokenAmt": 0.001923013554163473,
+    "usd": 162.647334016205,
+    "priceUsd": 84579.40073488351,
+    "ts": 1791021425,
+    "wallet": "0x939572264f180637d6a0f62aac7df9a4387146bd",
+    "pool": "0x247f51881d1e3ae0f759afb801413a6c948ef442"
+   }
+  ],
+  "nextBefore": "1791021425:125464200:138",
+  "ingestFloor": {
+   "minTradeUsd": 100,
+   "history": [
+    {
+     "usd": 100,
+     "fromTs": 1790789196
+    }
+   ]
+  },
+  "updatedAt": 1791021451693
+ },
+ "/v1/chains/bnb/venues?days=2": {
+  "chain": 56,
+  "days": 2,
+  "since": 1790899200,
+  "venues": [
+   {
+    "dex": "pancake_v3",
+    "volUsd": 736112650.6777563,
+    "trades": 1132649,
+    "sharePct": 48.37984424468907,
+    "series": [
+     {
+      "day": 1790899200,
+      "volUsd": 580832396.3483784,
+      "trades": 883596,
+      "tokens": 576
+     },
+     {
+      "day": 1790985600,
+      "volUsd": 155280254.32937792,
+      "trades": 249053,
+      "tokens": 430
+     }
+    ]
+   },
+   {
+    "dex": "pancake_infinity_cl",
+    "volUsd": 315145928.03220856,
+    "trades": 871769,
+    "sharePct": 20.712469617942627,
+    "series": [
+     {
+      "day": 1790899200,
+      "volUsd": 249510270.7062881,
+      "trades": 732838,
+      "tokens": 166
+     },
+     {
+      "day": 1790985600,
+      "volUsd": 65635657.32592046,
+      "trades": 138931,
+      "tokens": 128
+     }
+    ]
+   }
+  ],
+  "totals": {
+   "volUsd": 1521527533.1494346,
+   "trades": 2819913
+  },
+  "updatedAt": 1791021451942
+ },
+ "/v1/chains/bnb/wallet/0x34135a8b5cc02d1b579789fb09dd9cec4f8d7c13": {
+  "chain": 56,
+  "wallet": "0x34135a8b5cc02d1b579789fb09dd9cec4f8d7c13",
+  "window": {
+   "fromTs": 1790726400,
+   "toTs": 1791021452,
+   "days": 3
+  },
+  "history": "raw",
+  "trades": 438,
+  "truncated": false,
+  "realizedUsd": -52.50256178614943,
+  "unrealizedUsd": 264.3511103300407,
+  "totalUsd": 211.84854854389124,
+  "volumeUsd": 1074760.992352269,
+  "soldWithoutBasisUsd": 142196.1744304485,
+  "tokens": [
+   {
+    "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+    "symbol": "BTCB",
+    "buys": 82,
+    "sells": 88,
+    "boughtUsd": 232801.99929077973,
+    "soldUsd": 268637.2602480728,
+    "realizedUsd": 332.35056120683566,
+    "unrealizedUsd": 322.78762778211967,
+    "totalUsd": 655.1381889889553,
+    "holdsTokens": 0.48237177905003725,
+    "holdsUsd": 40925.42133609123,
+    "avgCostUsd": 84172.90453490094,
+    "lastPriceUsd": 84842.07226361385,
+    "soldWithoutBasisUsd": 76105.54410439507
+   },
+   {
+    "token": "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
+    "symbol": "ETH",
+    "buys": 92,
+    "sells": 96,
+    "boughtUsd": 179038.3807585184,
+    "soldUsd": 167683.46997452437,
+    "realizedUsd": -421.56179009490035,
+    "unrealizedUsd": -58.43651745207899,
+    "totalUsd": -479.99830754697933,
+    "holdsTokens": 14.799424875074559,
+    "holdsUsd": 39691.36613138376,
+    "avgCostUsd": 2685.901849860607,
+    "lastPriceUsd": 2681.9532830787653,
+    "soldWithoutBasisUsd": 28816.45365493667
+   }
+  ],
+  "recent": [
+   {
+    "ts": 1791021243,
+    "tx": "0xfacfd422253d675c6f886afffeb849d5a4f50c38cb0a3a5979b73473dd5b4273",
+    "logIndex": 31,
+    "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+    "side": "buy",
+    "tokenAmt": 0.007796979293366881,
+    "usd": 661.4196898072091,
+    "priceUsd": 84830.24834629204,
+    "dex": "pancake_v3",
+    "symbol": "BTCB"
+   },
+   {
+    "ts": 1791016125,
+    "tx": "0x06ac8ef3af4d007c08c7a9ca9e7ab666a724e1393c21865fe1d70d7c5825c19b",
+    "logIndex": 76,
+    "token": "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
+    "side": "sell",
+    "tokenAmt": 0.1525057769098823,
+    "usd": 408.73262726748277,
+    "priceUsd": 2680.1124229478096,
+    "dex": "pancake_v3",
+    "symbol": "ETH"
+   }
+  ],
+  "ingestFloor": {
+   "minTradeUsd": 100,
+   "history": [
+    {
+     "usd": 100,
+     "fromTs": 1790789196
+    }
+   ]
+  },
+  "updatedAt": 1791021452229
  }
 }

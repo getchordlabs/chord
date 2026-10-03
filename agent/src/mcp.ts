@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Chord MCP server (stdio). Point Claude Desktop, Cursor, Claude Code or any MCP client at
-// `chord-agent` and the nine Chord tools appear. Env: CHORD_API_KEY (optional, raises limits),
+// `chord-agent` and the 17 Chord tools appear. Env: CHORD_API_KEY (optional, raises limits),
 // CHORD_API_URL (default https://api.getchord.xyz).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";

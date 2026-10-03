@@ -22,7 +22,7 @@ Or copy the folder yourself: the skill is just this directory. OpenClaw: `~/.ope
 Hermes: `~/.hermes/skills/chord`.
 
 Optional: `export CHORD_API_KEY=...` raises the API rate limit and is required for Chord Ask. Get a
-key at https://getchord.xyz/ask (sign in, Settings > API Key). Data calls work without a key at 60
+key at https://getchord.xyz/developer or in Ask (sign in, Settings > API Key); both work everywhere. Data calls work without a key at 60
 requests a minute.
 
 Requirements: outbound HTTPS to `api.getchord.xyz`, and `curl` or `python3` (3.8+, standard library

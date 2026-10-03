@@ -1,7 +1,7 @@
 {
   "name": "chord-agent",
   "version": "0.1.0",
-  "description": "Chord agent harness: an MCP tool server and a function-calling manifest over the Chord API (stock tokens on chain 4663 and every token on Arc 5042 — prices, stocks, routes, smart money, wallet PnL).",
+  "description": "Chord agent harness: an MCP tool server and a function-calling manifest over the Chord API (stock tokens on chain 4663 and every token on Arc 5042: prices, stocks, routes, smart money, wallet PnL, LP pools and positions).",
   "type": "module",
   "bin": { "chord-agent": "./dist/mcp.js" },
   "main": "./dist/tools.js",
@@ -24,5 +24,5 @@
   },
   "engines": { "node": ">=18" },
   "license": "MIT",
-  "homepage": "https://getchord.xyz/docs#agents"
+  "homepage": "https://getchord.xyz/docs/agents/"
 }

@@ -2,9 +2,9 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Chord API",
-    "version": "2026-09-20",
-    "summary": "Trade, data and agent endpoints for Arc (5042) and Robinhood Chain (4663).",
-    "description": "Chord is a non-custodial trading app and on-chain data index. The API has three kinds of endpoint:\n\n- **Trade**: `/quote` finds the best route across every venue on the chain; `/swap` turns it into a transaction you sign yourself. Chord never holds funds or keys.\n- **Read**: every swap on the chain, rolled up by token, venue and hour, from Chord's own index — tokens, launches, holders, top wallets, portfolio PnL, liquidity positions and pools. No key needed.\n- **Agent**: the analyst (`/ask`) and the streams.\n\nAmounts are decimal strings in the token's smallest unit. Timestamps are Unix seconds unless the field is `updatedAt` (milliseconds). Reads answer anonymous callers at 60 requests a minute per IP; an `X-API-Key` header raises that to your plan. Every non-2xx body is `{ error, message }`.",
+    "version": "2026-10-03",
+    "summary": "Trade, data and agent endpoints for Arc (5042) and Robinhood Chain (4663), plus chain data for Avalanche (43114), Base (8453) and BNB Chain (56).",
+    "description": "Chord is a non-custodial trading app and on-chain data index. The API has three kinds of endpoint:\n\n- **Trade**: `/quote` finds the best route across every venue on the chain; `/swap` turns it into a transaction you sign yourself. Chord never holds funds or keys.\n- **Read**: every swap on the chain, rolled up by token, venue and hour, from Chord's own index — tokens, launches, holders, top wallets, portfolio PnL, liquidity positions and pools. No key needed. Avalanche, Base and BNB Chain have the same rollups under `/chains/{chain}/*`.\n- **Agent**: the analyst (`/ask`) and the streams.\n\nAmounts are decimal strings in the token's smallest unit. Timestamps are Unix seconds unless the field is `updatedAt` (milliseconds). Reads answer anonymous callers at 60 requests a minute per IP; an `X-API-Key` header raises that to your plan. Every non-2xx body is `{ error, message }`.",
     "contact": {
       "name": "Chord",
       "url": "https://getchord.xyz/developer"
@@ -59,6 +59,10 @@
     {
       "name": "Robinhood Chain data",
       "description": "Robinhood Chain (chain 4663): chain totals, tokens and tokenized stocks from the rollup tables."
+    },
+    {
+      "name": "Avalanche, Base, BNB Chain",
+      "description": "Avalanche C-Chain (43114), Base (8453) and BNB Chain (56): chain totals, the 24-hour token board, prints, one token's tape, venue share and a wallet's PnL, from Chord's own index of every swap on those chains. One set of routes, the chain in the path."
     },
     {
       "name": "Streaming",
@@ -3199,8 +3203,8 @@
           "Tokens and charts"
         ],
         "operationId": "marketMap",
-        "summary": "Price map (Robinhood Chain)",
-        "description": "Price, 24-hour change and volume for every token on the curated list in one call, keyed by lower-cased address — computed from Chord's own index for chain 4663.\n\n**Arc**: use `/arc/tokens` (every token with a 24-hour tape, not just the curated list). This endpoint does not take `chain=5042`.",
+        "summary": "Price map",
+        "description": "Price, 24-hour change, volume and trade count for every priced token in Chord's index of the chain (thousands of rows, not just the curated list), in one call, keyed by lower-cased address.\n\n- `4663` Robinhood Chain: every row also carries a 24-point hourly `spark` and `liquidityUsd` where known; the answer has `updatedAt`, the time the live overlay was applied.\n- `5042` Arc: from the Arc hourly rollup. `change24h` and `liquidityUsd` appear only when known; no `spark`, no `updatedAt`.\n\nFor names, logos and honesty flags use `/arc/tokens` or `/rh/tokens`. Always pass `chain`: omitted, it answers for Monad.",
         "parameters": [
           {
             "name": "chain",
@@ -3209,10 +3213,11 @@
             "schema": {
               "type": "integer",
               "enum": [
-                4663
+                4663,
+                5042
               ]
             },
-            "description": "Chain id: `4663` Robinhood Chain."
+            "description": "Chain id: `4663` Robinhood Chain · `5042` Arc."
           }
         ],
         "responses": {
@@ -3236,29 +3241,33 @@
                           },
                           "change24h": {
                             "type": "number",
-                            "description": ""
+                            "description": "Absent when there is no price 24 hours ago."
                           },
                           "volume24h": {
                             "type": "number",
-                            "description": "Includes trades the hourly rollup has not counted yet."
+                            "description": "Includes trades the hourly rollup has not counted yet (4663)."
                           },
                           "txns24h": {
                             "type": "integer",
                             "description": ""
+                          },
+                          "liquidityUsd": {
+                            "type": "number",
+                            "description": "Absent when unknown."
                           },
                           "spark": {
                             "type": "array",
                             "items": {
                               "type": "number"
                             },
-                            "description": "24 hourly closes."
+                            "description": "4663 only: 24 hourly closes."
                           }
                         }
                       }
                     },
                     "updatedAt": {
                       "type": "integer",
-                      "description": "Server time (ms) the live overlay was applied — compare with a WebSocket `prices` frame's `at`."
+                      "description": "4663 only. Server time (ms) the live overlay was applied; compare with a WebSocket `prices` frame's `at`."
                     }
                   }
                 },
@@ -3290,39 +3299,67 @@
           "Tokens and charts"
         ],
         "operationId": "searchTokens",
-        "summary": "Search the curated list (Robinhood Chain)",
-        "description": "Symbol, name or address over the curated list of chain 4663. Off-list results come back with `verified: false`.\n\n**Arc**: use `/arc/tokens/search`, which covers every token traded in the last 24 hours.",
+        "summary": "Search tokens on a chain",
+        "description": "Symbol, name or address. What it searches depends on `chain`:\n\n- `4663` Robinhood Chain: the curated list (`verified: true`, stocks tagged `stock`) plus tokens that traded in the last 24 hours and are not on it (`verified: false`, no logo).\n- `5042` Arc: every token traded in the last 24 hours, the same index as `/arc/tokens/search`. `verified` is true for tokens on the curated Arc list.\n- `43114` / `8453` / `56`: that chain's token list, all `verified: true`. A chain that is not public yet answers `404 CHAIN_NOT_PUBLIC` unless the request carries an `X-API-Key`.\n- no `chain`, or `143`: Monad off-list discovery. Tokens found through DexScreener that are **not** on the curated Monad list, with a logo and on-chain decimals, all `verified: false`. This mode answers `{ tokens }` only, returns up to 8 rows whatever `limit` says, and returns an empty list for a query under 2 characters.\n\nRanking: the exact address, then the exact symbol, a symbol prefix, a name prefix, then any substring; verified rows first within a rank, one row per address. A leading `$` is ignored. Treat `verified: false` as unvetted and check the address before trading it.\n\n**Arc**: `/arc/tokens/search` returns full board rows (price, volume, pools, flags) for the same query.",
         "parameters": [
           {
             "name": "q",
             "in": "query",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
             },
-            "description": ""
+            "description": "Symbol, name or address fragment."
           },
           {
             "name": "chain",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "integer",
               "enum": [
-                4663
-              ]
+                4663,
+                5042,
+                43114,
+                8453,
+                56,
+                143
+              ],
+              "default": 143
             },
-            "description": "Chain id: `4663` Robinhood Chain."
+            "description": "Chain id: `4663` Robinhood Chain · `5042` Arc · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain · `143` Monad. Omitted = 143. Pass the chain you want: the default is Monad off-list discovery."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25,
+              "default": 8
+            },
+            "description": "Rows to return, clamped to 1–25. Ignored in Monad mode."
           }
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "Matches, best first. An empty `tokens` is a real answer.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": "The chain searched. Absent in Monad mode."
+                    },
+                    "q": {
+                      "type": "string",
+                      "description": "The query as received. Absent in Monad mode."
+                    },
                     "tokens": {
                       "type": "array",
                       "items": {
@@ -3342,28 +3379,88 @@
                             "description": ""
                           },
                           "decimals": {
-                            "type": "integer",
-                            "description": ""
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "ERC-20 decimals. Null for an off-list token whose decimals are not resolved yet."
+                          },
+                          "logoURI": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Logo URL when known. Absent on off-list Robinhood Chain rows."
                           },
                           "verified": {
                             "type": "boolean",
-                            "description": ""
+                            "description": "On the chain's curated list. False = found by the index or by discovery, not vetted."
+                          },
+                          "tags": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "`stock`, `stablecoin`, … from the curated list (Robinhood Chain); `meme` in Monad mode. Absent when empty."
+                          },
+                          "liquidityUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Monad mode only: liquidity of the deepest DexScreener pair."
                           }
-                        }
+                        },
+                        "required": [
+                          "address",
+                          "symbol",
+                          "name",
+                          "decimals",
+                          "verified"
+                        ]
                       }
                     }
-                  }
+                  },
+                  "required": [
+                    "tokens"
+                  ]
                 },
                 "example": {
+                  "chain": 4663,
+                  "q": "NVDA",
                   "tokens": [
                     {
                       "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
                       "symbol": "NVDA",
                       "name": "NVIDIA • Robinhood Token",
                       "decimals": 18,
-                      "verified": true
+                      "logoURI": "https://cdn.robinhood.com/ncw_assets/logos/0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec.png",
+                      "verified": true,
+                      "tags": [
+                        "stock"
+                      ]
                     }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_CHAIN` (a chain this route does not search) or `BAD_QUERY` (`q` empty or longer than 64 characters). Monad mode does not validate `q`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`CHAIN_NOT_PUBLIC`: the chain is not public yet and the request has no `X-API-Key`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -3511,7 +3608,7 @@
         ],
         "operationId": "candles",
         "summary": "Candles (data API)",
-        "description": "OHLCV for any token Chord indexes on Arc, Robinhood Chain or Monad, built only from Chord's own index — never a third-party feed, so `source` is always `index`. 1m / 5m / 15m come from a 1-minute rollup that keeps history after raw trades are retired; 1h and above from the hourly rollup; the newest minutes straight from the tape. Each candle carries `n`, the trades in the bucket. Buckets without a trade are absent unless `fill=1`, which carries the previous close through them.\n\nPaging: the default window ends with the still-open bucket (`forming: true`) and holds `limit` buckets. A `from`–`to` range wider than `limit` keeps the newest buckets; ask for the previous page with `to` = this page's `from`. The token must trade on the chain you name — `404 UNKNOWN_TOKEN` says which chain it trades on when it is another one. The zero address stands for the chain's native asset. For live candles subscribe on `/v1/ws/live` (see Streaming).",
+        "description": "OHLCV for any token Chord indexes on Arc, Robinhood Chain, Avalanche, Base, BNB Chain or Monad, built only from Chord's own index — never a third-party feed, so `source` is always `index`. 1m / 5m / 15m come from a 1-minute rollup that keeps history after raw trades are retired; 1h and above from the hourly rollup; the newest minutes straight from the tape. Each candle carries `n`, the trades in the bucket. Buckets without a trade are absent unless `fill=1`, which carries the previous close through them.\n\nPaging: the default window ends with the still-open bucket (`forming: true`) and holds `limit` buckets. A `from`–`to` range wider than `limit` keeps the newest buckets; ask for the previous page with `to` = this page's `from`. The token must trade on the chain you name — `404 UNKNOWN_TOKEN` says which chain it trades on when it is another one. The zero address stands for the chain's native asset (its wrapped twin, or the USDC predeploy on Arc). For live candles subscribe on `/v1/ws/live` (see Streaming).\n\n**Avalanche, Base, BNB Chain** (`43114`, `8453`, `56`): candles come from chain-keyed tables, so one address on two chains is two tokens, and `404 UNKNOWN_TOKEN` means no indexed trades on the chain you named. These chains answer once their tape runs and, until the chain is public, only to requests with an `X-API-Key` (`400 UNSUPPORTED_CHAIN` otherwise; all three are public today). Where the tape runs with an ingest floor (BNB Chain, $100 today) the response carries `ingestFloor`, and `v` and `n` count only trades at or above it.",
         "parameters": [
           {
             "name": "chain",
@@ -3522,11 +3619,14 @@
               "enum": [
                 5042,
                 4663,
+                43114,
+                8453,
+                56,
                 143
               ],
               "default": 143
             },
-            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad. Omitted = 143."
+            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain · `143` Monad. Omitted = 143."
           },
           {
             "name": "token",
@@ -3639,6 +3739,10 @@
                     "forming": {
                       "type": "boolean",
                       "description": "The last candle is the still-open bucket."
+                    },
+                    "ingestFloor": {
+                      "$ref": "#/components/schemas/IngestFloor",
+                      "description": "Only on 43114 / 8453 / 56 when the tape runs with a floor (BNB Chain)."
                     },
                     "candles": {
                       "type": "array",
@@ -13682,6 +13786,2124 @@
         }
       }
     },
+    "/chains/{chain}/status": {
+      "get": {
+        "tags": [
+          "Avalanche, Base, BNB Chain"
+        ],
+        "operationId": "chainStatus",
+        "summary": "Rollup freshness and coverage",
+        "description": "Is the chain's rollup fresh, how far back it reaches, whether the tape and the public flag are on, where the raw tape is cut, and the ingest floor. Answers 200 even before the first rollup pass (`recentAt` is then null). Check it before trusting a quiet number.\n\nChain-keyed data for Avalanche C-Chain, Base and BNB Chain, served from Chord's rollup tables for the chain (every swap summed by hour, token and venue). Only the trade tape, the prints ticker and the wallet read raw rows, scoped to one token or one wallet and bounded.\n\n- **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers `400 UNSUPPORTED_CHAIN` (\"chain N is not served yet\") unless the request carries an `X-API-Key`; those answers are sent `Cache-Control: private`.\n- **Ingest floor.** Every count, volume and print covers trades at or above the chain's floor, returned as `ingestFloor`. BNB Chain runs at $100 today; Avalanche and Base at 0.\n- **Readiness.** `503 NOT_READY` until the chain's rollup has run on this deployment; `503 CHAIN_DATA_UNAVAILABLE` when the store cannot be read. Never treat either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "avalanche",
+                "base",
+                "bnb",
+                "43114",
+                "8453",
+                "56"
+              ]
+            },
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": "Registry id."
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "The rollup and the tape both run."
+                    },
+                    "tape": {
+                      "type": "boolean",
+                      "description": "The chain's trade tape runs."
+                    },
+                    "public": {
+                      "type": "boolean",
+                      "description": "Served to callers without a key."
+                    },
+                    "recentAt": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "staleSec": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Seconds since the last rollup pass."
+                    },
+                    "floorHour": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Oldest hour the backfill has rolled."
+                    },
+                    "genesisHour": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "The chain's first indexed hour, when this server knows it; often null."
+                    },
+                    "backfillComplete": {
+                      "type": "boolean",
+                      "description": "True once the backfill has reached the first indexed hour."
+                    },
+                    "retentionCutoffDay": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "UTC day start. Raw trades before it are retired from the database (about 3 days on BNB Chain and Base, 7 on Avalanche today); the hourly and daily rollups keep their history."
+                    },
+                    "ingestFloor": {
+                      "$ref": "#/components/schemas/IngestFloor"
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 56,
+                  "enabled": true,
+                  "tape": true,
+                  "public": true,
+                  "recentAt": 1791020996,
+                  "staleSec": 460,
+                  "floorHour": 1790787600,
+                  "genesisHour": null,
+                  "backfillComplete": true,
+                  "retentionCutoffDay": 1790726400,
+                  "ingestFloor": {
+                    "minTradeUsd": 100,
+                    "history": [
+                      {
+                        "usd": 100,
+                        "fromTs": 1790789196
+                      }
+                    ]
+                  },
+                  "updatedAt": 1791021456137
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (unknown chain, a chain with its own routes, or a chain not served to this caller yet).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE`: the store could not be read. Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/overview": {
+      "get": {
+        "tags": [
+          "Avalanche, Base, BNB Chain"
+        ],
+        "operationId": "chainOverview",
+        "summary": "Chain totals",
+        "description": "Last 24 hours (volume, swaps, tokens, venues), distinct wallets per UTC day, venue share, 24 hourly buckets and up to 14 daily rows.\n\nChain-keyed data for Avalanche C-Chain, Base and BNB Chain, served from Chord's rollup tables for the chain (every swap summed by hour, token and venue). Only the trade tape, the prints ticker and the wallet read raw rows, scoped to one token or one wallet and bounded.\n\n- **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers `400 UNSUPPORTED_CHAIN` (\"chain N is not served yet\") unless the request carries an `X-API-Key`; those answers are sent `Cache-Control: private`.\n- **Ingest floor.** Every count, volume and print covers trades at or above the chain's floor, returned as `ingestFloor`. BNB Chain runs at $100 today; Avalanche and Base at 0.\n- **Readiness.** `503 NOT_READY` until the chain's rollup has run on this deployment; `503 CHAIN_DATA_UNAVAILABLE` when the store cannot be read. Never treat either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "avalanche",
+                "base",
+                "bnb",
+                "43114",
+                "8453",
+                "56"
+              ]
+            },
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "last24h": {
+                      "type": "object",
+                      "properties": {
+                        "volUsd": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "swaps": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "tokens": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "venues": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "sinceHour": {
+                          "type": "integer",
+                          "description": "Start of the window."
+                        }
+                      }
+                    },
+                    "wallets": {
+                      "type": "object",
+                      "properties": {
+                        "day": {
+                          "type": "integer",
+                          "description": "Unix time, seconds, UTC."
+                        },
+                        "today": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Distinct attributed wallets so far today (UTC); partial."
+                        },
+                        "yesterday": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": ""
+                        }
+                      },
+                      "description": "Calendar-day counts, never a sliding 24 hours. Null = no day row yet."
+                    },
+                    "venues24h": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ChainVenueShare"
+                      },
+                      "description": "Biggest first."
+                    },
+                    "hourly24": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "hour": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "volUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "swaps": {
+                            "type": "integer",
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "Oldest first."
+                    },
+                    "daily": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "day": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "swaps": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "volUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "tokens": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "wallets": {
+                            "type": "integer",
+                            "description": "Attributed wallets only."
+                          },
+                          "venues": {
+                            "type": "integer",
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "Up to 14 days, oldest first. The first day of a young tape is partial."
+                    },
+                    "coverage": {
+                      "$ref": "#/components/schemas/ChainCoverage"
+                    },
+                    "ingestFloor": {
+                      "$ref": "#/components/schemas/IngestFloor"
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 56,
+                  "last24h": {
+                    "volUsd": 1014438316.7825807,
+                    "swaps": 1725125,
+                    "tokens": 4466,
+                    "venues": 57,
+                    "sinceHour": 1790935200
+                  },
+                  "wallets": {
+                    "day": 1790985600,
+                    "today": 52979,
+                    "yesterday": 110488
+                  },
+                  "venues24h": [
+                    {
+                      "dex": "pancake_v3",
+                      "volUsd": 507002171.3116286,
+                      "trades": 802437,
+                      "tokens": 581,
+                      "sharePct": 49.97861012581327
+                    },
+                    {
+                      "dex": "pancake_v2",
+                      "volUsd": 243172605.08525935,
+                      "trades": 299915,
+                      "tokens": 2950,
+                      "sharePct": 23.971157345131836
+                    }
+                  ],
+                  "hourly24": [
+                    {
+                      "hour": 1790935200,
+                      "volUsd": 32855754.23107098,
+                      "swaps": 62895
+                    },
+                    {
+                      "hour": 1790938800,
+                      "volUsd": 37902743.56465449,
+                      "swaps": 74862
+                    }
+                  ],
+                  "daily": [
+                    {
+                      "day": 1790726400,
+                      "swaps": 352759,
+                      "volUsd": 201620870.33918935,
+                      "tokens": 1711,
+                      "wallets": 24991,
+                      "venues": 31
+                    },
+                    {
+                      "day": 1790812800,
+                      "swaps": 2017913,
+                      "volUsd": 1025889560.5733465,
+                      "tokens": 4523,
+                      "wallets": 95849,
+                      "venues": 55
+                    }
+                  ],
+                  "coverage": {
+                    "recentAt": 1791020331,
+                    "stale": false
+                  },
+                  "ingestFloor": {
+                    "minTradeUsd": 100,
+                    "history": [
+                      {
+                        "usd": 100,
+                        "fromTs": 1790789196
+                      }
+                    ]
+                  },
+                  "updatedAt": 1791020818773
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (unknown chain, a chain with its own routes, or a chain not served to this caller yet).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`NOT_READY` (the chain's rollup has not run on this deployment yet) or `CHAIN_DATA_UNAVAILABLE` (the store could not be read). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/tokens": {
+      "get": {
+        "tags": [
+          "Avalanche, Base, BNB Chain"
+        ],
+        "operationId": "chainTokens",
+        "summary": "Every token traded in the last 24 hours",
+        "description": "The chain's 24-hour board: price on the busiest venue, change, volume split, trade counts and the dominant venue for every token that traded, with symbol, name and decimals read from the contract. There is no curated list on these chains yet: rows carry no logo, no `listed` flag, no trader count and no wash or impostor flags, so check the address before trusting a symbol.\n\nChain-keyed data for Avalanche C-Chain, Base and BNB Chain, served from Chord's rollup tables for the chain (every swap summed by hour, token and venue). Only the trade tape, the prints ticker and the wallet read raw rows, scoped to one token or one wallet and bounded.\n\n- **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers `400 UNSUPPORTED_CHAIN` (\"chain N is not served yet\") unless the request carries an `X-API-Key`; those answers are sent `Cache-Control: private`.\n- **Ingest floor.** Every count, volume and print covers trades at or above the chain's floor, returned as `ingestFloor`. BNB Chain runs at $100 today; Avalanche and Base at 0.\n- **Readiness.** `503 NOT_READY` until the chain's rollup has run on this deployment; `503 CHAIN_DATA_UNAVAILABLE` when the store cannot be read. Never treat either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "avalanche",
+                "base",
+                "bnb",
+                "43114",
+                "8453",
+                "56"
+              ]
+            },
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            },
+            "description": ""
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "volume",
+                "trades",
+                "change"
+              ],
+              "default": "volume"
+            },
+            "description": "Descending."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "sinceHour": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "sort": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Tokens that traded in the window."
+                    },
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ChainTokenRow"
+                      }
+                    },
+                    "coverage": {
+                      "$ref": "#/components/schemas/ChainCoverage"
+                    },
+                    "ingestFloor": {
+                      "$ref": "#/components/schemas/IngestFloor"
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 56,
+                  "sinceHour": 1790935200,
+                  "sort": "volume",
+                  "total": 4477,
+                  "tokens": [
+                    {
+                      "address": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+                      "symbol": "WBNB",
+                      "name": "Wrapped BNB",
+                      "decimals": 18,
+                      "logoURI": null,
+                      "priceUsd": 767.6455496451134,
+                      "change24hPct": -1.2492564760959057,
+                      "volume24h": 166967025.3366614,
+                      "buyVolume24h": 82320162.1387899,
+                      "sellVolume24h": 84646863.19787142,
+                      "trades24h": 249872,
+                      "buys24h": 126268,
+                      "sells24h": 123604,
+                      "dominantDex": "pancake_v3",
+                      "lastTradeTs": 1791020960
+                    },
+                    {
+                      "address": "0x4fa7c69a7b69f8bc48233024d546bc299d6b03bf",
+                      "symbol": "quq",
+                      "name": "quq",
+                      "decimals": 18,
+                      "logoURI": null,
+                      "priceUsd": 0.0016094473421225778,
+                      "change24hPct": -0.02009274621601609,
+                      "volume24h": 117639331.46884526,
+                      "buyVolume24h": 58830955.6143909,
+                      "sellVolume24h": 58808375.85445432,
+                      "trades24h": 23746,
+                      "buys24h": 11867,
+                      "sells24h": 11879,
+                      "dominantDex": "pancake_v3",
+                      "lastTradeTs": 1791020960
+                    }
+                  ],
+                  "coverage": {
+                    "recentAt": 1791020996,
+                    "stale": false
+                  },
+                  "ingestFloor": {
+                    "minTradeUsd": 100,
+                    "history": [
+                      {
+                        "usd": 100,
+                        "fromTs": 1790789196
+                      }
+                    ]
+                  },
+                  "updatedAt": 1791021450415
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (unknown chain, a chain with its own routes, or a chain not served to this caller yet), or `BAD_LIMIT` / `BAD_SORT`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`NOT_READY` (the chain's rollup has not run on this deployment yet) or `CHAIN_DATA_UNAVAILABLE` (the store could not be read). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/prints": {
+      "get": {
+        "tags": [
+          "Avalanche, Base, BNB Chain"
+        ],
+        "operationId": "chainPrints",
+        "summary": "Latest prints across the chain",
+        "description": "The newest swaps of tokens on the chain's 24-hour board, newest first: a ticker, not a tape. It looks back ten minutes, skips trades under $1, keeps at most three prints a token so one busy pair does not fill it, and is shared for 10 seconds per chain. For one token's full tape use `/chains/{chain}/token/{address}/trades`.\n\nChain-keyed data for Avalanche C-Chain, Base and BNB Chain, served from Chord's rollup tables for the chain (every swap summed by hour, token and venue). Only the trade tape, the prints ticker and the wallet read raw rows, scoped to one token or one wallet and bounded.\n\n- **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers `400 UNSUPPORTED_CHAIN` (\"chain N is not served yet\") unless the request carries an `X-API-Key`; those answers are sent `Cache-Control: private`.\n- **Ingest floor.** Every count, volume and print covers trades at or above the chain's floor, returned as `ingestFloor`. BNB Chain runs at $100 today; Avalanche and Base at 0.\n- **Readiness.** `503 NOT_READY` until the chain's rollup has run on this deployment; `503 CHAIN_DATA_UNAVAILABLE` when the store cannot be read. Never treat either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "avalanche",
+                "base",
+                "bnb",
+                "43114",
+                "8453",
+                "56"
+              ]
+            },
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "prints": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tx": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{64}$",
+                            "description": "Transaction hash."
+                          },
+                          "logIndex": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "block": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "token": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "buy",
+                              "sell"
+                            ]
+                          },
+                          "usd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "priceUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "ts": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "symbol": {
+                            "type": "string",
+                            "description": "From the board."
+                          }
+                        }
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 56,
+                  "prints": [
+                    {
+                      "tx": "0xfd35e2957d9660bddbef974222d8f4cf0960aa00ffbb560b437eeda98921124d",
+                      "logIndex": 322,
+                      "block": 125464252,
+                      "dex": "uniswap_v4",
+                      "token": "0xca750ef65f295bbecd685abf54e82caf297bdb61",
+                      "side": "sell",
+                      "usd": 374.6517520746725,
+                      "priceUsd": 196.98795013758274,
+                      "ts": 1791021448,
+                      "symbol": "SKHYB"
+                    },
+                    {
+                      "tx": "0x8eb8fb435526573f238417c155ebd7ad95ff73dae108eed0965db4bb7d84f7f3",
+                      "logIndex": 175,
+                      "block": 125464252,
+                      "dex": "pancake_infinity_cl",
+                      "token": "0x7ec43cf65f1663f820427c62a5780b8f2e25593a",
+                      "side": "buy",
+                      "usd": 109.53620868310122,
+                      "priceUsd": 0.052400254396345075,
+                      "ts": 1791021448,
+                      "symbol": "LAB"
+                    }
+                  ],
+                  "updatedAt": 1791021450656
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (unknown chain, a chain with its own routes, or a chain not served to this caller yet), or `BAD_LIMIT`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`NOT_READY` (the chain's rollup has not run on this deployment yet) or `CHAIN_DATA_UNAVAILABLE` (the store could not be read). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/token/{address}": {
+      "get": {
+        "tags": [
+          "Avalanche, Base, BNB Chain"
+        ],
+        "operationId": "chainToken",
+        "summary": "One token: hourly tape and venue split",
+        "description": "The token's identity (read from the contract), 24-hour stats, an hourly series (1–720 hours) and the venue split for the window. `404 UNKNOWN_TOKEN` when the chain's rollups have never seen the token trade; the same address on another chain is another token. For a price of a token Chord has not seen trade, `/ref-price` asks CoinGecko.\n\nChain-keyed data for Avalanche C-Chain, Base and BNB Chain, served from Chord's rollup tables for the chain (every swap summed by hour, token and venue). Only the trade tape, the prints ticker and the wallet read raw rows, scoped to one token or one wallet and bounded.\n\n- **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers `400 UNSUPPORTED_CHAIN` (\"chain N is not served yet\") unless the request carries an `X-API-Key`; those answers are sent `Cache-Control: private`.\n- **Ingest floor.** Every count, volume and print covers trades at or above the chain's floor, returned as `ingestFloor`. BNB Chain runs at $100 today; Avalanche and Base at 0.\n- **Readiness.** `503 NOT_READY` until the chain's rollup has run on this deployment; `503 CHAIN_DATA_UNAVAILABLE` when the store cannot be read. Never treat either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "avalanche",
+                "base",
+                "bnb",
+                "43114",
+                "8453",
+                "56"
+              ]
+            },
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+          },
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": "Token address. The zero address means the chain's wrapped native token (WAVAX, WETH, WBNB)."
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 720,
+              "default": 168
+            },
+            "description": "Hourly buckets to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "token": {
+                      "type": "object",
+                      "properties": {
+                        "address": {
+                          "type": "string",
+                          "pattern": "^0x[a-fA-F0-9]{40}$",
+                          "description": "EVM address, hex, case-insensitive."
+                        },
+                        "symbol": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": ""
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": ""
+                        },
+                        "decimals": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": ""
+                        },
+                        "logoURI": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    "hours": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "stats24h": {
+                      "type": "object",
+                      "properties": {
+                        "volUsd": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "buyUsd": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "sellUsd": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "trades": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "buys": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "sells": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "lastTs": {
+                          "type": "integer",
+                          "description": "Unix time, seconds, UTC."
+                        },
+                        "dominantDex": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": ""
+                        },
+                        "priceUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Last print on the dominant venue."
+                        },
+                        "priceThen": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Price 24 hours ago, same rule."
+                        },
+                        "change24hPct": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": ""
+                        },
+                        "sinceHour": {
+                          "type": "integer",
+                          "description": ""
+                        }
+                      }
+                    },
+                    "series": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "hour": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "volUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "buyUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "sellUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "trades": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "buys": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "sells": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "priceLast": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "The busiest venue's last print in the hour."
+                          }
+                        }
+                      },
+                      "description": "Oldest first. Hours without a trade are absent."
+                    },
+                    "byDex": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "dex": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "volUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "trades": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "sharePct": {
+                            "type": "number",
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "Over the requested window, biggest first."
+                    },
+                    "coverage": {
+                      "$ref": "#/components/schemas/ChainCoverage"
+                    },
+                    "ingestFloor": {
+                      "$ref": "#/components/schemas/IngestFloor"
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 56,
+                  "token": {
+                    "address": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+                    "symbol": "BTCB",
+                    "name": "BTCB Token",
+                    "decimals": 18,
+                    "logoURI": null
+                  },
+                  "hours": 2,
+                  "stats24h": {
+                    "volUsd": 60117802.11906611,
+                    "buyUsd": 28027904.632707972,
+                    "sellUsd": 32089897.486358132,
+                    "trades": 43182,
+                    "buys": 20811,
+                    "sells": 22371,
+                    "lastTs": 1791020918,
+                    "dominantDex": "pancake_v3",
+                    "priceUsd": 84842.07226361385,
+                    "priceThen": 86518.97620817002,
+                    "change24hPct": -1.93819207999113,
+                    "sinceHour": 1790935200
+                  },
+                  "series": [
+                    {
+                      "hour": 1791014400,
+                      "volUsd": 335885.749755259,
+                      "buyUsd": 157624.90195060932,
+                      "sellUsd": 178260.84780464956,
+                      "trades": 500,
+                      "buys": 259,
+                      "sells": 241,
+                      "priceLast": 84615.63679704415
+                    },
+                    {
+                      "hour": 1791018000,
+                      "volUsd": 499369.02600572666,
+                      "buyUsd": 84656.32485821295,
+                      "sellUsd": 414712.70114751335,
+                      "trades": 636,
+                      "buys": 166,
+                      "sells": 470,
+                      "priceLast": 84842.07226361385
+                    }
+                  ],
+                  "byDex": [
+                    {
+                      "dex": "pancake_v3",
+                      "volUsd": 712878.8358403383,
+                      "trades": 920,
+                      "sharePct": 85.34866923578463
+                    },
+                    {
+                      "dex": "uniswap_v3",
+                      "volUsd": 100444.15196685962,
+                      "trades": 98,
+                      "sharePct": 12.025570506357985
+                    }
+                  ],
+                  "coverage": {
+                    "recentAt": 1791020996,
+                    "stale": false
+                  },
+                  "ingestFloor": {
+                    "minTradeUsd": 100,
+                    "history": [
+                      {
+                        "usd": 100,
+                        "fromTs": 1790789196
+                      }
+                    ]
+                  },
+                  "updatedAt": 1791021450886
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (unknown chain, a chain with its own routes, or a chain not served to this caller yet), or `BAD_ADDRESS` / `BAD_HOURS`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`UNKNOWN_TOKEN`: no indexed trades for this token on this chain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`NOT_READY` (the chain's rollup has not run on this deployment yet) or `CHAIN_DATA_UNAVAILABLE` (the store could not be read). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/token/{address}/ref-price": {
+      "get": {
+        "tags": [
+          "Avalanche, Base, BNB Chain"
+        ],
+        "operationId": "chainTokenRefPrice",
+        "summary": "Reference price from CoinGecko",
+        "description": "CoinGecko's price and 24-hour change for a token by contract address, for a token Chord's index has not seen trade (or to cross-check one it has). Not Chord's own data: the answer says so in `source`. Cached two minutes; `ageS` is the age of the cached CoinGecko answer.\n\nChain-keyed data for Avalanche C-Chain, Base and BNB Chain, served from Chord's rollup tables for the chain (every swap summed by hour, token and venue). Only the trade tape, the prints ticker and the wallet read raw rows, scoped to one token or one wallet and bounded.\n\n- **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers `400 UNSUPPORTED_CHAIN` (\"chain N is not served yet\") unless the request carries an `X-API-Key`; those answers are sent `Cache-Control: private`.\n- **Ingest floor.** Every count, volume and print covers trades at or above the chain's floor, returned as `ingestFloor`. BNB Chain runs at $100 today; Avalanche and Base at 0.\n- **Readiness.** `503 NOT_READY` until the chain's rollup has run on this deployment; `503 CHAIN_DATA_UNAVAILABLE` when the store cannot be read. Never treat either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "avalanche",
+                "base",
+                "bnb",
+                "43114",
+                "8453",
+                "56"
+              ]
+            },
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+          },
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": "Token address. The zero address means the chain's wrapped native token (WAVAX, WETH, WBNB)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "address": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "priceUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "change24hPct": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "coingecko"
+                    },
+                    "ageS": {
+                      "type": "integer",
+                      "description": "Seconds since CoinGecko answered."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 56,
+                  "address": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+                  "priceUsd": 84397,
+                  "change24hPct": -2.11,
+                  "source": "coingecko",
+                  "ageS": 0
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (unknown chain, a chain with its own routes, or a chain not served to this caller yet), or `BAD_ADDRESS`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`NOT_LISTED`: CoinGecko does not list this token on this chain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`UNAVAILABLE`: CoinGecko did not answer. Retry later.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/token/{address}/trades": {
+      "get": {
+        "tags": [
+          "Avalanche, Base, BNB Chain"
+        ],
+        "operationId": "chainTokenTrades",
+        "summary": "Trade tape",
+        "description": "The token's swaps straight from the raw tape, newest first: venue, side, size, USD, price, block, wallet (`null` for a router or an unattributed trade, never a guess) and pool. Keyset-paged: pass `nextBefore` back as `before` for the next page; `nextBefore` is null on the last one. The raw tape is short on these chains (see `retentionCutoffDay` on `/status`), so paging stops there.\n\nChain-keyed data for Avalanche C-Chain, Base and BNB Chain, served from Chord's rollup tables for the chain (every swap summed by hour, token and venue). Only the trade tape, the prints ticker and the wallet read raw rows, scoped to one token or one wallet and bounded.\n\n- **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers `400 UNSUPPORTED_CHAIN` (\"chain N is not served yet\") unless the request carries an `X-API-Key`; those answers are sent `Cache-Control: private`.\n- **Ingest floor.** Every count, volume and print covers trades at or above the chain's floor, returned as `ingestFloor`. BNB Chain runs at $100 today; Avalanche and Base at 0.\n- **Readiness.** `503 NOT_READY` until the chain's rollup has run on this deployment; `503 CHAIN_DATA_UNAVAILABLE` when the store cannot be read. Never treat either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "avalanche",
+                "base",
+                "bnb",
+                "43114",
+                "8453",
+                "56"
+              ]
+            },
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+          },
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": "Token address. The zero address means the chain's wrapped native token (WAVAX, WETH, WBNB)."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": "Newest rows."
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,12}(:\\d{1,15}:\\d{1,9})?$"
+            },
+            "description": "Exclusive cursor: the previous page's `nextBefore` (`ts:block:logIndex`), or a Unix second."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "token": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "trades": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tx": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{64}$",
+                            "description": "Transaction hash."
+                          },
+                          "logIndex": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "block": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "buy",
+                              "sell"
+                            ]
+                          },
+                          "tokenAmt": {
+                            "type": "number",
+                            "description": "Whole tokens."
+                          },
+                          "usd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "priceUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "ts": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "wallet": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "pool": {
+                            "type": "string",
+                            "pattern": "^0x([a-fA-F0-9]{40}|[a-fA-F0-9]{64})$",
+                            "description": "A pool: a 20-byte contract address (V2 / V3) or a 32-byte Uniswap V4 pool id."
+                          }
+                        }
+                      }
+                    },
+                    "nextBefore": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Cursor for the next page; null when this page is not full."
+                    },
+                    "ingestFloor": {
+                      "$ref": "#/components/schemas/IngestFloor"
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 56,
+                  "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+                  "trades": [
+                    {
+                      "tx": "0x92fdb5120761de73892df232e459c1e93bd540160abf8123235d24b6a7544f65",
+                      "logIndex": 116,
+                      "block": 125464201,
+                      "dex": "pancake_v3",
+                      "side": "buy",
+                      "tokenAmt": 0.003505439793265937,
+                      "usd": 296.55131688178034,
+                      "priceUsd": 84597.46404758256,
+                      "ts": 1791021425,
+                      "wallet": "0x7d63e553f87e560528ecd18e3d801ef4c7144313",
+                      "pool": "0x247f51881d1e3ae0f759afb801413a6c948ef442"
+                    },
+                    {
+                      "tx": "0xbc749bf541475ff782ea186a076614a6634ace0abe6f855d1b4f6f7ff871055f",
+                      "logIndex": 138,
+                      "block": 125464200,
+                      "dex": "pancake_v3",
+                      "side": "sell",
+                      "tokenAmt": 0.001923013554163473,
+                      "usd": 162.647334016205,
+                      "priceUsd": 84579.40073488351,
+                      "ts": 1791021425,
+                      "wallet": "0x939572264f180637d6a0f62aac7df9a4387146bd",
+                      "pool": "0x247f51881d1e3ae0f759afb801413a6c948ef442"
+                    }
+                  ],
+                  "nextBefore": "1791021425:125464200:138",
+                  "ingestFloor": {
+                    "minTradeUsd": 100,
+                    "history": [
+                      {
+                        "usd": 100,
+                        "fromTs": 1790789196
+                      }
+                    ]
+                  },
+                  "updatedAt": 1791021451693
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (unknown chain, a chain with its own routes, or a chain not served to this caller yet), or `BAD_ADDRESS` / `BAD_LIMIT` / `BAD_BEFORE`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`NOT_READY` (the chain's rollup has not run on this deployment yet) or `CHAIN_DATA_UNAVAILABLE` (the store could not be read). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/venues": {
+      "get": {
+        "tags": [
+          "Avalanche, Base, BNB Chain"
+        ],
+        "operationId": "chainVenues",
+        "summary": "Venue share over a window",
+        "description": "Per-venue volume, trades and share for 1–30 UTC days, with a daily series per venue. The first day of a young tape is partial.\n\nChain-keyed data for Avalanche C-Chain, Base and BNB Chain, served from Chord's rollup tables for the chain (every swap summed by hour, token and venue). Only the trade tape, the prints ticker and the wallet read raw rows, scoped to one token or one wallet and bounded.\n\n- **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers `400 UNSUPPORTED_CHAIN` (\"chain N is not served yet\") unless the request carries an `X-API-Key`; those answers are sent `Cache-Control: private`.\n- **Ingest floor.** Every count, volume and print covers trades at or above the chain's floor, returned as `ingestFloor`. BNB Chain runs at $100 today; Avalanche and Base at 0.\n- **Readiness.** `503 NOT_READY` until the chain's rollup has run on this deployment; `503 CHAIN_DATA_UNAVAILABLE` when the store cannot be read. Never treat either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "avalanche",
+                "base",
+                "bnb",
+                "43114",
+                "8453",
+                "56"
+              ]
+            },
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 30
+            },
+            "description": "Window length, in UTC days including today."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "days": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "since": {
+                      "type": "integer",
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "venues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "dex": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "volUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "trades": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "sharePct": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "series": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "day": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "volUsd": {
+                                  "type": "number",
+                                  "description": ""
+                                },
+                                "trades": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "tokens": {
+                                  "type": "integer",
+                                  "description": ""
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "description": "Biggest first."
+                    },
+                    "totals": {
+                      "type": "object",
+                      "properties": {
+                        "volUsd": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "trades": {
+                          "type": "integer",
+                          "description": ""
+                        }
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 56,
+                  "days": 2,
+                  "since": 1790899200,
+                  "venues": [
+                    {
+                      "dex": "pancake_v3",
+                      "volUsd": 736112650.6777563,
+                      "trades": 1132649,
+                      "sharePct": 48.37984424468907,
+                      "series": [
+                        {
+                          "day": 1790899200,
+                          "volUsd": 580832396.3483784,
+                          "trades": 883596,
+                          "tokens": 576
+                        },
+                        {
+                          "day": 1790985600,
+                          "volUsd": 155280254.32937792,
+                          "trades": 249053,
+                          "tokens": 430
+                        }
+                      ]
+                    },
+                    {
+                      "dex": "pancake_infinity_cl",
+                      "volUsd": 315145928.03220856,
+                      "trades": 871769,
+                      "sharePct": 20.712469617942627,
+                      "series": [
+                        {
+                          "day": 1790899200,
+                          "volUsd": 249510270.7062881,
+                          "trades": 732838,
+                          "tokens": 166
+                        },
+                        {
+                          "day": 1790985600,
+                          "volUsd": 65635657.32592046,
+                          "trades": 138931,
+                          "tokens": 128
+                        }
+                      ]
+                    }
+                  ],
+                  "totals": {
+                    "volUsd": 1521527533.1494346,
+                    "trades": 2819913
+                  },
+                  "updatedAt": 1791021451942
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (unknown chain, a chain with its own routes, or a chain not served to this caller yet), or `BAD_DAYS`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`NOT_READY` (the chain's rollup has not run on this deployment yet) or `CHAIN_DATA_UNAVAILABLE` (the store could not be read). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/wallet/{address}": {
+      "get": {
+        "tags": [
+          "Avalanche, Base, BNB Chain"
+        ],
+        "operationId": "chainWallet",
+        "summary": "One wallet's swaps and PnL",
+        "description": "A wallet's swaps on the chain and an average-cost PnL over them. **The window is short**: the database keeps the raw tape for a few days on these chains (about 3 on BNB Chain and Base, 7 on Avalanche today), and older days come from Chord's data lake only where its days run without a gap up to that window. `window` says how far back the numbers go and `history` where they came from (`raw`, `raw+lake`, or `raw (lake unavailable)`). Say so when you show the number.\n\n- A buy adds tokens and cost; a sell realizes proceeds minus the average cost of the part the window saw bought.\n- A sell with nothing bought in the window has no cost basis: it is counted in `soldWithoutBasisUsd`, never as profit.\n- `holdsTokens` is bought minus sold inside the window, priced at the token's last hourly print. It is not the on-chain balance (transfers are not swaps).\n- Trades under the chain's ingest floor are not in the tape (BNB Chain: $100).\n- Past 5,000 swaps in the window the newest 5,000 are kept and `truncated` is true (a bot or a router).\n\nChain-keyed data for Avalanche C-Chain, Base and BNB Chain, served from Chord's rollup tables for the chain (every swap summed by hour, token and venue). Only the trade tape, the prints ticker and the wallet read raw rows, scoped to one token or one wallet and bounded.\n\n- **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers `400 UNSUPPORTED_CHAIN` (\"chain N is not served yet\") unless the request carries an `X-API-Key`; those answers are sent `Cache-Control: private`.\n- **Ingest floor.** Every count, volume and print covers trades at or above the chain's floor, returned as `ingestFloor`. BNB Chain runs at $100 today; Avalanche and Base at 0.\n- **Readiness.** `503 NOT_READY` until the chain's rollup has run on this deployment; `503 CHAIN_DATA_UNAVAILABLE` when the store cannot be read. Never treat either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "avalanche",
+                "base",
+                "bnb",
+                "43114",
+                "8453",
+                "56"
+              ]
+            },
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+          },
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": "Wallet address."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "wallet": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "window": {
+                      "type": "object",
+                      "properties": {
+                        "fromTs": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Unix time, seconds, UTC."
+                        },
+                        "toTs": {
+                          "type": "integer",
+                          "description": "Unix time, seconds, UTC."
+                        },
+                        "days": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": ""
+                        }
+                      },
+                      "description": "The span the numbers cover. `fromTs` null = no trades indexed for the wallet."
+                    },
+                    "history": {
+                      "type": "string",
+                      "enum": [
+                        "raw",
+                        "raw+lake",
+                        "raw (lake unavailable)"
+                      ],
+                      "description": "Where the window's rows came from."
+                    },
+                    "trades": {
+                      "type": "integer",
+                      "description": "Swaps in the window."
+                    },
+                    "truncated": {
+                      "type": "boolean",
+                      "description": "More than 5,000 swaps in the window: only the newest 5,000 are counted."
+                    },
+                    "realizedUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "unrealizedUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "totalUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "volumeUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "soldWithoutBasisUsd": {
+                      "type": "number",
+                      "description": "Sell proceeds with no buy in the window to match. Not profit."
+                    },
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "token": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "symbol": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "buys": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "sells": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "boughtUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "soldUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "realizedUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "unrealizedUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "totalUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "holdsTokens": {
+                            "type": "number",
+                            "description": "Bought minus sold in the window, whole tokens."
+                          },
+                          "holdsUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "avgCostUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Average cost per token of what is still held."
+                          },
+                          "lastPriceUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Last hourly print within 7 days."
+                          },
+                          "soldWithoutBasisUsd": {
+                            "type": "number",
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "Largest absolute PnL first."
+                    },
+                    "recent": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ts": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "tx": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{64}$",
+                            "description": "Transaction hash."
+                          },
+                          "logIndex": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "token": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "buy",
+                              "sell"
+                            ]
+                          },
+                          "tokenAmt": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "usd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "priceUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "symbol": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "Last 25 swaps, newest first."
+                    },
+                    "ingestFloor": {
+                      "$ref": "#/components/schemas/IngestFloor"
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 56,
+                  "wallet": "0x34135a8b5cc02d1b579789fb09dd9cec4f8d7c13",
+                  "window": {
+                    "fromTs": 1790726400,
+                    "toTs": 1791021452,
+                    "days": 3
+                  },
+                  "history": "raw",
+                  "trades": 438,
+                  "truncated": false,
+                  "realizedUsd": -52.50256178614943,
+                  "unrealizedUsd": 264.3511103300407,
+                  "totalUsd": 211.84854854389124,
+                  "volumeUsd": 1074760.992352269,
+                  "soldWithoutBasisUsd": 142196.1744304485,
+                  "tokens": [
+                    {
+                      "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+                      "symbol": "BTCB",
+                      "buys": 82,
+                      "sells": 88,
+                      "boughtUsd": 232801.99929077973,
+                      "soldUsd": 268637.2602480728,
+                      "realizedUsd": 332.35056120683566,
+                      "unrealizedUsd": 322.78762778211967,
+                      "totalUsd": 655.1381889889553,
+                      "holdsTokens": 0.48237177905003725,
+                      "holdsUsd": 40925.42133609123,
+                      "avgCostUsd": 84172.90453490094,
+                      "lastPriceUsd": 84842.07226361385,
+                      "soldWithoutBasisUsd": 76105.54410439507
+                    },
+                    {
+                      "token": "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
+                      "symbol": "ETH",
+                      "buys": 92,
+                      "sells": 96,
+                      "boughtUsd": 179038.3807585184,
+                      "soldUsd": 167683.46997452437,
+                      "realizedUsd": -421.56179009490035,
+                      "unrealizedUsd": -58.43651745207899,
+                      "totalUsd": -479.99830754697933,
+                      "holdsTokens": 14.799424875074559,
+                      "holdsUsd": 39691.36613138376,
+                      "avgCostUsd": 2685.901849860607,
+                      "lastPriceUsd": 2681.9532830787653,
+                      "soldWithoutBasisUsd": 28816.45365493667
+                    }
+                  ],
+                  "recent": [
+                    {
+                      "ts": 1791021243,
+                      "tx": "0xfacfd422253d675c6f886afffeb849d5a4f50c38cb0a3a5979b73473dd5b4273",
+                      "logIndex": 31,
+                      "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+                      "side": "buy",
+                      "tokenAmt": 0.007796979293366881,
+                      "usd": 661.4196898072091,
+                      "priceUsd": 84830.24834629204,
+                      "dex": "pancake_v3",
+                      "symbol": "BTCB"
+                    },
+                    {
+                      "ts": 1791016125,
+                      "tx": "0x06ac8ef3af4d007c08c7a9ca9e7ab666a724e1393c21865fe1d70d7c5825c19b",
+                      "logIndex": 76,
+                      "token": "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
+                      "side": "sell",
+                      "tokenAmt": 0.1525057769098823,
+                      "usd": 408.73262726748277,
+                      "priceUsd": 2680.1124229478096,
+                      "dex": "pancake_v3",
+                      "symbol": "ETH"
+                    }
+                  ],
+                  "ingestFloor": {
+                    "minTradeUsd": 100,
+                    "history": [
+                      {
+                        "usd": 100,
+                        "fromTs": 1790789196
+                      }
+                    ]
+                  },
+                  "updatedAt": 1791021452229
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (unknown chain, a chain with its own routes, or a chain not served to this caller yet), or `BAD_ADDRESS`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE`: the store could not be read. Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/stream/market": {
       "get": {
         "tags": [
@@ -15826,6 +18048,158 @@
             "description": ""
           }
         }
+      },
+      "IngestFloor": {
+        "type": "object",
+        "properties": {
+          "minTradeUsd": {
+            "type": "number",
+            "description": "Trades under this USD value (at index time) are not in the index, so every count, volume and candle covers trades at or above it. 0 = every priced trade."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "usd": {
+                  "type": "number",
+                  "description": "Floor in force."
+                },
+                "fromTs": {
+                  "type": "integer",
+                  "description": "Unix time, seconds, UTC."
+                }
+              }
+            },
+            "description": "Floors in force over time, oldest first. Empty when the chain was never floored. Raising a floor does not remove older, smaller rows."
+          }
+        },
+        "description": "The tape's ingest floor. BNB Chain runs at $100 today; Avalanche and Base at 0."
+      },
+      "ChainCoverage": {
+        "type": "object",
+        "properties": {
+          "recentAt": {
+            "type": "integer",
+            "description": "Unix time, seconds, UTC."
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "True when the last rollup pass is more than 30 minutes old."
+          }
+        },
+        "description": "When the rollup last ran."
+      },
+      "ChainTokenRow": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{40}$",
+            "description": "EVM address, hex, case-insensitive."
+          },
+          "symbol": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Read from the contract. Null while unresolved."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
+          },
+          "decimals": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": ""
+          },
+          "logoURI": {
+            "type": "null",
+            "description": "Always null on these chains for now."
+          },
+          "priceUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Last print on the token's busiest venue, USD."
+          },
+          "change24hPct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": ""
+          },
+          "volume24h": {
+            "type": "number",
+            "description": "USD, every venue, trades at or above the ingest floor."
+          },
+          "buyVolume24h": {
+            "type": "number",
+            "description": ""
+          },
+          "sellVolume24h": {
+            "type": "number",
+            "description": ""
+          },
+          "trades24h": {
+            "type": "integer",
+            "description": ""
+          },
+          "buys24h": {
+            "type": "integer",
+            "description": ""
+          },
+          "sells24h": {
+            "type": "integer",
+            "description": ""
+          },
+          "dominantDex": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Venue id with the most 24-hour volume."
+          },
+          "lastTradeTs": {
+            "type": "integer",
+            "description": "Unix time, seconds, UTC."
+          }
+        },
+        "description": "One token on a chain-keyed chain with its 24-hour tape. No curated list, no honesty flags, no trader counts yet."
+      },
+      "ChainVenueShare": {
+        "type": "object",
+        "properties": {
+          "dex": {
+            "type": "string",
+            "description": "Venue id."
+          },
+          "volUsd": {
+            "type": "number",
+            "description": ""
+          },
+          "trades": {
+            "type": "integer",
+            "description": ""
+          },
+          "tokens": {
+            "type": "integer",
+            "description": ""
+          },
+          "sharePct": {
+            "type": "number",
+            "description": ""
+          }
+        },
+        "description": "One venue's share of the window."
       }
     }
   }
