@@ -25,6 +25,10 @@
       "description": "Best-route quotes across every venue on the chain, and the unsigned transaction to execute them."
     },
     {
+      "name": "Meta aggregator",
+      "description": "One quote and one unsigned transaction on any Chord chain, for agents. Chord's own router answers first; a third-party aggregator (KyberSwap, Monorail, LI.FI, Relay) only when Chord fails, never for a better price. Every answer names the provider, and a fallback transaction is returned only when its router is on Chord's allowlist and it passed a simulation run as the taker."
+    },
+    {
       "name": "Arc data",
       "description": "Arc (chain 5042): chain totals, every token traded, launches, launchers, holders — from Chord's own rollup and index tables."
     },
@@ -665,6 +669,561 @@
           },
           "400": {
             "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meta/quote": {
+      "get": {
+        "tags": [
+          "Meta aggregator"
+        ],
+        "operationId": "metaQuote",
+        "summary": "Quote on any chain: Chord first, a fallback only when it fails",
+        "description": "One call that ends in a route you can sign or an honest \"no route anywhere\". Without `taker` it is a price; with `taker` it also returns the unsigned transaction, the approval it needs and a simulation.\n\n**Policy**\n1. Chord's own router is always asked first, with its normal budget.\n2. A fallback is asked only when Chord fails: the engine timed out, errored or is down; there is no route; Chord refuses the route itself (value guard, taxed token, stale bonding-curve route); the chain's router is not live; or the built transaction fails simulation. A better price elsewhere is not a reason. A user error (unknown token, bad amount) never falls back.\n3. Fallbacks are tried in the chain's order (`GET /meta/providers`); the first answer that passes every check wins. Per provider 4 s, whole request 9 s, a circuit breaker per provider and chain.\n\n**Safety, on every fallback answer**\n- The transaction target and the approval spender must be on Chord's allowlist for that provider and chain, and deployed there.\n- `minAmountOut` comes from your slippage; a provider minimum below it is refused.\n- The value guard of `/quote` applies: an output worth 30 % less than the input at Chord's prices is refused. An unpriced token gets a security scan (`safety`); a honeypot is refused.\n- With `taker`, the transaction is simulated as that wallet and must deliver at least `minAmountOut`. A fallback transaction that cannot be simulated is never returned.\n\n**Notes**\n- `provider: null` with HTTP 200 means every provider looked and none has a route. HTTP 503 `UNAVAILABLE` means nobody could answer right now: retry, do not conclude the pair is untradeable.\n- The answer is good until `expiresAt` (30 s). Quote again before signing if you waited.",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Chain id or key: `143` monad · `4663` robinhood · `5042` arc · `43114` avalanche · `8453` base · `56` bnb."
+          },
+          {
+            "name": "tokenIn",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": "Token you sell. The zero address = the chain's native asset (on Arc it aliases to the USDC predeploy). `inputMint` is accepted too."
+          },
+          {
+            "name": "tokenOut",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": "Token you buy. `outputMint` is accepted too."
+          },
+          {
+            "name": "amount",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+            },
+            "description": "Input amount, smallest unit."
+          },
+          {
+            "name": "slippageBps",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000,
+              "default": 50
+            },
+            "description": "Sets `minAmountOut`."
+          },
+          {
+            "name": "taker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": "The wallet that signs and receives. With it the answer carries `tx`, `approval` and `simulation`. `userPublicKey` is accepted too."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The quote. Read `provider` and `fallbackReason` before anything else.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetaQuote"
+                },
+                "example": {
+                  "chain": 8453,
+                  "tokenIn": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+                  "tokenOut": "0x4200000000000000000000000000000000000006",
+                  "amountIn": "10000000",
+                  "taker": "0x00000000000000000000000000000000000c0ffe",
+                  "slippageBps": 50,
+                  "provider": "chord",
+                  "fallbackReason": null,
+                  "attempts": [
+                    {
+                      "provider": "chord",
+                      "status": "ok",
+                      "ms": 222,
+                      "error": null
+                    }
+                  ],
+                  "amountOut": "3727897844407334",
+                  "minAmountOut": "3709258355185298",
+                  "priceImpactPct": "0.0000",
+                  "valueLossPct": -0.02,
+                  "feeBps": 0,
+                  "feeRecipient": "0x6c66229675fd9ceda9a9b2ea2bd983b3d8255834",
+                  "route": {
+                    "venues": [
+                      "aerodrome_slipstream_3"
+                    ]
+                  },
+                  "tx": {
+                    "to": "0x1b1fee89a381e595fe6536b99ba91f3e16e9601a",
+                    "data": "0xdc72a437…",
+                    "value": "0",
+                    "gas": "1000000",
+                    "chainId": 8453
+                  },
+                  "approval": {
+                    "token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+                    "spender": "0x1b1fee89a381e595fe6536b99ba91f3e16e9601a",
+                    "amount": "10000000"
+                  },
+                  "simulation": {
+                    "ok": true,
+                    "amountOut": "3727897844407334",
+                    "gasUsed": 456590
+                  },
+                  "safety": null,
+                  "warnings": [
+                    "INSUFFICIENT_BALANCE: the taker holds less than the input amount; the transaction was simulated with the input supplied."
+                  ],
+                  "quoteId": "8f722080-92a4-493d-aa16-a06f468a581e",
+                  "expiresAt": 1791055797
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meta/swap": {
+      "post": {
+        "tags": [
+          "Meta aggregator"
+        ],
+        "operationId": "metaSwap",
+        "summary": "Unsigned transaction on any chain: Chord first, a fallback only when it fails",
+        "description": "The same answer as `/meta/quote` with a `taker` required: an UNSIGNED transaction, simulated as the taker. Chord never signs and never holds funds.\n\nSend the pair and amount, or the `quoteId` of a `/meta/quote` answer from the last 2 minutes. The policy runs again at the current state, so `provider` can differ from the quote's: compare before you sign.\n\n**Before signing**\n- `approval` not null: send `token.approve(spender, amount)` first. `spender` is `tx.to`.\n- When `provider` is not `chord`, `tx.to` is that aggregator's router. Show the user which provider it is.\n\n**Policy**\n1. Chord's own router is always asked first, with its normal budget.\n2. A fallback is asked only when Chord fails: the engine timed out, errored or is down; there is no route; Chord refuses the route itself (value guard, taxed token, stale bonding-curve route); the chain's router is not live; or the built transaction fails simulation. A better price elsewhere is not a reason. A user error (unknown token, bad amount) never falls back.\n3. Fallbacks are tried in the chain's order (`GET /meta/providers`); the first answer that passes every check wins. Per provider 4 s, whole request 9 s, a circuit breaker per provider and chain.\n\n**Safety, on every fallback answer**\n- The transaction target and the approval spender must be on Chord's allowlist for that provider and chain, and deployed there.\n- `minAmountOut` comes from your slippage; a provider minimum below it is refused.\n- The value guard of `/quote` applies: an output worth 30 % less than the input at Chord's prices is refused. An unpriced token gets a security scan (`safety`); a honeypot is refused.\n- With `taker`, the transaction is simulated as that wallet and must deliver at least `minAmountOut`. A fallback transaction that cannot be simulated is never returned.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "chain": {
+                    "type": "string",
+                    "description": "Chain id or key."
+                  },
+                  "tokenIn": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "tokenOut": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "amount": {
+                    "type": "string",
+                    "pattern": "^\\d+$",
+                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                  },
+                  "slippageBps": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5000,
+                    "default": 50
+                  },
+                  "taker": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "The wallet that signs and receives."
+                  },
+                  "quoteId": {
+                    "type": "string",
+                    "description": "Instead of chain / tokens / amount: the id of a `/meta/quote` answer (valid 2 minutes)."
+                  }
+                },
+                "required": [
+                  "taker"
+                ]
+              },
+              "example": {
+                "chain": 8453,
+                "tokenIn": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+                "tokenOut": "0x4200000000000000000000000000000000000006",
+                "amount": "10000000",
+                "slippageBps": 50,
+                "taker": "0x00000000000000000000000000000000000c0ffe"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sign `tx` with any wallet library and submit it to the chain in `tx.chainId`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetaQuote"
+                },
+                "example": {
+                  "chain": 8453,
+                  "tokenIn": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+                  "tokenOut": "0x4200000000000000000000000000000000000006",
+                  "amountIn": "10000000",
+                  "taker": "0x00000000000000000000000000000000000c0ffe",
+                  "slippageBps": 50,
+                  "provider": "chord",
+                  "fallbackReason": null,
+                  "attempts": [
+                    {
+                      "provider": "chord",
+                      "status": "ok",
+                      "ms": 222,
+                      "error": null
+                    }
+                  ],
+                  "amountOut": "3727897844407334",
+                  "minAmountOut": "3709258355185298",
+                  "priceImpactPct": "0.0000",
+                  "valueLossPct": -0.02,
+                  "feeBps": 0,
+                  "feeRecipient": "0x6c66229675fd9ceda9a9b2ea2bd983b3d8255834",
+                  "route": {
+                    "venues": [
+                      "aerodrome_slipstream_3"
+                    ]
+                  },
+                  "tx": {
+                    "to": "0x1b1fee89a381e595fe6536b99ba91f3e16e9601a",
+                    "data": "0xdc72a437…",
+                    "value": "0",
+                    "gas": "1000000",
+                    "chainId": 8453
+                  },
+                  "approval": {
+                    "token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+                    "spender": "0x1b1fee89a381e595fe6536b99ba91f3e16e9601a",
+                    "amount": "10000000"
+                  },
+                  "simulation": {
+                    "ok": true,
+                    "amountOut": "3727897844407334",
+                    "gasUsed": 456590
+                  },
+                  "safety": null,
+                  "warnings": [
+                    "INSUFFICIENT_BALANCE: the taker holds less than the input amount; the transaction was simulated with the input supplied."
+                  ],
+                  "quoteId": "8f722080-92a4-493d-aa16-a06f468a581e",
+                  "expiresAt": 1791055797
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No provider has a route for this pair and size (`NO_ROUTE`); the body carries `fallbackReason` and `attempts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Unknown or expired `quoteId` (`QUOTE_EXPIRED`). Send the full params.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meta/providers": {
+      "get": {
+        "tags": [
+          "Meta aggregator"
+        ],
+        "operationId": "metaProviders",
+        "summary": "Fallback order and breaker state per chain",
+        "description": "Which aggregators stand behind Chord's router on each chain, in the order they are tried, and whether each one's circuit breaker is closed. `first` is always `chord`.",
+        "responses": {
+          "200": {
+            "description": "Per chain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "policy": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "chains": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "chain": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "key": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "first": {
+                            "type": "string",
+                            "description": "Always `chord`."
+                          },
+                          "fallbacks": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "description": ""
+                                },
+                                "breaker": {
+                                  "type": "string",
+                                  "description": "`closed`, `open` (skipped for up to 60 s after 5 infrastructure failures in 2 minutes) or `half-open` (the next request probes it)."
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "policy": "Chord's router answers first; a fallback is used only when Chord fails, never for a better price.",
+                  "chains": [
+                    {
+                      "chain": 143,
+                      "key": "monad",
+                      "first": "chord",
+                      "fallbacks": [
+                        {
+                          "provider": "kyberswap",
+                          "breaker": "closed"
+                        },
+                        {
+                          "provider": "monorail",
+                          "breaker": "closed"
+                        },
+                        {
+                          "provider": "relay",
+                          "breaker": "closed"
+                        }
+                      ]
+                    },
+                    {
+                      "chain": 4663,
+                      "key": "robinhood",
+                      "first": "chord",
+                      "fallbacks": [
+                        {
+                          "provider": "kyberswap",
+                          "breaker": "closed"
+                        },
+                        {
+                          "provider": "lifi",
+                          "breaker": "closed"
+                        },
+                        {
+                          "provider": "relay",
+                          "breaker": "closed"
+                        }
+                      ]
+                    },
+                    {
+                      "chain": 5042,
+                      "key": "arc",
+                      "first": "chord",
+                      "fallbacks": [
+                        {
+                          "provider": "kyberswap",
+                          "breaker": "closed"
+                        },
+                        {
+                          "provider": "lifi",
+                          "breaker": "closed"
+                        },
+                        {
+                          "provider": "relay",
+                          "breaker": "closed"
+                        }
+                      ]
+                    },
+                    {
+                      "chain": 43114,
+                      "key": "avalanche",
+                      "first": "chord",
+                      "fallbacks": [
+                        {
+                          "provider": "kyberswap",
+                          "breaker": "closed"
+                        },
+                        {
+                          "provider": "lifi",
+                          "breaker": "closed"
+                        },
+                        {
+                          "provider": "relay",
+                          "breaker": "closed"
+                        }
+                      ]
+                    },
+                    {
+                      "chain": 8453,
+                      "key": "base",
+                      "first": "chord",
+                      "fallbacks": [
+                        {
+                          "provider": "kyberswap",
+                          "breaker": "closed"
+                        },
+                        {
+                          "provider": "lifi",
+                          "breaker": "closed"
+                        },
+                        {
+                          "provider": "relay",
+                          "breaker": "closed"
+                        }
+                      ]
+                    },
+                    {
+                      "chain": 56,
+                      "key": "bnb",
+                      "first": "chord",
+                      "fallbacks": [
+                        {
+                          "provider": "kyberswap",
+                          "breaker": "closed"
+                        },
+                        {
+                          "provider": "lifi",
+                          "breaker": "closed"
+                        },
+                        {
+                          "provider": "relay",
+                          "breaker": "closed"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
             "content": {
               "application/json": {
                 "schema": {
@@ -17036,6 +17595,295 @@
           }
         },
         "description": "Unsigned transaction against the router."
+      },
+      "MetaAttempt": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "`chord`, `kyberswap`, `monorail`, `lifi` or `relay`."
+          },
+          "status": {
+            "type": "string",
+            "description": "`ok`, or why this provider did not produce the answer: `no_route`, `timeout`, `http_error`, `rate_limited`, `invalid_response`, `not_allowlisted`, `calldata_mismatch`, `min_out_too_low`, `value_gap`, `unsafe_token`, `simulation_failed`, `unverified`, `breaker_open`, `skipped`; for Chord also `engine_error`, `engine_timeout`, `engine_down`, `route_refused`, `build_failed`, `chain_not_live`."
+          },
+          "ms": {
+            "type": "integer",
+            "description": "Time spent on this provider."
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Short reason from a fixed vocabulary, never provider text."
+          }
+        },
+        "description": "One provider that was asked, in order."
+      },
+      "MetaQuote": {
+        "type": "object",
+        "properties": {
+          "chain": {
+            "type": "integer",
+            "description": "Chain id."
+          },
+          "tokenIn": {
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{40}$",
+            "description": "EVM address, hex, case-insensitive."
+          },
+          "tokenOut": {
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{40}$",
+            "description": "EVM address, hex, case-insensitive."
+          },
+          "amountIn": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+          },
+          "taker": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^0x[a-fA-F0-9]{40}$",
+            "description": "The wallet the transaction was built and simulated for; null on a price-only quote."
+          },
+          "slippageBps": {
+            "type": "integer",
+            "description": "The slippage `minAmountOut` reflects."
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Who answered: `chord` (Chord's own router), `kyberswap`, `monorail`, `lifi`, `relay`. `null` = no provider has a route."
+          },
+          "fallbackReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`null` when Chord answered. Otherwise why it did not: `no_route`, `insufficient_liquidity`, `engine_error`, `engine_timeout`, `engine_down`, `value_guard`, `taxed_token`, `route_stale`, `chain_not_live`, `build_failed`, `simulation_failed`."
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MetaAttempt"
+            },
+            "description": "Every provider asked, in order."
+          },
+          "amountOut": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "What the taker receives after every fee, smallest unit of `tokenOut`. (`/quote`'s `outputAmount` is before Chord's fee; this is after.)"
+          },
+          "minAmountOut": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "The minimum the transaction enforces, from the slippage you asked for."
+          },
+          "priceImpactPct": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Percent, when the provider states one."
+          },
+          "valueLossPct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Output value against input value at Chord's own prices, percent (negative = worth more). `null` when Chord has no reliable price for a side: see `safety` and `warnings`."
+          },
+          "feeBps": {
+            "type": "integer",
+            "description": "Chord path: Chord's protocol fee on the output. Fallback: the integrator fee Chord added (0 today); the provider's own fees are already inside `amountOut`."
+          },
+          "feeRecipient": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^0x[a-fA-F0-9]{40}$",
+            "description": "EVM address, hex, case-insensitive."
+          },
+          "route": {
+            "type": "object",
+            "properties": {
+              "venues": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": ""
+                },
+                "description": "Venue names."
+              }
+            }
+          },
+          "tx": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "to": {
+                "type": "string",
+                "pattern": "^0x[a-fA-F0-9]{40}$",
+                "description": "EVM address, hex, case-insensitive."
+              },
+              "data": {
+                "type": "string",
+                "description": "Calldata."
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^\\d+$",
+                "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+              },
+              "gas": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Gas limit to sign with."
+              },
+              "chainId": {
+                "type": "integer",
+                "description": ""
+              }
+            },
+            "description": "The UNSIGNED transaction. `null` without `taker`. `to` is the Chord router when `provider` is `chord`, the provider's own router otherwise."
+          },
+          "approval": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "token": {
+                "type": "string",
+                "pattern": "^0x[a-fA-F0-9]{40}$",
+                "description": "EVM address, hex, case-insensitive."
+              },
+              "spender": {
+                "type": "string",
+                "pattern": "^0x[a-fA-F0-9]{40}$",
+                "description": "EVM address, hex, case-insensitive."
+              },
+              "amount": {
+                "type": "string",
+                "pattern": "^\\d+$",
+                "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+              }
+            },
+            "description": "The approval to send first. `null` for a native input or when the taker's allowance already covers the amount."
+          },
+          "simulation": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "ok": {
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "description": "`true` = ran and delivered at least `minAmountOut`; `null` = no verdict (only ever returned on the Chord path)."
+              },
+              "amountOut": {
+                "type": "string",
+                "pattern": "^\\d+$",
+                "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+              },
+              "gasUsed": {
+                "type": "integer",
+                "description": ""
+              },
+              "revert": {
+                "type": "string",
+                "description": ""
+              },
+              "reason": {
+                "type": "string",
+                "description": ""
+              }
+            },
+            "description": "The transaction run as the taker (with the input supplied when the taker does not hold it), measuring the taker's own balance change. `null` without `taker`."
+          },
+          "safety": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "source": {
+                "type": "string",
+                "description": "`goplus`"
+              },
+              "token": {
+                "type": "string",
+                "pattern": "^0x[a-fA-F0-9]{40}$",
+                "description": "EVM address, hex, case-insensitive."
+              },
+              "worstFlag": {
+                "type": "string",
+                "description": "`none`, `low`, `medium`, `high`."
+              },
+              "honeypot": {
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "description": ""
+              },
+              "buyTaxPct": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": ""
+              },
+              "sellTaxPct": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": ""
+              },
+              "risks": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": ""
+                }
+              }
+            },
+            "description": "A security scan of the unknown token, present when the value check could not run on a fallback answer."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": ""
+            },
+            "description": "`INSUFFICIENT_BALANCE`, `UNPRICED`, `OUTPUT_WRAPPED`, `NO_ROUTE` — each followed by a sentence."
+          },
+          "quoteId": {
+            "type": "string",
+            "description": "Pass to `POST /meta/swap` within 2 minutes."
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "Unix time, seconds, UTC."
+          }
+        },
+        "description": "The same shape whichever provider answered."
       },
       "Candle": {
         "type": "object",

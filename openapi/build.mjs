@@ -227,6 +227,33 @@ const ChainTokenRow = obj({
   dominantDex: nullable(str("Venue id with the most 24-hour volume.")), lastTradeTs: UNIX_S,
 }, "One token on a chain-keyed chain with its 24-hour tape. No curated list, no honesty flags, no trader counts yet.");
 
+const META_CHAINS = [143, 4663, 5042, 43114, 8453, 56];
+const MetaAttempt = obj({
+  provider: str("`chord`, `kyberswap`, `monorail`, `lifi` or `relay`."),
+  status: str("`ok`, or why this provider did not produce the answer: `no_route`, `timeout`, `http_error`, `rate_limited`, `invalid_response`, `not_allowlisted`, `calldata_mismatch`, `min_out_too_low`, `value_gap`, `unsafe_token`, `simulation_failed`, `unverified`, `breaker_open`, `skipped`; for Chord also `engine_error`, `engine_timeout`, `engine_down`, `route_refused`, `build_failed`, `chain_not_live`."),
+  ms: int("Time spent on this provider."), error: nullable(str("Short reason from a fixed vocabulary, never provider text.")),
+}, "One provider that was asked, in order.");
+const MetaQuote = obj({
+  chain: int("Chain id."), tokenIn: ADDRESS, tokenOut: ADDRESS, amountIn: WEI, taker: nullable({ ...ADDRESS, description: "The wallet the transaction was built and simulated for; null on a price-only quote." }),
+  slippageBps: int("The slippage `minAmountOut` reflects."),
+  provider: nullable(str("Who answered: `chord` (Chord's own router), `kyberswap`, `monorail`, `lifi`, `relay`. `null` = no provider has a route.")),
+  fallbackReason: nullable(str("`null` when Chord answered. Otherwise why it did not: `no_route`, `insufficient_liquidity`, `engine_error`, `engine_timeout`, `engine_down`, `value_guard`, `taxed_token`, `route_stale`, `chain_not_live`, `build_failed`, `simulation_failed`.")),
+  attempts: arr(ref("MetaAttempt"), "Every provider asked, in order."),
+  amountOut: { ...WEI, description: "What the taker receives after every fee, smallest unit of `tokenOut`. (`/quote`'s `outputAmount` is before Chord's fee; this is after.)" },
+  minAmountOut: { ...WEI, description: "The minimum the transaction enforces, from the slippage you asked for." },
+  priceImpactPct: nullable(str("Percent, when the provider states one.")),
+  valueLossPct: nullable(num("Output value against input value at Chord's own prices, percent (negative = worth more). `null` when Chord has no reliable price for a side: see `safety` and `warnings`.")),
+  feeBps: int("Chord path: Chord's protocol fee on the output. Fallback: the integrator fee Chord added (0 today); the provider's own fees are already inside `amountOut`."),
+  feeRecipient: nullable(ADDRESS),
+  route: obj({ venues: arr(str(""), "Venue names.") }),
+  tx: nullable(obj({ to: ADDRESS, data: str("Calldata."), value: WEI, gas: nullable(str("Gas limit to sign with.")), chainId: int("") }, "The UNSIGNED transaction. `null` without `taker`. `to` is the Chord router when `provider` is `chord`, the provider's own router otherwise.")),
+  approval: nullable(obj({ token: ADDRESS, spender: ADDRESS, amount: WEI }, "The approval to send first. `null` for a native input or when the taker's allowance already covers the amount.")),
+  simulation: nullable(obj({ ok: nullable(bool("`true` = ran and delivered at least `minAmountOut`; `null` = no verdict (only ever returned on the Chord path).")), amountOut: WEI, gasUsed: int(""), revert: str(""), reason: str("") }, "The transaction run as the taker (with the input supplied when the taker does not hold it), measuring the taker's own balance change. `null` without `taker`.")),
+  safety: nullable(obj({ source: str("`goplus`"), token: ADDRESS, worstFlag: str("`none`, `low`, `medium`, `high`."), honeypot: nullable(bool("")), buyTaxPct: nullable(num("")), sellTaxPct: nullable(num("")), risks: arr(str("")) }, "A security scan of the unknown token, present when the value check could not run on a fallback answer.")),
+  warnings: arr(str(""), "`INSUFFICIENT_BALANCE`, `UNPRICED`, `OUTPUT_WRAPPED`, `NO_ROUTE` — each followed by a sentence."),
+  quoteId: str("Pass to `POST /meta/swap` within 2 minutes."), expiresAt: UNIX_S,
+}, "The same shape whichever provider answered.");
+
 const components = {
   securitySchemes: {
     ApiKey: { type: "apiKey", in: "header", name: "X-API-Key", description: "Optional on every read. A key from getchord.xyz/developer raises the rate limit to your plan and meters usage per key. Required for `?only=` on quotes and for the Ask agent API." },
@@ -234,7 +261,7 @@ const components = {
   },
   schemas: {
     Error: obj({ error: str("Stable machine code, e.g. `INVALID_PARAMS`, `NOT_READY`, `RATE_LIMIT_EXCEEDED`."), message: str("For humans."), statusCode: int("HTTP status, when included.") }, "Every non-2xx body.", { required: ["error"], example: { error: "INVALID_PARAMS", message: "amount must be an integer string in the token's smallest unit" } }),
-    Coverage, TokenLite, ArcTokenRow, ArcTrendingRow, ArcGraduatedRow, RhTokenRow, RhStockRow, RouteLeg, QuoteResponse, SwapTx, Candle, TradeRow, StatsWindow, SmartWallet, PnlToken, LpEvent, PoolListRow, LpPosition, LpLeaderRow, SimResult, LauncherStat, IngestFloor, ChainCoverage, ChainTokenRow, ChainVenueShare,
+    Coverage, TokenLite, ArcTokenRow, ArcTrendingRow, ArcGraduatedRow, RhTokenRow, RhStockRow, RouteLeg, QuoteResponse, SwapTx, MetaAttempt, MetaQuote, Candle, TradeRow, StatsWindow, SmartWallet, PnlToken, LpEvent, PoolListRow, LpPosition, LpLeaderRow, SimResult, LauncherStat, IngestFloor, ChainCoverage, ChainTokenRow, ChainVenueShare,
   },
 };
 
@@ -244,6 +271,7 @@ const add = (path, method, operation) => { (paths[path] ??= {})[method] = operat
 
 const T = {
   swap: "Quote and swap",
+  meta: "Meta aggregator",
   arc: "Arc data",
   tokens: "Tokens and charts",
   wallets: "Top wallets",
@@ -316,6 +344,73 @@ add("/swap/simulate", "post", op(T.swap, "simulateSwap", "Simulate a built trans
   {
     body: bodyJson(obj({ chain: { type: "integer", enum: [5042, 4663, 143] }, from: ADDRESS, to: ADDRESS, data: str("Calldata from `/swap`."), value: WEI }, undefined, { required: ["from", "to", "data", "value"] }), { chain: 5042, from: WAL, to: ROUTER, data: "0xdc72a437…", value: "0" }),
     responses: withErr({ 200: ok("`ok: true` with the simulated output and gas, or `ok: false` with the decoded revert.", obj({ ok: bool(""), amountOut: nullable(str("Simulated output, smallest unit.")), gas: nullable(int("Estimated gas units.")), revert: str("Decoded reason (when `ok` is false)."), selector: nullable(str("4-byte error selector.")) }), { ok: true, amountOut: "465", gas: 318189 }) }, [400, 503]),
+  }));
+
+// Meta aggregator ──────────────────────────────────────────────────────────────────────────────
+const META_USDC_BASE = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", META_WETH_BASE = "0x4200000000000000000000000000000000000006";
+const META_TAKER = "0x00000000000000000000000000000000000c0ffe";
+const META_POLICY = `**Policy**
+1. Chord's own router is always asked first, with its normal budget.
+2. A fallback is asked only when Chord fails: the engine timed out, errored or is down; there is no route; Chord refuses the route itself (value guard, taxed token, stale bonding-curve route); the chain's router is not live; or the built transaction fails simulation. A better price elsewhere is not a reason. A user error (unknown token, bad amount) never falls back.
+3. Fallbacks are tried in the chain's order (\`GET /meta/providers\`); the first answer that passes every check wins. Per provider 4 s, whole request 9 s, a circuit breaker per provider and chain.
+
+**Safety, on every fallback answer**
+- The transaction target and the approval spender must be on Chord's allowlist for that provider and chain, and deployed there.
+- \`minAmountOut\` comes from your slippage; a provider minimum below it is refused.
+- The value guard of \`/quote\` applies: an output worth 30 % less than the input at Chord's prices is refused. An unpriced token gets a security scan (\`safety\`); a honeypot is refused.
+- With \`taker\`, the transaction is simulated as that wallet and must deliver at least \`minAmountOut\`. A fallback transaction that cannot be simulated is never returned.`;
+const metaParams = [
+  q("chain", { type: "string" }, "Chain id or key: `143` monad · `4663` robinhood · `5042` arc · `43114` avalanche · `8453` base · `56` bnb.", true),
+  q("tokenIn", ADDRESS, "Token you sell. The zero address = the chain's native asset (on Arc it aliases to the USDC predeploy). `inputMint` is accepted too.", true),
+  q("tokenOut", ADDRESS, "Token you buy. `outputMint` is accepted too.", true),
+  q("amount", WEI, "Input amount, smallest unit.", true),
+  q("slippageBps", { type: "integer", minimum: 1, maximum: 5000, default: 50 }, "Sets `minAmountOut`."),
+  q("taker", ADDRESS, "The wallet that signs and receives. With it the answer carries `tx`, `approval` and `simulation`. `userPublicKey` is accepted too."),
+];
+add("/meta/quote", "get", op(T.meta, "metaQuote", "Quote on any chain: Chord first, a fallback only when it fails",
+`One call that ends in a route you can sign or an honest "no route anywhere". Without \`taker\` it is a price; with \`taker\` it also returns the unsigned transaction, the approval it needs and a simulation.
+
+${META_POLICY}
+
+**Notes**
+- \`provider: null\` with HTTP 200 means every provider looked and none has a route. HTTP 503 \`UNAVAILABLE\` means nobody could answer right now: retry, do not conclude the pair is untradeable.
+- The answer is good until \`expiresAt\` (30 s). Quote again before signing if you waited.`,
+  {
+    params: metaParams,
+    responses: withErr({ 200: ok("The quote. Read `provider` and `fallbackReason` before anything else.", ref("MetaQuote"), ex(`/v1/meta/quote?chain=8453&tokenIn=${META_USDC_BASE}&tokenOut=${META_WETH_BASE}&amount=10000000&slippageBps=50&taker=${META_TAKER}`)) }, [400, 429, 503]),
+  }));
+
+add("/meta/swap", "post", op(T.meta, "metaSwap", "Unsigned transaction on any chain: Chord first, a fallback only when it fails",
+`The same answer as \`/meta/quote\` with a \`taker\` required: an UNSIGNED transaction, simulated as the taker. Chord never signs and never holds funds.
+
+Send the pair and amount, or the \`quoteId\` of a \`/meta/quote\` answer from the last 2 minutes. The policy runs again at the current state, so \`provider\` can differ from the quote's: compare before you sign.
+
+**Before signing**
+- \`approval\` not null: send \`token.approve(spender, amount)\` first. \`spender\` is \`tx.to\`.
+- When \`provider\` is not \`chord\`, \`tx.to\` is that aggregator's router. Show the user which provider it is.
+
+${META_POLICY}`,
+  {
+    body: bodyJson(obj({
+      chain: { type: "string", description: "Chain id or key." }, tokenIn: ADDRESS, tokenOut: ADDRESS, amount: WEI,
+      slippageBps: { type: "integer", minimum: 1, maximum: 5000, default: 50 },
+      taker: { ...ADDRESS, description: "The wallet that signs and receives." },
+      quoteId: str("Instead of chain / tokens / amount: the id of a `/meta/quote` answer (valid 2 minutes)."),
+    }, undefined, { required: ["taker"] }), { chain: 8453, tokenIn: META_USDC_BASE, tokenOut: META_WETH_BASE, amount: "10000000", slippageBps: 50, taker: META_TAKER }),
+    responses: {
+      ...withErr({ 200: ok("Sign `tx` with any wallet library and submit it to the chain in `tx.chainId`.", ref("MetaQuote"), ex(`/v1/meta/quote?chain=8453&tokenIn=${META_USDC_BASE}&tokenOut=${META_WETH_BASE}&amount=10000000&slippageBps=50&taker=${META_TAKER}`)) }, [400, 429, 503]),
+      404: errRes("No provider has a route for this pair and size (`NO_ROUTE`); the body carries `fallbackReason` and `attempts`."),
+      410: errRes("Unknown or expired `quoteId` (`QUOTE_EXPIRED`). Send the full params."),
+    },
+  }));
+
+add("/meta/providers", "get", op(T.meta, "metaProviders", "Fallback order and breaker state per chain",
+`Which aggregators stand behind Chord's router on each chain, in the order they are tried, and whether each one's circuit breaker is closed. \`first\` is always \`chord\`.`,
+  {
+    responses: withErr({ 200: ok("Per chain.", obj({
+      policy: str(""),
+      chains: arr(obj({ chain: int(""), key: str(""), first: str("Always `chord`."), fallbacks: arr(obj({ provider: str(""), breaker: str("`closed`, `open` (skipped for up to 60 s after 5 infrastructure failures in 2 minutes) or `half-open` (the next request probes it).") })) })),
+    }), ex("/v1/meta/providers")) }, [429, 503]),
   }));
 
 // Arc data ─────────────────────────────────────────────────────────────────────────────────────
@@ -689,6 +784,7 @@ Amounts are decimal strings in the token's smallest unit. Timestamps are Unix se
   servers: [{ url: "https://api.getchord.xyz/v1", description: "Production" }],
   tags: [
     { name: T.swap, description: "Best-route quotes across every venue on the chain, and the unsigned transaction to execute them." },
+    { name: T.meta, description: "One quote and one unsigned transaction on any Chord chain, for agents. Chord's own router answers first; a third-party aggregator (KyberSwap, Monorail, LI.FI, Relay) only when Chord fails, never for a better price. Every answer names the provider, and a fallback transaction is returned only when its router is on Chord's allowlist and it passed a simulation run as the taker." },
     { name: T.arc, description: "Arc (chain 5042): chain totals, every token traded, launches, launchers, holders — from Chord's own rollup and index tables." },
     { name: T.tokens, description: "Curated lists, candles, trade tapes, windowed stats and logos. Address-keyed routes serve both chains." },
     { name: T.wallets, description: "Wallets ranked from the tape by a skill-adjusted score, with routers and bots removed." },

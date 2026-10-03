@@ -3652,5 +3652,176 @@
   ],
   "totalUsd": 1221.38,
   "updatedAt": 1791052461304
+ },
+ "/v1/meta/quote?chain=8453&tokenIn=0x833589fcd6edb6e08f4c7c32d4f71b54bda02913&tokenOut=0x4200000000000000000000000000000000000006&amount=10000000&slippageBps=50&taker=0x00000000000000000000000000000000000c0ffe": {
+  "chain": 8453,
+  "tokenIn": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+  "tokenOut": "0x4200000000000000000000000000000000000006",
+  "amountIn": "10000000",
+  "taker": "0x00000000000000000000000000000000000c0ffe",
+  "slippageBps": 50,
+  "provider": "chord",
+  "fallbackReason": null,
+  "attempts": [
+   {
+    "provider": "chord",
+    "status": "ok",
+    "ms": 222,
+    "error": null
+   }
+  ],
+  "amountOut": "3727897844407334",
+  "minAmountOut": "3709258355185298",
+  "priceImpactPct": "0.0000",
+  "valueLossPct": -0.02,
+  "feeBps": 0,
+  "feeRecipient": "0x6c66229675fd9ceda9a9b2ea2bd983b3d8255834",
+  "route": {
+   "venues": [
+    "aerodrome_slipstream_3"
+   ]
+  },
+  "tx": {
+   "to": "0x1b1fee89a381e595fe6536b99ba91f3e16e9601a",
+   "data": "0xdc72a437…",
+   "value": "0",
+   "gas": "1000000",
+   "chainId": 8453
+  },
+  "approval": {
+   "token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+   "spender": "0x1b1fee89a381e595fe6536b99ba91f3e16e9601a",
+   "amount": "10000000"
+  },
+  "simulation": {
+   "ok": true,
+   "amountOut": "3727897844407334",
+   "gasUsed": 456590
+  },
+  "safety": null,
+  "warnings": [
+   "INSUFFICIENT_BALANCE: the taker holds less than the input amount; the transaction was simulated with the input supplied."
+  ],
+  "quoteId": "8f722080-92a4-493d-aa16-a06f468a581e",
+  "expiresAt": 1791055797
+ },
+ "/v1/meta/providers": {
+  "policy": "Chord's router answers first; a fallback is used only when Chord fails, never for a better price.",
+  "chains": [
+   {
+    "chain": 143,
+    "key": "monad",
+    "first": "chord",
+    "fallbacks": [
+     {
+      "provider": "kyberswap",
+      "breaker": "closed"
+     },
+     {
+      "provider": "monorail",
+      "breaker": "closed"
+     },
+     {
+      "provider": "relay",
+      "breaker": "closed"
+     }
+    ]
+   },
+   {
+    "chain": 4663,
+    "key": "robinhood",
+    "first": "chord",
+    "fallbacks": [
+     {
+      "provider": "kyberswap",
+      "breaker": "closed"
+     },
+     {
+      "provider": "lifi",
+      "breaker": "closed"
+     },
+     {
+      "provider": "relay",
+      "breaker": "closed"
+     }
+    ]
+   },
+   {
+    "chain": 5042,
+    "key": "arc",
+    "first": "chord",
+    "fallbacks": [
+     {
+      "provider": "kyberswap",
+      "breaker": "closed"
+     },
+     {
+      "provider": "lifi",
+      "breaker": "closed"
+     },
+     {
+      "provider": "relay",
+      "breaker": "closed"
+     }
+    ]
+   },
+   {
+    "chain": 43114,
+    "key": "avalanche",
+    "first": "chord",
+    "fallbacks": [
+     {
+      "provider": "kyberswap",
+      "breaker": "closed"
+     },
+     {
+      "provider": "lifi",
+      "breaker": "closed"
+     },
+     {
+      "provider": "relay",
+      "breaker": "closed"
+     }
+    ]
+   },
+   {
+    "chain": 8453,
+    "key": "base",
+    "first": "chord",
+    "fallbacks": [
+     {
+      "provider": "kyberswap",
+      "breaker": "closed"
+     },
+     {
+      "provider": "lifi",
+      "breaker": "closed"
+     },
+     {
+      "provider": "relay",
+      "breaker": "closed"
+     }
+    ]
+   },
+   {
+    "chain": 56,
+    "key": "bnb",
+    "first": "chord",
+    "fallbacks": [
+     {
+      "provider": "kyberswap",
+      "breaker": "closed"
+     },
+     {
+      "provider": "lifi",
+      "breaker": "closed"
+     },
+     {
+      "provider": "relay",
+      "breaker": "closed"
+     }
+    ]
+   }
+  ]
  }
 }
