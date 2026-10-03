@@ -4656,6 +4656,11 @@
                       "type": "number",
                       "description": ""
                     },
+                    "exitedWithoutSale": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Present when bought quantity left the wallet with no sale on the tape (a transfer out, or a sale credited to another address): `{tokens, costUsd, top: [{symbol, costUsd}]}`. Its result is unknown and NOT in the PnL above."
+                    },
                     "byChain": {
                       "type": "object",
                       "additionalProperties": true,
@@ -4704,6 +4709,216 @@
                   "unrealized": 11700.939232721703,
                   "total": 42189.04111549597,
                   "updatedAt": 1789809277093
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallet/{wallet}/balances": {
+      "get": {
+        "tags": [
+          "Portfolio"
+        ],
+        "operationId": "walletBalances",
+        "summary": "Holdings on every chain",
+        "description": "What a wallet holds right now on Chord's six chains (Monad, Robinhood Chain, Arc, Avalanche, Base, BNB Chain), read on-chain: the native coin plus every token on Chord's list for each chain, priced by Chord's own maps. `raw` is the exact balance in the token's smallest unit (use it for a Max button); `amount` is the same number in whole tokens. Each chain answers on its own deadline: a slow or failing chain comes back `unavailable` with a reason and the others still answer. Only listed tokens are seen; a token outside Chord's lists will not show. Cached 15 s per wallet and chain set.",
+        "parameters": [
+          {
+            "name": "wallet",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": ""
+          },
+          {
+            "name": "chains",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma list of chain ids (143, 4663, 5042, 43114, 8453, 56). Default: all six; unknown ids are ignored."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "wallet": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "totalUsd": {
+                      "type": "number",
+                      "description": "Sum of priced holdings."
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    },
+                    "chains": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "chain": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "ok",
+                              "unavailable",
+                              "no_rpc"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "description": "Only when not ok."
+                          },
+                          "totalUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "holdings": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "symbol": {
+                                  "type": "string",
+                                  "description": ""
+                                },
+                                "name": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "description": ""
+                                },
+                                "address": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "description": "Null for the native coin."
+                                },
+                                "native": {
+                                  "type": "boolean",
+                                  "description": ""
+                                },
+                                "decimals": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "raw": {
+                                  "type": "string",
+                                  "description": "Exact balance, smallest unit."
+                                },
+                                "amount": {
+                                  "type": "string",
+                                  "description": "Whole tokens."
+                                },
+                                "priceUsd": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ],
+                                  "description": ""
+                                },
+                                "valueUsd": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ],
+                                  "description": ""
+                                },
+                                "logoURI": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "description": ""
+                                },
+                                "stable": {
+                                  "type": "boolean",
+                                  "description": ""
+                                }
+                              }
+                            },
+                            "description": "Highest value first."
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "wallet": "0x0d36a315083033d3d097950c9e494acc04588f99",
+                  "chains": [
+                    {
+                      "chain": 8453,
+                      "name": "Base",
+                      "status": "ok",
+                      "totalUsd": 1221.38,
+                      "holdings": [
+                        {
+                          "symbol": "ETH",
+                          "name": null,
+                          "address": null,
+                          "native": true,
+                          "decimals": 18,
+                          "raw": "454663939527832318",
+                          "amount": "0.454663939527832318",
+                          "priceUsd": 2686.342436128022,
+                          "valueUsd": 1221.38,
+                          "logoURI": null,
+                          "stable": false
+                        },
+                        {
+                          "symbol": "WETH",
+                          "name": null,
+                          "address": "0x4200000000000000000000000000000000000006",
+                          "native": false,
+                          "decimals": 18,
+                          "raw": "148044",
+                          "amount": "0.000000000000148044",
+                          "priceUsd": 2686.342436128022,
+                          "valueUsd": 0,
+                          "logoURI": null,
+                          "stable": false
+                        }
+                      ]
+                    }
+                  ],
+                  "totalUsd": 1221.38,
+                  "updatedAt": 1791052461304
                 }
               }
             }

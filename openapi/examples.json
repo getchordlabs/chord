@@ -1659,7 +1659,7 @@
    "nonceOrDenylist": 5,
    "behavior": 37
   },
-  "note": "ranked by Smart Score \u2014 skill-adjusted, realized-weighted profit (est. at current prices)"
+  "note": "ranked by Smart Score — skill-adjusted, realized-weighted profit (est. at current prices)"
  },
  "/v1/lp/overview?chain=5042": {
   "chain": 5042,
@@ -2330,7 +2330,7 @@
      "feeAprPct": 0.1,
      "capitalEfficiency": 50,
      "shareOfPoolPct": 0.443,
-     "note": "Backtest on the last 7 days of Chord's own candles and this pool's hourly volume at today's TVL \u2014 what would have happened, not what will."
+     "note": "Backtest on the last 7 days of Chord's own candles and this pool's hourly volume at today's TVL — what would have happened, not what will."
     }
    },
    {
@@ -2363,7 +2363,7 @@
      "feeAprPct": 15.8,
      "capitalEfficiency": 36.4,
      "shareOfPoolPct": 0.323,
-     "note": "Backtest on the last 7 days of Chord's own candles and this pool's hourly volume at today's TVL \u2014 what would have happened, not what will."
+     "note": "Backtest on the last 7 days of Chord's own candles and this pool's hourly volume at today's TVL — what would have happened, not what will."
     }
    }
   ],
@@ -2671,7 +2671,7 @@
    {
     "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
     "symbol": "NVDA",
-    "name": "NVIDIA \u2022 Robinhood Token",
+    "name": "NVIDIA • Robinhood Token",
     "decimals": 18,
     "logoURI": "https://cdn.robinhood.com/ncw_assets/logos/0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec.png",
     "tags": [
@@ -2702,7 +2702,7 @@
    {
     "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
     "symbol": "NVDA",
-    "name": "NVIDIA \u2022 Robinhood Token",
+    "name": "NVIDIA • Robinhood Token",
     "decimals": 18,
     "logoURI": "https://cdn.robinhood.com/ncw_assets/logos/0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec.png",
     "tags": [
@@ -2731,7 +2731,7 @@
    {
     "address": "0x4a0E65A3EcceC6dBe60AE065F2e7bb85Fae35eEa",
     "symbol": "SPCX",
-    "name": "Space Exploration Technologies Corp \u2022 Robinhood Token",
+    "name": "Space Exploration Technologies Corp • Robinhood Token",
     "decimals": 18,
     "logoURI": "https://cdn.robinhood.com/ncw_assets/logos/0x4a0e65a3eccec6dbe60ae065f2e7bb85fae35eea.png",
     "tags": [
@@ -3611,5 +3611,46 @@
    ]
   },
   "updatedAt": 1791021452229
+ },
+ "/v1/wallet/0x0d36a315083033d3d097950c9e494acc04588f99/balances?chains=8453": {
+  "wallet": "0x0d36a315083033d3d097950c9e494acc04588f99",
+  "chains": [
+   {
+    "chain": 8453,
+    "name": "Base",
+    "status": "ok",
+    "totalUsd": 1221.38,
+    "holdings": [
+     {
+      "symbol": "ETH",
+      "name": null,
+      "address": null,
+      "native": true,
+      "decimals": 18,
+      "raw": "454663939527832318",
+      "amount": "0.454663939527832318",
+      "priceUsd": 2686.342436128022,
+      "valueUsd": 1221.38,
+      "logoURI": null,
+      "stable": false
+     },
+     {
+      "symbol": "WETH",
+      "name": null,
+      "address": "0x4200000000000000000000000000000000000006",
+      "native": false,
+      "decimals": 18,
+      "raw": "148044",
+      "amount": "0.000000000000148044",
+      "priceUsd": 2686.342436128022,
+      "valueUsd": 0,
+      "logoURI": null,
+      "stable": false
+     }
+    ]
+   }
+  ],
+  "totalUsd": 1221.38,
+  "updatedAt": 1791052461304
  }
 }
