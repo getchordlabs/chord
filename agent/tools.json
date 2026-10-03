@@ -164,6 +164,112 @@
     {
       "type": "function",
       "function": {
+        "name": "chord_meta_quote",
+        "description": "USE THIS FIRST for any swap quote. One quote on any Chord chain (monad, robinhood, arc, avalanche, base, bnb) that always ends in a route or an honest 'no route anywhere': Chord's own router answers first; a third-party aggregator (KyberSwap, Monorail, LI.FI, Relay) answers ONLY when Chord fails, and `provider` + `fallbackReason` say who answered and why. Pass `wallet` to also get the UNSIGNED transaction, the approval it needs and a simulation run as that wallet. Amount is human units (`amount`) for a listed token, or smallest units (`amountRaw`) for any address.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "type": "string",
+              "enum": [
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb"
+              ],
+              "default": "robinhood",
+              "description": "Chain key"
+            },
+            "tokenIn": {
+              "type": "string",
+              "description": "Symbol or 0x address to pay with; `native` for the chain's gas token"
+            },
+            "tokenOut": {
+              "type": "string",
+              "description": "Symbol or 0x address to receive; `native` for the chain's gas token"
+            },
+            "amount": {
+              "type": "string",
+              "description": "Amount of tokenIn in human units, e.g. \"25\" (needs a listed token)"
+            },
+            "amountRaw": {
+              "type": "string",
+              "description": "Amount of tokenIn in its smallest unit (use this for an unlisted address)"
+            },
+            "slippageBps": {
+              "type": "integer",
+              "default": 50,
+              "description": "Slippage tolerance in basis points, default 50 = 0.5%"
+            },
+            "wallet": {
+              "type": "string",
+              "description": "The wallet that will sign and receive. With it the answer carries the unsigned transaction, the approval and a simulation"
+            }
+          },
+          "required": [
+            "tokenIn",
+            "tokenOut"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_meta_swap_tx",
+        "description": "The UNSIGNED transaction for a swap through Chord's meta-aggregator (Chord's router first, a third-party aggregator only when Chord fails). Give the `quoteId` of a chord_meta_quote answer from the last 2 minutes, or the full pair + amount. Returns `transaction` {to, data, value, gas, chainId}, the `approval` {token, spender, amount} to send first when it is not null, and `simulation` (run as the wallet: ok + the amount it receives). Chord never signs or holds funds. Fund-moving: show the person provider, amountOut, minAmountOut and the approval, and get a clear yes before signing.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "wallet": {
+              "type": "string",
+              "description": "The wallet that will sign and receive"
+            },
+            "quoteId": {
+              "type": "string",
+              "description": "`quoteId` from chord_meta_quote (valid 2 minutes). Without it, give chain + tokens + amount"
+            },
+            "chain": {
+              "type": "string",
+              "enum": [
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb"
+              ]
+            },
+            "tokenIn": {
+              "type": "string"
+            },
+            "tokenOut": {
+              "type": "string"
+            },
+            "amount": {
+              "type": "string"
+            },
+            "amountRaw": {
+              "type": "string"
+            },
+            "slippageBps": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          "required": [
+            "wallet"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
         "name": "chord_smart_money",
         "description": "The wallets that traded best on the chain, ranked from the tape with routers and bots removed: profit, volume, trades, win rate, best token.",
         "parameters": {

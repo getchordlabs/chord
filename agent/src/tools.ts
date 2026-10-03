@@ -1,8 +1,8 @@
 // Chord agent harness — the tools, framework-agnostic. Each tool is a name, a description an LLM can
 // read, a zod input schema, and a handler that calls the Chord API and returns compact JSON. mcp.ts
 // exposes them over the Model Context Protocol; manifest.ts prints them as function-calling schemas
-// for OpenAI-style tool use. Everything is a read except chord_swap_tx, which returns an UNSIGNED
-// transaction — signing stays in the agent's own wallet, Chord never holds keys or funds.
+// for OpenAI-style tool use. Everything is a read except chord_swap_tx and chord_meta_swap_tx, which return an
+// UNSIGNED transaction — signing stays in the agent's own wallet, Chord never holds keys or funds.
 import { z } from "zod";
 
 export const CHAIN = 4663;
@@ -61,6 +61,70 @@ export interface Tool<I extends z.ZodTypeAny = z.ZodTypeAny> {
   run: (args: z.infer<I>) => Promise<unknown>;
 }
 const tool = <I extends z.ZodTypeAny>(t: Tool<I>) => t;
+
+// ── Meta-aggregator (GET /v1/meta/quote, POST /v1/meta/swap): every Chord chain, Chord's router first ──
+const META_CHAINS = { monad: 143, robinhood: 4663, arc: 5042, avalanche: 43114, base: 8453, bnb: 56 } as const;
+const META_CHAIN_KEYS = ["monad", "robinhood", "arc", "avalanche", "base", "bnb"] as const;
+const NATIVE_SYMBOL: Record<number, string> = { 143: "MON", 4663: "ETH", 5042: "USDC", 43114: "AVAX", 8453: "ETH", 56: "BNB" };
+const chainLists = new Map<number, { at: number; list: Token[] }>();
+async function listFor(chain: number): Promise<Token[]> {
+  const hit = chainLists.get(chain);
+  if (hit && Date.now() - hit.at < 5 * 60_000) return hit.list;
+  const d = await api<any>(`/v1/tokens?chain=${chain}`);
+  const list: Token[] = Array.isArray(d) ? d : d.tokens ?? [];
+  chainLists.set(chain, { at: Date.now(), list });
+  return list;
+}
+/** A token on any Chord chain: `native` / the gas symbol / the zero address, a listed symbol, or any 0x address
+ *  (decimals unknown when it is not listed — then the amount must be given raw). */
+async function resolveOn(chain: number, q: string): Promise<{ address: string; symbol: string | null; decimals: number | null }> {
+  const s = q.trim().toLowerCase();
+  if (s === "native" || s === NATIVE || s === NATIVE_SYMBOL[chain].toLowerCase()) {
+    // Arc's gas token is the USDC predeploy: the API aliases the zero address to it (6 decimals).
+    return chain === 5042 ? { address: "0x3600000000000000000000000000000000000000", symbol: "USDC", decimals: 6 } : { address: NATIVE, symbol: NATIVE_SYMBOL[chain], decimals: 18 };
+  }
+  const list = await listFor(chain).catch(() => [] as Token[]);
+  const hit = list.find((t) => t.address.toLowerCase() === s) ?? list.find((t) => t.symbol.toLowerCase() === s);
+  if (hit) return { address: hit.address.toLowerCase(), symbol: hit.symbol, decimals: hit.decimals };
+  if (/^0x[0-9a-f]{40}$/.test(s)) return { address: s, symbol: null, decimals: null };
+  throw new Error(`No listed token on chain ${chain} matches "${q}". Pass its 0x address (with amountRaw).`);
+}
+type MetaArgs = { chain?: keyof typeof META_CHAINS; tokenIn?: string; tokenOut?: string; amount?: string; amountRaw?: string; slippageBps?: number; wallet?: string; quoteId?: string };
+async function metaCall(method: "GET" | "POST", a: MetaArgs) {
+  let chain: number, out: { decimals: number | null; symbol: string | null } | null = null, d: any;
+  if (method === "POST" && a.quoteId) {
+    d = await api<any>("/v1/meta/swap", { method: "POST", body: JSON.stringify({ quoteId: a.quoteId, taker: a.wallet }) });
+    chain = d.chain;
+  } else {
+    if (!a.chain || !a.tokenIn || !a.tokenOut) throw new Error("Give chain, tokenIn and tokenOut (or a quoteId).");
+    chain = META_CHAINS[a.chain];
+    const [tin, tout] = await Promise.all([resolveOn(chain, a.tokenIn), resolveOn(chain, a.tokenOut)]);
+    out = tout;
+    let raw = a.amountRaw?.trim();
+    if (!raw) {
+      if (!a.amount) throw new Error("Give amount (human units) or amountRaw (smallest unit).");
+      if (tin.decimals == null) throw new Error(`${a.tokenIn} is not a listed token, so its decimals are unknown here: pass amountRaw in the token's smallest unit.`);
+      raw = toRaw(a.amount, tin.decimals);
+    }
+    const params = { chain, tokenIn: tin.address, tokenOut: tout.address, amount: raw, slippageBps: a.slippageBps ?? 50, ...(a.wallet ? { taker: a.wallet } : {}) };
+    d = method === "GET"
+      ? await api<any>(`/v1/meta/quote?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))}`)
+      : await api<any>("/v1/meta/swap", { method: "POST", body: JSON.stringify(params) });
+  }
+  const human = (raw: string) => (out?.decimals != null && /^\d+$/.test(raw) ? fromRaw(raw, out.decimals) : null);
+  return {
+    chainId: chain, provider: d.provider, fallbackReason: d.fallbackReason, noRoute: d.provider === null,
+    tokenIn: d.tokenIn, tokenOut: d.tokenOut, amountInRaw: d.amountIn,
+    amountOutRaw: d.amountOut, amountOut: human(d.amountOut), minAmountOutRaw: d.minAmountOut, minAmountOut: human(d.minAmountOut), tokenOutSymbol: out?.symbol ?? null,
+    priceImpactPct: d.priceImpactPct != null ? Number(d.priceImpactPct) : null, valueLossPct: d.valueLossPct, feeBps: d.feeBps, feeRecipient: d.feeRecipient,
+    venues: d.route?.venues ?? [], attempts: d.attempts, warnings: d.warnings, safety: d.safety,
+    transaction: d.tx, approval: d.approval, simulation: d.simulation,
+    quoteId: d.quoteId, expiresAt: d.expiresAt,
+    note: d.provider === null ? "No provider has a route for this pair and size."
+      : d.tx ? `Unsigned. ${d.provider === "chord" ? "Chord's own router" : `Chord's router did not answer (${d.fallbackReason}); this route is from ${d.provider}, a third-party aggregator`}. ${d.approval ? "Send the approval (token.approve(spender, amount)) first, then the transaction." : "No approval needed."} Sign with the wallet given, before expiresAt.`
+      : "Price only. Pass `wallet` (or call chord_meta_swap_tx) for the unsigned transaction.",
+  };
+}
 
 export const tools = [
   tool({
@@ -158,6 +222,35 @@ export const tools = [
       const d = await api<any>("/v1/swap", { method: "POST", body: JSON.stringify({ quoteResponse: quote, userPublicKey: wallet, slippageBps, chain: CHAIN }) });
       return { chainId: CHAIN, transaction: d.transaction, note: "Unsigned. Sign with the wallet given; the input token may need an approve() to `transaction.to` first." };
     },
+  }),
+  tool({
+    name: "chord_meta_quote",
+    description: "USE THIS FIRST for any swap quote. One quote on any Chord chain (monad, robinhood, arc, avalanche, base, bnb) that always ends in a route or an honest 'no route anywhere': Chord's own router answers first; a third-party aggregator (KyberSwap, Monorail, LI.FI, Relay) answers ONLY when Chord fails, and `provider` + `fallbackReason` say who answered and why. Pass `wallet` to also get the UNSIGNED transaction, the approval it needs and a simulation run as that wallet. Amount is human units (`amount`) for a listed token, or smallest units (`amountRaw`) for any address.",
+    input: z.object({
+      chain: z.enum(META_CHAIN_KEYS).default("robinhood").describe("Chain key"),
+      tokenIn: z.string().describe("Symbol or 0x address to pay with; `native` for the chain's gas token"),
+      tokenOut: z.string().describe("Symbol or 0x address to receive; `native` for the chain's gas token"),
+      amount: z.string().optional().describe("Amount of tokenIn in human units, e.g. \"25\" (needs a listed token)"),
+      amountRaw: z.string().optional().describe("Amount of tokenIn in its smallest unit (use this for an unlisted address)"),
+      slippageBps: z.number().int().min(1).max(5000).default(50).describe("Slippage tolerance in basis points, default 50 = 0.5%"),
+      wallet: z.string().optional().describe("The wallet that will sign and receive. With it the answer carries the unsigned transaction, the approval and a simulation"),
+    }),
+    run: async (a) => metaCall("GET", a),
+  }),
+  tool({
+    name: "chord_meta_swap_tx",
+    description: "The UNSIGNED transaction for a swap through Chord's meta-aggregator (Chord's router first, a third-party aggregator only when Chord fails). Give the `quoteId` of a chord_meta_quote answer from the last 2 minutes, or the full pair + amount. Returns `transaction` {to, data, value, gas, chainId}, the `approval` {token, spender, amount} to send first when it is not null, and `simulation` (run as the wallet: ok + the amount it receives). Chord never signs or holds funds. Fund-moving: show the person provider, amountOut, minAmountOut and the approval, and get a clear yes before signing.",
+    input: z.object({
+      wallet: z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe("The wallet that will sign and receive"),
+      quoteId: z.string().optional().describe("`quoteId` from chord_meta_quote (valid 2 minutes). Without it, give chain + tokens + amount"),
+      chain: z.enum(META_CHAIN_KEYS).optional(),
+      tokenIn: z.string().optional(),
+      tokenOut: z.string().optional(),
+      amount: z.string().optional(),
+      amountRaw: z.string().optional(),
+      slippageBps: z.number().int().min(1).max(5000).default(50),
+    }),
+    run: async (a) => metaCall("POST", a),
   }),
   tool({
     name: "chord_smart_money",

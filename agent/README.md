@@ -1,6 +1,6 @@
 # chord-agent
 
-The Chord agent harness: 17 tools over the Chord API, exposed as an MCP server and as a
+The Chord agent harness: 19 tools over the Chord API, exposed as an MCP server and as a
 function-calling manifest. Robinhood Chain (4663): prices, the stock screener, one stock in depth,
 best-route quotes with swap calldata, smart money and any wallet's PnL. Arc (5042): chain totals,
 the 24h token board, one token in depth, venue share. Liquidity (5042 by default, 4663 or 143):
@@ -27,6 +27,8 @@ keep its tool table in step with `src/tools.ts`.
 | `chord_stock` | 4663 | one stock in depth: activity windows, ATH, first trade, pools |
 | `chord_quote` | 4663 | best route across every venue, expected output, price impact, the route |
 | `chord_swap_tx` | 4663 | the unsigned transaction for a quote, for the agent's wallet to sign |
+| `chord_meta_quote` | all six | **quote here first**: Chord's router, or a third-party aggregator only when Chord fails; `provider` + `fallbackReason` say who answered; with `wallet` also the unsigned transaction, approval and a simulation |
+| `chord_meta_swap_tx` | all six | the unsigned transaction for a meta quote (`quoteId`) or a pair + amount, with its approval and simulation |
 | `chord_smart_money` | 4663 | wallets ranked from the tape, routers and bots removed |
 | `chord_wallet_pnl` | 4663 | realized and open profit per token for one wallet |
 | `chord_arc_overview` | 5042 | 24h volume in USDC, swaps, venues, coverage |
@@ -62,7 +64,7 @@ Claude Code: `claude mcp add chord -- node /absolute/path/to/packages/agent/dist
 
 ## Function calling (OpenAI-style, LangChain, anything that takes a manifest)
 
-`tools.json` in this folder, or `https://getchord.xyz/agent/tools.json`, is the same 17 tools as
+`tools.json` in this folder, or `https://getchord.xyz/agent/tools.json`, is the same 19 tools as
 JSON Schema. Call the API yourself with the arguments the model produces; the base URL and the
 optional `X-API-Key` header are in the manifest. `pnpm manifest` regenerates it from `src/tools.ts`
 and copies it to `packages/web/public/agent/tools.json` (the served copy).

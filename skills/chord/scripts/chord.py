@@ -13,7 +13,12 @@ Commands
   board CHAIN [--sort volume] [--limit 10] most traded / moving tokens in the last 24h, compact rows
   stock SYMBOL                             one Robinhood Chain stock token: price, reference (NAV), gap, off-hours share
   ask QUESTION [--wallet 0x..]             Chord Ask, one JSON answer (needs CHORD_API_KEY)
-  quote CHAIN TOKEN_IN TOKEN_OUT AMOUNT    best route; AMOUNT in human units of TOKEN_IN ("50", "0.25")
+  meta-quote CHAIN TOKEN_IN TOKEN_OUT AMOUNT [--wallet 0x..]
+                                           QUOTE HERE FIRST: Chord's router, or a third-party aggregator only when
+                                           Chord fails; the answer names the provider that quoted it
+  meta-swap QUOTE_FILE WALLET --user-confirmed
+                                           build the unsigned transaction for a saved meta quote (simulated as WALLET)
+  quote CHAIN TOKEN_IN TOKEN_OUT AMOUNT    Chord's own router only, with the full route; AMOUNT in human units ("50", "0.25")
   swap-tx QUOTE_FILE WALLET --user-confirmed
                                            build the unsigned transaction for a saved quote
   simulate QUOTE_FILE WALLET               eth_call the built transaction from WALLET before signing
@@ -550,13 +555,203 @@ def cmd_simulate(args):
     print(json.dumps({"chain": cid, "from": wallet, "simulation": r}, indent=1))
 
 
+# The ONLY contracts a meta-aggregator transaction may target or ask an approval for, per provider and chain.
+# A pinned copy of packages/api/src/services/meta/config.ts (a test there keeps the two equal): the API checks its own
+# list, this is the second, independent check before anything reaches a wallet.
+META_ROUTERS = {
+    "chord": {c: [ROUTER] for c in (143, 4663, 5042, 43114, 8453, 56)},
+    "kyberswap": {c: ["0x6131b5fae19ea4f9d964eac0408e4408b66337b5"] for c in (143, 4663, 5042, 43114, 8453, 56)},
+    "monorail": {143: ["0xa68a7f0601effdc65c64d9c47ca1b18d96b4352c"]},
+    "lifi": {
+        143: ["0x026f252016a7c47cdef1f05a3fc9e20c92a49c37"],
+        4663: ["0xb477751b76cf82d00a686a1232f5fcd772414af3"],
+        5042: ["0xa4072583658fae592a3506a42431cb6316a8d40b"],
+        43114: ["0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae"],
+        8453: ["0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae"],
+        56: ["0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae"],
+    },
+    "relay": {c: ["0xccc88a9d1b4ed6b0eaba998850414b24f1c315be", "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f"] for c in (143, 4663, 5042, 43114, 8453, 56)},
+}
+PROVIDER_NAMES = {"chord": "Chord router", "kyberswap": "KyberSwap", "monorail": "Monorail", "lifi": "LI.FI", "relay": "Relay"}
+
+
+def meta_problems(m, cid):
+    """Why a meta answer must not be signed (empty list = nothing found)."""
+    problems = []
+    prov = m.get("provider")
+    allowed = [a.lower() for a in (META_ROUTERS.get(prov) or {}).get(cid, [])]
+    tx = m.get("tx") or {}
+    if tx:
+        if str(tx.get("to", "")).lower() not in allowed:
+            problems.append(f"transaction.to {tx.get('to')} is not a known {PROVIDER_NAMES.get(prov, prov)} router on chain {cid}: DO NOT SIGN")
+        if int(tx.get("chainId") or 0) != cid:
+            problems.append(f"transaction.chainId {tx.get('chainId')} does not match the quoted chain {cid}: DO NOT SIGN")
+        sim = m.get("simulation") or {}
+        if sim.get("ok") is False:
+            problems.append(f"the simulation reverted ({sim.get('revert')}): DO NOT SIGN")
+        elif sim.get("ok") is not True and prov != "chord":
+            problems.append("a third-party transaction without a passing simulation: DO NOT SIGN")
+    ap = m.get("approval")
+    if ap and str(ap.get("spender", "")).lower() not in allowed:
+        problems.append(f"approval spender {ap.get('spender')} is not a known {PROVIDER_NAMES.get(prov, prov)} router on chain {cid}: DO NOT APPROVE")
+    return problems
+
+
+def meta_summary(m, cid, tin, tout, raw):
+    meta = CHAINS[cid]
+    prov = m.get("provider")
+    s = {
+        "chain": {"id": cid, "name": meta["name"], "gasToken": meta["gas"]},
+        "sell": {"symbol": tin["symbol"], "address": m.get("tokenIn") or tin["address"], "decimals": tin["decimals"], "amount": to_human(raw, tin["decimals"]), "amountRaw": raw},
+        "buy": {"symbol": tout["symbol"], "address": m.get("tokenOut") or tout["address"], "decimals": tout["decimals"]},
+        "noRoute": prov is None,
+        "provider": prov,
+        "providerName": PROVIDER_NAMES.get(prov, prov),
+        "fallbackReason": m.get("fallbackReason"),
+        "attempts": [{"provider": a.get("provider"), "status": a.get("status"), "ms": a.get("ms")} for a in (m.get("attempts") or [])],
+    }
+    if prov is not None:
+        s.update({
+            "expectedOutAfterFee": to_human(m["amountOut"], tout["decimals"]),
+            "minimumReceived": to_human(m["minAmountOut"], tout["decimals"]),
+            "minimumReceivedRaw": m["minAmountOut"],
+            "slippageBps": m.get("slippageBps"),
+            "priceImpactPct": m.get("priceImpactPct"),
+            "valueLossPct": m.get("valueLossPct"),
+            "fee": {"bps": m.get("feeBps"), "recipient": m.get("feeRecipient")},
+            "route": m.get("route", {}).get("venues"),
+            "router": (m.get("tx") or {}).get("to") or (m.get("approval") or {}).get("spender"),
+            "approval": m.get("approval"),
+            "simulation": m.get("simulation"),
+            "safety": m.get("safety"),
+            "expiresAt": m.get("expiresAt"),
+        })
+    return s
+
+
+def cmd_meta_quote(args):
+    opts, rest = parse_opts(args, {"--slippage-bps": True, "--save": True, "--wallet": True})
+    if len(rest) != 4:
+        die("usage: chord.py meta-quote CHAIN TOKEN_IN TOKEN_OUT AMOUNT [--slippage-bps 50] [--wallet 0x..] [--save FILE]")
+    cid = chain_id(rest[0])
+    slip = int(opts.get("--slippage-bps", 50))
+    if not 1 <= slip <= 5000:
+        die("--slippage-bps must be between 1 and 5000")
+    wallet = opts.get("--wallet")
+    if wallet and not ADDR_RE.match(wallet):
+        die(f"wallet '{wallet}' is not a 0x address with 40 hex characters")
+    tin = resolve_one(cid, rest[1], "tokenIn")
+    tout = resolve_one(cid, rest[2], "tokenOut")
+    if tin["address"].lower() == tout["address"].lower():
+        die("tokenIn and tokenOut are the same token")
+    raw = to_raw(rest[3], tin["decimals"])
+    params = {"chain": cid, "tokenIn": tin["address"], "tokenOut": tout["address"], "amount": raw, "slippageBps": slip}
+    q = dict(params, taker=wallet) if wallet else params
+    m = api(f"/v1/meta/quote?{urllib.parse.urlencode(q)}")
+    if isinstance(m, dict) and "__http_error__" in m:
+        print(json.dumps({"error": m.get("error"), "message": m.get("message"), "status": m["__http_error__"], "chain": cid, "attempts": m.get("attempts")}, indent=1), file=sys.stderr)
+        sys.exit(1)
+    summary = meta_summary(m, cid, tin, tout, raw)
+    warnings = list(m.get("warnings") or [])
+    prov = m.get("provider")
+    if prov is None:
+        warnings.append("No route anywhere: neither Chord's router nor any fallback aggregator can fill this. Do not build a transaction.")
+    elif prov != "chord":
+        warnings.append(f"Chord's own router did not answer ({m.get('fallbackReason')}). This quote is from {PROVIDER_NAMES.get(prov, prov)}, a third-party aggregator: say so, and show its router address as the approval spender.")
+    for label in ("priceImpactPct", "valueLossPct"):
+        try:
+            v = float(m.get(label)) if m.get(label) is not None else None
+        except (TypeError, ValueError):
+            v = None
+        if v is not None and v >= 2:
+            warnings.append(f"{label} {v}% is high: suggest a smaller size.")
+    sf = m.get("safety") or {}
+    if sf.get("worstFlag") in ("medium", "high"):
+        warnings.append(f"Security scan ({sf.get('source')}): {sf.get('worstFlag')} risk. " + " ".join(sf.get("risks") or [])[:300])
+    for t in (tin, tout):
+        if t.get("sameSymbolOthers"):
+            warnings.append(f"{t['sameSymbolOthers']} other token(s) on {CHAINS[cid]['name']} also use the symbol {t['symbol']}; this quote uses the curated one at {t['address']}. Show that address.")
+        if t.get("flags"):
+            warnings.append(f"{t['symbol']} {t['address']} carries flags {t['flags']}.")
+        if t["source"].startswith("token-endpoint"):
+            warnings.append(f"{t['symbol'] or t['address']} is not on Chord's curated list for {CHAINS[cid]['name']}: verify the contract before trading.")
+    problems = meta_problems(m, cid) if prov is not None else []
+    summary["warnings"] = warnings
+    summary["problems"] = problems
+    summary["quotedAt"] = int(time.time())
+    path = opts.get("--save") or os.path.join(tempfile.gettempdir(), f"chord-meta-{cid}-{int(time.time())}.json")
+    with open(path, "w") as f:
+        json.dump({"kind": "meta", "chain": cid, "savedAt": summary["quotedAt"], "slippageBps": slip, "params": params, "tokens": {"in": tin, "out": tout}, "summary": summary}, f)
+    summary["quoteFile"] = path
+    print(json.dumps(summary, indent=1))
+    if problems:
+        sys.exit(2)
+
+
+def cmd_meta_swap(args):
+    opts, rest = parse_opts(args, {"--user-confirmed": False})
+    if len(rest) != 2:
+        die("usage: chord.py meta-swap QUOTE_FILE WALLET --user-confirmed")
+    if not opts.get("--user-confirmed"):
+        die("refused: show the user the meta-quote summary (provider, minimum received, router) and wait for their explicit yes in a new message, then re-run with --user-confirmed. Never pass this flag on the user's behalf.")
+    try:
+        with open(rest[0]) as f:
+            saved = json.load(f)
+    except (OSError, ValueError) as e:
+        die(f"cannot read quote file {rest[0]}: {e}")
+    if saved.get("kind") != "meta" or "params" not in saved:
+        die("not a quote file written by chord.py meta-quote")
+    wallet = rest[1]
+    if not ADDR_RE.match(wallet):
+        die(f"wallet '{wallet}' is not a 0x address with 40 hex characters")
+    age = int(time.time()) - int(saved.get("savedAt") or 0)
+    if age > QUOTE_MAX_AGE_S:
+        print(json.dumps({"error": "STALE_QUOTE", "ageSeconds": age, "message": "Re-quote, show the new numbers, and confirm again if the provider or the minimum received moved."}), file=sys.stderr)
+        sys.exit(3)
+    old = saved["summary"]
+    if old.get("noRoute"):
+        die("this quote has no route; there is nothing to build")
+    cid = saved["chain"]
+    m = api("/v1/meta/swap", body=dict(saved["params"], taker=wallet))
+    if isinstance(m, dict) and "__http_error__" in m:
+        print(json.dumps({"error": m.get("error"), "message": m.get("message"), "status": m["__http_error__"], "attempts": m.get("attempts")}, indent=1), file=sys.stderr)
+        sys.exit(1)
+    problems = meta_problems(m, cid)
+    if not m.get("tx"):
+        problems.append("the answer carries no transaction")
+    # The user said yes to ONE provider and ONE minimum. Anything else is a new decision.
+    if m.get("provider") != old.get("provider"):
+        problems.append(f"the provider changed from {old.get('providerName')} to {PROVIDER_NAMES.get(m.get('provider'), m.get('provider'))} since the confirmed quote: show the new summary and ask again")
+    elif int(m.get("minAmountOut") or 0) < int(old.get("minimumReceivedRaw") or 0):
+        problems.append("the minimum received is lower than the one the user confirmed: show the new summary and ask again")
+    s = meta_summary(m, cid, saved["tokens"]["in"], saved["tokens"]["out"], saved["params"]["amount"])
+    out = {
+        "unsigned": True,
+        "chain": s["chain"],
+        "from": wallet,
+        "provider": s["provider"],
+        "providerName": s["providerName"],
+        "fallbackReason": s["fallbackReason"],
+        "transaction": m.get("tx"),
+        "approval": None if not m.get("approval") else dict(m["approval"], note="Approve exactly this amount (not unlimited) to this spender before the swap."),
+        "simulation": m.get("simulation"),
+        "summary": {k: s.get(k) for k in ("sell", "buy", "expectedOutAfterFee", "minimumReceived", "priceImpactPct", "valueLossPct", "route")},
+        "warnings": m.get("warnings") or [],
+        "problems": problems,
+        "next": "Hand this to the user's own wallet to review and sign. Chord and this script never sign or broadcast.",
+    }
+    print(json.dumps(out, indent=1))
+    if problems:
+        sys.exit(2)
+
+
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
         print(__doc__)
         return
     cmd, args = sys.argv[1], sys.argv[2:]
     handlers = {"chains": cmd_chains, "get": cmd_get, "token": cmd_token, "price": cmd_price, "board": cmd_board, "stock": cmd_stock, "ask": cmd_ask,
-                "quote": cmd_quote, "swap-tx": cmd_swap_tx, "simulate": cmd_simulate}
+                "quote": cmd_quote, "swap-tx": cmd_swap_tx, "simulate": cmd_simulate, "meta-quote": cmd_meta_quote, "meta-swap": cmd_meta_swap}
     if cmd not in handlers:
         die(f"unknown command '{cmd}'. Run chord.py --help.")
     handlers[cmd](args)

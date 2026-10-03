@@ -32,12 +32,13 @@ read that data and prepare swaps carefully. **You never sign, never broadcast, n
   and is required for Ask. A user gets a key by signing in at https://getchord.xyz/ask , then
   Settings > API Key. Never print, log or echo a key.
 - Helper: `python3 scripts/chord.py` (path relative to this skill's folder, standard library only):
-  `token`, `price`, `board`, `stock`, `quote`, `swap-tx`, `simulate`, `ask`, `get`. It resolves symbols
+  `token`, `price`, `board`, `stock`, `meta-quote`, `meta-swap`, `quote`, `swap-tx`, `simulate`, `ask`, `get`. It resolves symbols
   to addresses, converts amounts exactly, prints compact JSON, and builds an unsigned transaction only
   behind `--user-confirmed`. Prefer it; plain `curl` works too. Always pass `limit` on list calls and
   never cut JSON with `head -c` (a truncated answer is a wrong answer).
-- If `chord_*` MCP tools are in your tool list they wrap the same API (Robinhood Chain prices,
-  stocks, quote and `chord_swap_tx`; Arc data; LP; `chord_ask`). Every rule below applies to them.
+- If `chord_*` MCP tools are in your tool list they wrap the same API (`chord_meta_quote` and
+  `chord_meta_swap_tx` on every chain: use them first for any swap; Robinhood Chain prices, stocks,
+  `chord_quote` and `chord_swap_tx`; Arc data; LP; `chord_ask`). Every rule below applies to them.
 
 ## Chains
 
@@ -50,8 +51,8 @@ read that data and prepare swaps carefully. **You never sign, never broadcast, n
 | Base | 8453 | `base` | ETH | USDC, USDbC (bridged), WETH | `/v1/chains/base/*` |
 | BNB Chain | 56 | `bnb` | BNB | USDT and USDC (both **18 decimals** here), WBNB | `/v1/chains/bnb/*` |
 
-`/v1/quote`, `POST /v1/swap` and `/v1/candles` work on all six with `chain=<id>`. Always pass it:
-`/v1/quote` silently defaults to Monad. The zero address means the chain's native gas token (on
+`/v1/meta/quote`, `POST /v1/meta/swap`, `/v1/quote`, `POST /v1/swap` and `/v1/candles` work on all
+six with `chain=<id>`. Always pass it: `/v1/quote` silently defaults to Monad. The zero address means the chain's native gas token (on
 Arc it is an alias for the 6-decimal USDC predeploy).
 
 ## Intent routing
@@ -70,8 +71,8 @@ Arc it is an alias for the 6-decimal USDC predeploy).
 | Recent trades of a token | `/v1/arc/token/{addr}/trades`, `/v1/chains/{key}/token/{addr}/trades` | `references/data.md` |
 | New launches on Arc | `/v1/arc/graduated?hours=24`, `/v1/arc/launchers` | `references/data.md` |
 | Stock token price, gap to the real share, after-hours share | `chord.py stock SYMBOL` (wraps `GET /v1/rh/stocks`) | `references/stocks.md` |
-| Quote, best route, "how much X for Y" | `chord.py quote CHAIN IN OUT AMOUNT` (wraps `GET /v1/quote`) | `references/quote-and-swap.md` |
-| Buy, sell, swap, convert | quote, confirmation summary, wait for an explicit yes, then `chord.py swap-tx ... --user-confirmed` (wraps `POST /v1/swap`) | `references/quote-and-swap.md` |
+| Quote, best route, "how much X for Y" | `chord.py meta-quote CHAIN IN OUT AMOUNT` first (wraps `GET /v1/meta/quote`: Chord's router, or a third-party aggregator only when Chord fails; the answer names the `provider`). `chord.py quote` = Chord's own router only, with per-pool route detail | `references/quote-and-swap.md` |
+| Buy, sell, swap, convert | meta-quote, confirmation summary (it names the provider and its router), wait for an explicit yes, then `chord.py meta-swap ... --user-confirmed` (wraps `POST /v1/meta/swap`) | `references/quote-and-swap.md` |
 | Will the transaction revert | `chord.py simulate QUOTE_FILE WALLET` (wraps `POST /v1/swap/simulate`) | `references/quote-and-swap.md` |
 | Smart money, best traders | `/v1/smart-money/top?chain=ID&source=onchain&window=7d` (5042, 4663, 143) | `references/data.md` |
 | A wallet's PnL | `/v1/portfolio/{w}/pnl?chain=ID` (5042, 4663, 143) · `/v1/chains/{key}/wallet/{w}` (43114, 8453, 56) | `references/data.md` |
@@ -84,9 +85,11 @@ Worked calls with real responses: `references/examples.md`.
 
 ## The boundary: read and prepare, never sign
 
-- **Read-only, run without asking:** every GET above, `/v1/quote`, `/v1/swap/simulate`, `POST /v1/ask`.
-- **Fund-moving, needs the user's confirmation first:** `POST /v1/swap`, `chord.py swap-tx`,
-  `chord_swap_tx`, and every token approval.
+- **Read-only, run without asking:** every GET above, `/v1/meta/quote` **without** a wallet,
+  `/v1/quote`, `/v1/swap/simulate`, `POST /v1/ask`.
+- **Fund-moving, needs the user's confirmation first:** `POST /v1/meta/swap`, `/v1/meta/quote` with
+  `taker` (it returns a transaction), `chord.py meta-swap`, `chord_meta_swap_tx`, `POST /v1/swap`,
+  `chord.py swap-tx`, `chord_swap_tx`, and every token approval.
 - **Never:** sign or broadcast anything; ask for, accept or store a private key or seed phrase;
   build the swap in the same response that shows the quote; pass `--user-confirmed` unless the user
   said yes in a later message; write or imagine the user's yes yourself; propose an unlimited approval.
@@ -96,8 +99,10 @@ Worked calls with real responses: `references/examples.md`.
 1. **Resolve.** Chain named? If not and the token exists on several Chord chains, ask which one.
    Resolve both tokens on that chain; if a symbol has several candidates, list them with full
    addresses and ask. Need the user's wallet address for the build step (full, never truncated).
-2. **Quote** with `chord.py quote`. No route, price impact of 2% or more, `valueLossPct` of 2% or
-   more, a flagged token, or a token off the curated list: say so plainly before anything else.
+2. **Quote** with `chord.py meta-quote` (no `--wallet` yet). No route, price impact of 2% or more,
+   `valueLossPct` of 2% or more, a flagged token, a token off the curated list, or a `provider` other
+   than `chord`: say so plainly before anything else. A fallback provider means Chord's own router
+   could not route it (`fallbackReason`); the user is then trusting that third party's router.
 3. **Message 1 = summary + question, then stop.** Read-only calls are fine in this message; no build.
 
    | Field | Value |
@@ -108,24 +113,28 @@ Worked calls with real responses: `references/examples.md`.
    | You receive (estimate, after Chord fee) | amount + symbol + full contract address |
    | Minimum received | `minimumReceived` at the slippage used |
    | Price impact / value loss | `priceImpactPct` / `valueLossPct` |
-   | Chord fee | `feeBps` bps of the output |
-   | Route | venues and their percent |
-   | Router (transaction `to`, approval spender) | `0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a` |
-   | Approval | ERC-20 input: approve exactly the input amount to the router first; native input: none |
+   | Provider | `providerName`; when it is not the Chord router, add "third-party aggregator, used because Chord's router returned `fallbackReason`" |
+   | Fee | `fee.bps` bps (Chord router: of the output; a fallback: the provider's own fees are already inside the amount) |
+   | Route | venues |
+   | Router (transaction `to`, approval spender) | the `router` of the summary, in full: `0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a` for the Chord router, the provider's own router otherwise |
+   | Approval | ERC-20 input: approve exactly the input amount to that router first; native input: none |
    | Wallet | full address |
 
    End with: "Reply **confirm** to build the unsigned transaction for your wallet to sign, or
    **cancel**." Do not continue in the same response.
 4. **After the user replies** in a new message:
-   - Clear yes to these exact numbers: run `chord.py swap-tx QUOTE_FILE WALLET --user-confirmed`.
-     If the quote is older than 60 seconds the script refuses: re-quote, and if the minimum received
-     got worse, show the new summary and ask again.
+   - Clear yes to these exact numbers: run `chord.py meta-swap QUOTE_FILE WALLET --user-confirmed`.
+     If the quote is older than 60 seconds the script refuses: re-quote. If the provider changed or
+     the minimum received got worse, the script exits with `problems`: show the new summary and ask
+     again.
    - Any change (amount, token, chain, slippage, wallet): void the old confirmation, re-quote, new
      summary, ask again.
    - No, cancel, stop, or anything unclear: build nothing, say it is cancelled.
-5. **Hand over.** Check `transaction.to` is the router and `chainId` matches (the script does).
-   Give the unsigned transaction, plus the approval if needed, to the user's own wallet. Say it is
-   unsigned and not sent. Offer `chord.py simulate` before signing.
+5. **Hand over.** `problems` must be empty: the script checks `transaction.to` and the approval
+   spender against its own pinned list of routers per provider and chain, the `chainId`, and that
+   the simulation (run as the wallet, with the input supplied) passed. Any problem: do not hand it
+   over. Give the unsigned transaction, plus the approval if needed, to the user's own wallet. Say
+   it is unsigned and not sent, and report `simulation.amountOut`.
 
 Compound requests ("check the price and swap", "swap then send it to 0x...") split into steps: do
 the reads, run the confirmation flow for the swap alone, and say Chord does not do transfers.

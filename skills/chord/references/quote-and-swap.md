@@ -21,7 +21,60 @@ the fund-moving step: it follows the confirmation flow in `SKILL.md`, every time
 Not supported: Ethereum mainnet, Solana, Arbitrum and every other chain; cross-chain swaps; limit
 orders; perps.
 
-## 1. Quote
+## 0. Meta quote first (Chord's router, a fallback only when it fails)
+
+`GET /v1/meta/quote` and `POST /v1/meta/swap` are the one-call path on all six chains. Chord's own
+router always answers first. A third-party aggregator (KyberSwap on every chain, Monorail on Monad,
+LI.FI, Relay) answers ONLY when Chord's router fails: its engine is down or timed out, it has no
+route, it refuses the route itself (value guard, taxed token), or its built transaction fails
+simulation. A better price elsewhere is never a reason. A user error (unknown token, bad amount)
+never falls back.
+
+```bash
+python3 scripts/chord.py meta-quote base USDC AERO 50                       # price only, read-only
+python3 scripts/chord.py meta-quote monad USDC WMON 25 --wallet 0xYourWallet # + unsigned tx, approval, simulation
+python3 scripts/chord.py meta-swap /tmp/chord-meta-8453-....json 0xYourWallet --user-confirmed
+```
+
+Raw:
+
+```bash
+curl -s "https://api.getchord.xyz/v1/meta/quote?chain=8453&tokenIn=0x833589fcd6edb6e08f4c7c32d4f71b54bda02913&tokenOut=0x4200000000000000000000000000000000000006&amount=10000000&slippageBps=50&taker=0xYourWallet"
+curl -s -X POST https://api.getchord.xyz/v1/meta/swap -H 'Content-Type: application/json' \
+  -d '{"chain":8453,"tokenIn":"0x8335...2913","tokenOut":"0x4200...0006","amount":"10000000","slippageBps":50,"taker":"0xYourWallet"}'
+```
+
+The same shape whichever provider answered:
+
+| Field | Meaning |
+|---|---|
+| `provider` | `chord`, `kyberswap`, `monorail`, `lifi`, `relay`, or `null` = no route anywhere |
+| `fallbackReason` | `null` when Chord answered; otherwise why it did not (`no_route`, `insufficient_liquidity`, `engine_error`, `engine_timeout`, `engine_down`, `value_guard`, `taxed_token`, `route_stale`, `chain_not_live`, `build_failed`, `simulation_failed`) |
+| `attempts` | every provider asked, in order: `{provider, status, ms, error}` |
+| `amountOut` | what the wallet receives AFTER every fee, smallest units (unlike `/v1/quote`'s `outputAmount`, which is before Chord's fee) |
+| `minAmountOut` | the minimum the transaction enforces, from the slippage you asked for |
+| `priceImpactPct`, `valueLossPct` | as in `/v1/quote`; `valueLossPct` is `null` when Chord has no reliable price for a side (then see `safety` and `warnings`) |
+| `feeBps`, `feeRecipient` | Chord path: Chord's fee and its FeeCollector. Fallback: the integrator fee Chord added (0 today); the provider's own fees are already inside `amountOut` |
+| `route.venues` | venue names |
+| `tx` | `{to, data, value, gas, chainId}`, unsigned; `null` without `taker` |
+| `approval` | `{token, spender, amount}` to send first, or `null` (native input, or the allowance already covers it) |
+| `simulation` | the transaction run as the taker with the input supplied: `{ok, amountOut, gasUsed}`; a fallback transaction is only returned with `ok: true` |
+| `safety` | a GoPlus scan of the unknown token when the value check could not run |
+| `warnings` | `INSUFFICIENT_BALANCE`, `UNPRICED`, `OUTPUT_WRAPPED`, `NO_ROUTE` |
+| `quoteId`, `expiresAt` | `POST /v1/meta/swap {quoteId, taker}` rebuilds it within 2 minutes; re-quote after `expiresAt` |
+
+Rules for a fallback answer (`provider` is not `chord`):
+
+- Name the provider to the user and say Chord's own router could not route it, with the reason.
+- `tx.to` and `approval.spender` are that provider's router, not Chord's. `chord.py` checks both
+  against its own pinned list and refuses anything else (`problems`). Never sign when `problems` is
+  not empty.
+- `chord.py simulate` and `/v1/swap/simulate` are for Chord-router quotes; a meta answer already
+  carries its `simulation`.
+- HTTP 503 `UNAVAILABLE` means nobody could answer right now (retry in a few seconds); it does not
+  mean the pair has no route. HTTP 400 `UNKNOWN_TOKEN` means the address is not a token contract.
+
+## 1. Quote on Chord's own router
 
 The helper does the error-prone parts (symbol resolution, exact decimal conversion, fee math):
 
