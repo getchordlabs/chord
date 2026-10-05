@@ -66,6 +66,7 @@ const ERR = {
   400: errRes("Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …)."),
   401: errRes("Missing or unknown credential (`UNAUTHORIZED`)."),
   404: errRes("Nothing at this identity (`NOT_FOUND`, `UNKNOWN_TOKEN`, `NO_ROUTE`)."),
+  422: errRes("The request is valid but cannot be served as asked (`INPUT_NOT_SIMULATABLE` on `/meta/*`: a route exists, but the input token cannot be supplied in a simulation and the taker does not hold it — hold the input and ask again)."),
   429: errRes("Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off."),
   502: errRes("The routing engine or an upstream did not answer (`ENGINE_ERROR`, `ROUTE_ERROR`)."),
   503: errRes("The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer."),
@@ -251,7 +252,7 @@ const MetaQuote = obj({
   approval: nullable(obj({ token: ADDRESS, spender: ADDRESS, amount: WEI }, "The approval to send first. `null` for a native input or when the taker's allowance already covers the amount.")),
   simulation: nullable(obj({ ok: nullable(bool("`true` = ran and delivered at least `minAmountOut`; `null` = no verdict (only ever returned on the Chord path).")), amountOut: WEI, gasUsed: int(""), revert: str(""), reason: str("") }, "The transaction run as the taker (with the input supplied when the taker does not hold it), measuring the taker's own balance change. `null` without `taker`.")),
   safety: nullable(obj({ source: str("`goplus`"), token: ADDRESS, worstFlag: str("`none`, `low`, `medium`, `high`."), honeypot: nullable(bool("")), buyTaxPct: nullable(num("")), sellTaxPct: nullable(num("")), risks: arr(str("")) }, "A security scan of the unknown token, present when the value check could not run on a fallback answer.")),
-  warnings: arr(str(""), "`INSUFFICIENT_BALANCE`, `UNPRICED`, `OUTPUT_WRAPPED`, `NO_ROUTE` — each followed by a sentence."),
+  warnings: arr(str(""), "`INSUFFICIENT_BALANCE`, `UNPRICED`, `OUTPUT_WRAPPED`, `NO_ROUTE`, and on a price-only fallback `PRICE_CHECKED` (built and simulated for a placeholder wallet) or `UNVERIFIED_PRICE` (built, not simulatable) — each followed by a sentence."),
   quoteId: str("Pass to `POST /meta/swap` within 2 minutes."), expiresAt: UNIX_S,
 }, "The same shape whichever provider answered.");
 
@@ -360,7 +361,9 @@ const META_POLICY = `**Policy**
 - The transaction target and the approval spender must be on Chord's allowlist for that provider and chain, and deployed there.
 - \`minAmountOut\` comes from your slippage; a provider minimum below it is refused.
 - The value guard of \`/quote\` applies: an output worth 30 % less than the input at Chord's prices is refused. An unpriced token gets a security scan (\`safety\`); a honeypot is refused.
-- With \`taker\`, the transaction is simulated as that wallet and must deliver at least \`minAmountOut\`. A fallback transaction that cannot be simulated is never returned.`;
+- With \`taker\`, the transaction is simulated as that wallet and must deliver at least \`minAmountOut\`. A fallback transaction that cannot be simulated is never returned.
+- Without \`taker\`, a fallback price is shown only after the provider BUILT the route and it was simulated for a placeholder wallet (\`PRICE_CHECKED\`); a provider that prices a size but will not build it is skipped. The placeholder's transaction is never returned.
+- An input the simulation cannot supply (a balance that is not a plain storage mapping, e.g. rebasing shares) while the taker does not hold it: HTTP 422 \`INPUT_NOT_SIMULATABLE\` — hold the input and ask again.`;
 const metaParams = [
   q("chain", { type: "string" }, "Chain id or key: `143` monad · `4663` robinhood · `5042` arc · `43114` avalanche · `8453` base · `56` bnb.", true),
   q("tokenIn", ADDRESS, "Token you sell. The zero address = the chain's native asset (on Arc it aliases to the USDC predeploy). `inputMint` is accepted too.", true),
@@ -379,7 +382,7 @@ ${META_POLICY}
 - The answer is good until \`expiresAt\` (30 s). Quote again before signing if you waited.`,
   {
     params: metaParams,
-    responses: withErr({ 200: ok("The quote. Read `provider` and `fallbackReason` before anything else.", ref("MetaQuote"), ex(`/v1/meta/quote?chain=8453&tokenIn=${META_USDC_BASE}&tokenOut=${META_WETH_BASE}&amount=10000000&slippageBps=50&taker=${META_TAKER}`)) }, [400, 429, 503]),
+    responses: withErr({ 200: ok("The quote. Read `provider` and `fallbackReason` before anything else.", ref("MetaQuote"), ex(`/v1/meta/quote?chain=8453&tokenIn=${META_USDC_BASE}&tokenOut=${META_WETH_BASE}&amount=10000000&slippageBps=50&taker=${META_TAKER}`)) }, [400, 422, 429, 503]),
   }));
 
 add("/meta/swap", "post", op(T.meta, "metaSwap", "Unsigned transaction on any chain: Chord first, a fallback only when it fails",
@@ -400,7 +403,7 @@ ${META_POLICY}`,
       quoteId: str("Instead of chain / tokens / amount: the id of a `/meta/quote` answer (valid 2 minutes)."),
     }, undefined, { required: ["taker"] }), { chain: 8453, tokenIn: META_USDC_BASE, tokenOut: META_WETH_BASE, amount: "10000000", slippageBps: 50, taker: META_TAKER }),
     responses: {
-      ...withErr({ 200: ok("Sign `tx` with any wallet library and submit it to the chain in `tx.chainId`.", ref("MetaQuote"), ex(`/v1/meta/quote?chain=8453&tokenIn=${META_USDC_BASE}&tokenOut=${META_WETH_BASE}&amount=10000000&slippageBps=50&taker=${META_TAKER}`)) }, [400, 429, 503]),
+      ...withErr({ 200: ok("Sign `tx` with any wallet library and submit it to the chain in `tx.chainId`.", ref("MetaQuote"), ex(`/v1/meta/quote?chain=8453&tokenIn=${META_USDC_BASE}&tokenOut=${META_WETH_BASE}&amount=10000000&slippageBps=50&taker=${META_TAKER}`)) }, [400, 422, 429, 503]),
       404: errRes("No provider has a route for this pair and size (`NO_ROUTE`); the body carries `fallbackReason` and `attempts`."),
       410: errRes("Unknown or expired `quoteId` (`QUOTE_EXPIRED`). Send the full params."),
     },
