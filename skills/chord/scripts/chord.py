@@ -6,11 +6,13 @@ to a wallet, and never broadcasts: the most it does is ask the API for an UNSIGN
 only when the caller passes --user-confirmed.
 
 Commands
-  chains                                   the six chains, their ids, gas tokens and data families
+  chains                                   the six chains (+ Solana, data only), their ids, gas tokens and data families
   get PATH                                 GET any public /v1 path, print the JSON
   token CHAIN QUERY                        resolve a symbol, name or 0x address to token candidates
   price CHAIN TOKEN                        price and 24h stats from Chord's index (+ CoinGecko on 43114/8453/56)
   board CHAIN [--sort volume] [--limit 10] most traded / moving tokens in the last 24h, compact rows
+                                           token / price / board also take CHAIN = solana (read-only: base58 mints,
+                                           case-sensitive; Chord does not quote or build Solana swaps)
   stock SYMBOL                             one Robinhood Chain stock token: price, reference (NAV), gap, off-hours share
   ask QUESTION [--wallet 0x..]             Chord Ask, one JSON answer (needs CHORD_API_KEY)
   meta-quote CHAIN TOKEN_IN TOKEN_OUT AMOUNT [--wallet 0x..]
@@ -47,6 +49,14 @@ ZERO = "0x0000000000000000000000000000000000000000"
 ROUTER = "0x1b1fee89a381e595fe6536b99ba91f3e16e9601a"
 ARC_USDC = "0x3600000000000000000000000000000000000000"
 ADDR_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
+# Solana (read-only data, /v1/chains/solana/*): base58 addresses are CASE-SENSITIVE. Never lower-case one.
+SOL_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
+SOL_KEYS = ("solana", "sol")
+SOL_MAJORS = {"SOL": "So11111111111111111111111111111111111111112", "WSOL": "So11111111111111111111111111111111111111112",
+              "USDC": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "USDT": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"}
+SOL_NOTE = ("Chord's Solana tape reads the swap events of 11 venues (PumpSwap, pump.fun, Meteora, Raydium, Orca), not prop AMMs "
+            "(SolFi, HumidiFi) or order books: majors such as SOL/USDC are understated; pump / Meteora / Raydium tokens are accurate. "
+            "Symbols are creator-chosen and shared by many mints: identify tokens by mint. Timestamps (updatedAt too) are Unix seconds.")
 QUOTE_MAX_AGE_S = 60
 
 CHAINS = {
@@ -72,10 +82,16 @@ def die(msg, code=2):
     sys.exit(code)
 
 
+def is_solana(raw):
+    return str(raw).strip().lower() in SOL_KEYS
+
+
 def chain_id(raw):
+    if is_solana(raw):
+        die("Solana is read-only in Chord: use 'token solana QUERY', 'price solana MINT', 'board solana' or 'get /v1/chains/solana/...'. Chord does not quote, route or build Solana swaps.")
     cid = ALIASES.get(str(raw).strip().lower().replace(" ", "-"))
     if cid is None:
-        die(f"unsupported chain '{raw}'. Chord covers: " + ", ".join(f"{v['name']} ({k})" for k, v in CHAINS.items()) + ". It does not cover Ethereum mainnet, Solana, Arbitrum or other chains.")
+        die(f"unsupported chain '{raw}'. Chord covers: " + ", ".join(f"{v['name']} ({k})" for k, v in CHAINS.items()) + ", plus Solana data (read-only). It does not cover Ethereum mainnet, Arbitrum or other chains.")
     return cid
 
 
@@ -239,6 +255,8 @@ def num(x, nd=None):
 def cmd_price(args):
     if len(args) != 2:
         die("usage: chord.py price CHAIN TOKEN")
+    if is_solana(args[0]):
+        return sol_price(args[1])
     cid = chain_id(args[0])
     tok = resolve_one(cid, args[1], "token")
     a = tok["address"].lower()
@@ -276,12 +294,14 @@ def cmd_price(args):
 def cmd_board(args):
     opts, rest = parse_opts(args, {"--sort": True, "--limit": True})
     if len(rest) != 1:
-        die("usage: chord.py board CHAIN [--sort volume|trades|change|traders|mcap] [--limit 10]")
-    cid = chain_id(rest[0])
+        die("usage: chord.py board CHAIN [--sort volume|trades|change|traders|mcap|new] [--limit 10]")
     sort = opts.get("--sort", "volume")
     limit = int(opts.get("--limit", 10))
     if not 1 <= limit <= 100:
         die("--limit must be between 1 and 100")
+    if is_solana(rest[0]):
+        return sol_board(sort, limit)
+    cid = chain_id(rest[0])
     allowed = {5042: ("volume", "trades", "traders", "change", "mcap"), 4663: ("volume", "trades", "traders", "change"), 143: ("volume", "change")}.get(cid, ("volume", "trades", "change"))
     if sort not in allowed:
         die(f"--sort on {CHAINS[cid]['name']} takes one of {', '.join(allowed)}")
@@ -315,6 +335,76 @@ def cmd_board(args):
     for i, r in enumerate(rows, 1):
         r["rank"] = i
     print(json.dumps({"chain": {"id": cid, "name": CHAINS[cid]["name"]}, "sort": sort, "window": "24h", "source": "Chord index", **meta, "rows": rows}, indent=1))
+
+
+# -- Solana (read-only) ---------------------------------------------------------------------------
+def sol_api(path):
+    d = api("/v1/chains/solana" + path)
+    if isinstance(d, dict) and "__http_error__" in d:
+        die(f"{d.get('error')}: {d.get('message')}", 1)
+    return d
+
+
+def sol_candidates(query):
+    q = query.strip()
+    major = q.upper().lstrip("$")
+    if not SOL_RE.match(q) and major in SOL_MAJORS:
+        return [{"mint": SOL_MAJORS[major], "symbol": "SOL" if major == "WSOL" else major, "source": "canonical mint"}]
+    d = sol_api("/search?" + urllib.parse.urlencode({"q": q}))
+    return [{"mint": t.get("token"), "symbol": t.get("symbol"), "name": t.get("name"), "priceUsd": t.get("priceUsd"), "liquidityUsd": num(t.get("liquidityUsd"), 0),
+             "volumeUsd": num(t.get("volumeUsd"), 0), "source": "solana tape search"} for t in d.get("tokens") or []]
+
+
+def sol_token(query):
+    c = sol_candidates(query)
+    out = {"chain": {"id": "solana", "name": "Solana"}, "query": query, "candidates": c[:10], "note": SOL_NOTE}
+    if len(c) > 10:
+        out["moreCandidates"] = len(c) - 10
+    if len(c) > 1:
+        out["warning"] = (f"{len(c)} mints match. Symbols on Solana are creator-chosen: show the candidates with their full mints and ask, or use the mint "
+                          "the user named. volumeUsd here is the main pool's volume since the tape first saw it, a ranking hint only.")
+    print(json.dumps(out, indent=1, ensure_ascii=False))
+
+
+def sol_price(query):
+    q = query.strip()
+    if SOL_RE.match(q):
+        mint = q
+    else:
+        c = sol_candidates(q)
+        if not c:
+            die(f"no Solana token on Chord's tape has the symbol or name '{q}' (exact match). Ask the user for the mint.", 3)
+        if len(c) > 1:
+            print(json.dumps({"error": "AMBIGUOUS", "chain": "solana", "query": q, "message": "Several Solana mints use this symbol or name. Show the candidates (full mints) and ask which one; then pass the mint.",
+                              "candidates": c[:10]}, indent=1, ensure_ascii=False), file=sys.stderr)
+            sys.exit(3)
+        mint = c[0]["mint"]
+    d = sol_api(f"/token/{urllib.parse.quote(mint, safe='')}?hours=24")
+    st = sol_api("/status")
+    main_pool = next((p for p in d.get("pools") or [] if p.get("priceUsd") is not None), None)
+    out = {"chain": {"id": "solana", "name": "Solana"}, "token": {"mint": d.get("token"), "symbol": d.get("symbol"), "name": d.get("name"), "decimals": d.get("decimals")},
+           "source": "Chord Solana tape (last swap on the main pool)", "priceUsd": d.get("priceUsd"), "change1hPct": num(d.get("change1hPct"), 2), "change24hPct": num(d.get("change24hPct"), 2),
+           "volume24hUsd": num(d.get("volume24hUsd"), 0), "trades24h": d.get("trades24h"), "liquidityUsd": num(d.get("liquidityUsd"), 0), "marketCapUsd": num(d.get("marketCapUsd"), 0),
+           "mainPool": {"pool": main_pool.get("pool"), "dex": main_pool.get("dex"), "quote": main_pool.get("quote")} if main_pool else None,
+           "venues24h": [{"dex": v.get("dex"), "volumeUsd": num(v.get("volumeUsd"), 0)} for v in d.get("venues") or []],
+           "updatedAt": d.get("updatedAt"), "tape": {"ok": st.get("ok"), "blockAgeS": st.get("blockAgeS")}, "note": SOL_NOTE}
+    if st.get("ok") is False:
+        out["warning"] = f"The Solana tape is behind right now (newest block written {st.get('blockAgeS')} s ago): say the numbers may be stale."
+    print(json.dumps({k: v for k, v in out.items() if v is not None}, indent=1, ensure_ascii=False))
+
+
+def sol_board(sort, limit):
+    if sort not in ("volume", "trades", "change", "new"):
+        die("--sort on Solana takes one of volume, trades, change, new")
+    d = sol_api(f"/tokens?sort={sort}&limit={limit}")
+    rows = []
+    for i, t in enumerate(d.get("tokens") or [], 1):
+        rows.append({"rank": i, "symbol": t.get("symbol"), "name": t.get("name"), "mint": t.get("token"), "volume24hUsd": num(t.get("volume24hUsd"), 0), "trades24h": t.get("trades24h"),
+                     "priceUsd": t.get("priceUsd"), "change24hPct": num(t.get("change24hPct"), 2), "liquidityUsd": num(t.get("liquidityUsd"), 0), "marketCapUsd": num(t.get("marketCapUsd"), 0), "dex": t.get("dex")})
+    note = SOL_NOTE + (" There are no wash flags on Solana: a volume hundreds of times the liquidity, or millions of dollars over a few hundred trades, "
+                       "usually means a thin or wash-traded pool. Say so when you show such a row.")
+    print(json.dumps({"chain": {"id": "solana", "name": "Solana"}, "sort": sort, "window": "24h", "source": "Chord Solana tape", "updatedAt": d.get("updatedAt"), "rows": rows, "note": note},
+                     indent=1, ensure_ascii=False))
 
 
 def cmd_stock(args):
@@ -359,7 +449,8 @@ def cmd_ask(args):
 
 def cmd_chains(_args):
     rows = [{"chainId": k, "key": v["key"], "name": v["name"], "gasToken": v["gas"], "dataEndpoints": v["family"], "quoteAndSwap": True} for k, v in CHAINS.items()]
-    print(json.dumps({"chains": rows, "router": ROUTER, "note": "Every chain answers /v1/quote, POST /v1/swap and /v1/candles with ?chain=<id>."}, indent=1))
+    rows.append({"chainId": None, "key": "solana", "name": "Solana", "gasToken": "SOL", "dataEndpoints": "/v1/chains/solana/*", "quoteAndSwap": False})
+    print(json.dumps({"chains": rows, "router": ROUTER, "note": "The six EVM chains answer /v1/quote, POST /v1/swap and /v1/candles with ?chain=<id>. Solana is data only, under /v1/chains/solana/* (no chain id; base58 addresses, case-sensitive)."}, indent=1))
 
 
 def cmd_get(args):
@@ -377,6 +468,8 @@ def cmd_get(args):
 def cmd_token(args):
     if len(args) < 2:
         die("usage: chord.py token CHAIN QUERY")
+    if is_solana(args[0]):
+        return sol_token(" ".join(args[1:]))
     cid = chain_id(args[0])
     c = rank_candidates(candidates(cid, " ".join(args[1:])))
     out = {"chain": {"id": cid, "name": CHAINS[cid]["name"]}, "query": " ".join(args[1:]), "candidates": c[:10]}

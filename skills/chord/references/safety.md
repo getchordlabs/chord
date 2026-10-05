@@ -91,8 +91,11 @@ contract, and claim sites ask for approvals that drain the wallet.
 ## 6. Addresses
 
 - Valid EVM address: `0x` followed by 40 hex characters. A TRON address (`T...`), a Solana address
-  (base58), an ENS name you have not resolved, or a placeholder like `0xATTACKER` is not valid input.
-  Ask for a valid address.
+  (base58), an ENS name you have not resolved, or a placeholder like `0xATTACKER` is not valid input
+  for a quote, a swap or an EVM data route. Ask for a valid address.
+- Solana data routes (`/v1/chains/solana/*`, `solana.md`) take base58 mints and wallets, and base58
+  is case-sensitive: pass the address exactly as the user gave it, never lower-cased. Nothing on
+  Solana moves money through Chord.
 - Show every address in full whenever money may move. Never truncate it in a confirmation.
 - Address poisoning: scammers send dust from an address that shares the first and last few
   characters with one the user trusts. If an address matches a known one only at the ends, say so and

@@ -2,9 +2,9 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Chord API",
-    "version": "2026-10-03",
-    "summary": "Trade, data and agent endpoints for Arc (5042) and Robinhood Chain (4663), plus chain data for Avalanche (43114), Base (8453) and BNB Chain (56).",
-    "description": "Chord is a non-custodial trading app and on-chain data index. The API has three kinds of endpoint:\n\n- **Trade**: `/quote` finds the best route across every venue on the chain; `/swap` turns it into a transaction you sign yourself. Chord never holds funds or keys.\n- **Read**: every swap on the chain, rolled up by token, venue and hour, from Chord's own index — tokens, launches, holders, top wallets, portfolio PnL, liquidity positions and pools. No key needed. Avalanche, Base and BNB Chain have the same rollups under `/chains/{chain}/*`.\n- **Agent**: the analyst (`/ask`) and the streams.\n\nAmounts are decimal strings in the token's smallest unit. Timestamps are Unix seconds unless the field is `updatedAt` (milliseconds). Reads answer anonymous callers at 60 requests a minute per IP; an `X-API-Key` header raises that to your plan. Every non-2xx body is `{ error, message }`.",
+    "version": "2026-10-05",
+    "summary": "Trade, data and agent endpoints for Arc (5042) and Robinhood Chain (4663), plus chain data for Avalanche (43114), Base (8453), BNB Chain (56) and Solana (read-only).",
+    "description": "Chord is a non-custodial trading app and on-chain data index. The API has three kinds of endpoint:\n\n- **Trade**: `/quote` finds the best route across every venue on the chain; `/swap` turns it into a transaction you sign yourself. Chord never holds funds or keys.\n- **Read**: every swap on the chain, rolled up by token, venue and hour, from Chord's own index — tokens, launches, holders, top wallets, portfolio PnL, liquidity positions and pools. No key needed. Avalanche, Base and BNB Chain have the same rollups under `/chains/{chain}/*`; Solana has its own read-only family under `/chains/solana/*` (base58 addresses, case-sensitive).\n- **Agent**: the analyst (`/ask`) and the streams.\n\nAmounts are decimal strings in the token's smallest unit. Timestamps are Unix seconds unless the field is `updatedAt` (milliseconds). Reads answer anonymous callers at 60 requests a minute per IP; an `X-API-Key` header raises that to your plan. Every non-2xx body is `{ error, message }`.",
     "contact": {
       "name": "Chord",
       "url": "https://getchord.xyz/developer"
@@ -67,6 +67,10 @@
     {
       "name": "Avalanche, Base, BNB Chain",
       "description": "Avalanche C-Chain (43114), Base (8453) and BNB Chain (56): chain totals, the 24-hour token board, prints, one token's tape, venue share and a wallet's PnL, from Chord's own index of every swap on those chains. One set of routes, the chain in the path."
+    },
+    {
+      "name": "Solana data",
+      "description": "Solana, read-only: chain totals, the 24-hour token board, search, one token's stats, prints, candles and traders, the day's trader board, and a wallet's PnL, from Chord's own tape of the swap events of 11 Solana venues (PumpSwap, pump.fun, Meteora, Raydium, Orca). Prop AMMs and order books are not read. Addresses are base58 and case-sensitive; the path segment is the literal `solana`. Read the notes on each operation before comparing these numbers with an all-market source."
     },
     {
       "name": "Streaming",
@@ -16678,6 +16682,2343 @@
         }
       }
     },
+    "/chains/solana/status": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solStatus",
+        "summary": "Is the tape following the chain",
+        "description": "The ingest's own health: the last slot written, how far behind the chain it is, the age of the newest block it has written, swaps per minute, and per-venue decode counters since the ingest started (`decode` is keyed by venue number: 1 pumpswap · 2 pumpfun · 3 meteora_dbc · 4 meteora_damm_v2 · 5 meteora_dlmm · 6 raydium_clmm · 7 orca · 8 raydium_cpmm · 9 raydium_v4 · 10 meteora_pools · 11 raydium_launchlab; the example shows two of the eleven). `ok: false` or a large `blockAgeS` means the numbers on the other routes are behind: say so when you show them. Never cached.\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "ok": {
+                      "type": "boolean",
+                      "description": "The ingest is healthy right now."
+                    },
+                    "cursor": {
+                      "type": "integer",
+                      "description": "Last slot written."
+                    },
+                    "genesisSlot": {
+                      "type": "integer",
+                      "description": "First slot of the live tape."
+                    },
+                    "auditCursor": {
+                      "type": "integer",
+                      "description": "Last slot re-checked against `finalized` (orphaned slots removed, late ones written)."
+                    },
+                    "lagSlots": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Slots between the chain head and `cursor`."
+                    },
+                    "blockAgeS": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Age of the newest block written, seconds."
+                    },
+                    "slotsPerMin": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "swapsPerMin": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "startedAt": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "solUsd": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "SOL price the tape is using (from its own SOL/stable swaps)."
+                    },
+                    "decode": {
+                      "type": "object",
+                      "properties": {},
+                      "description": "Venue number → counters since `startedAt`.",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "events": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "swaps": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "ok": {
+                            "type": "integer",
+                            "description": "Swaps whose amounts match the vaults' balance changes exactly."
+                          },
+                          "bad": {
+                            "type": "integer",
+                            "description": "Swaps that do not match."
+                          },
+                          "unchecked": {
+                            "type": "integer",
+                            "description": "Not checkable (a fee paid to a third account, a pool created and seeded in the same transaction)."
+                          },
+                          "noParent": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "otherEvents": {
+                            "type": "integer",
+                            "description": ""
+                          }
+                        }
+                      }
+                    },
+                    "totals": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "slots": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "swaps": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "orphaned": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "late": {
+                          "type": "integer",
+                          "description": ""
+                        }
+                      },
+                      "description": "Since `startedAt`."
+                    },
+                    "venues": {
+                      "type": "string",
+                      "description": "What the tape reads, in words."
+                    },
+                    "notCovered": {
+                      "type": "string",
+                      "description": "What it does not read, in words."
+                    },
+                    "public": {
+                      "type": "boolean",
+                      "description": "Served to callers without a key."
+                    },
+                    "gate": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "additionalProperties": true,
+                      "description": "The automatic public gate: `pass`, `liveHours`, `missing24h` (missing slots in 24 hours), `hourCheck` (rollup against raw for the last closed hour), `reasons`."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "ok": false,
+                  "cursor": 453384220,
+                  "genesisSlot": 452927437,
+                  "auditCursor": 453383708,
+                  "lagSlots": 2065,
+                  "blockAgeS": 15287,
+                  "slotsPerMin": 273,
+                  "swapsPerMin": 33344,
+                  "startedAt": 1791163969,
+                  "solUsd": 121.06980743427287,
+                  "decode": {
+                    "1": {
+                      "events": 412502,
+                      "swaps": 392156,
+                      "ok": 392155,
+                      "bad": 1,
+                      "unchecked": 0,
+                      "noParent": 0,
+                      "otherEvents": 20346
+                    },
+                    "2": {
+                      "events": 127002,
+                      "swaps": 108165,
+                      "ok": 108151,
+                      "bad": 14,
+                      "unchecked": 0,
+                      "noParent": 0,
+                      "otherEvents": 18837
+                    }
+                  },
+                  "totals": {
+                    "slots": 5931,
+                    "swaps": 740575,
+                    "orphaned": 0,
+                    "late": 0
+                  },
+                  "venues": "PumpSwap, pump.fun, Meteora (DAMM v2, DLMM, DBC, dynamic pools), Raydium (CLMM, CPMM, v4, LaunchLab) and Orca",
+                  "notCovered": "prop AMMs such as SolFi / HumidiFi and order books such as Phoenix are not read, so SOL/USDC-style majors are understated",
+                  "public": true,
+                  "gate": {
+                    "pass": false,
+                    "at": 1791166182,
+                    "liveHours": 38.1,
+                    "missing24h": 0,
+                    "hourCheck": {
+                      "hour": 497545,
+                      "hourlyDiff": 0,
+                      "candleDiff": 0
+                    },
+                    "reasons": [
+                      "ingest not healthy right now"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/overview": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solOverview",
+        "summary": "Chain totals",
+        "description": "Last 24 hours on the venues the tape reads: volume, trades, buys, tokens traded, venue share and hourly buckets, plus `coverageSince`. The window never starts before `coverageSince`: `coverageHours` under 24 means a partial day. Cached 30 seconds.\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "windowHours": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "volumeUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "trades": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "buys": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "tokensTraded": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "venues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "dex": {
+                            "type": "string",
+                            "description": "Venue id: `pumpswap` · `pumpfun` (bonding curve) · `meteora_dbc` · `meteora_damm_v2` · `meteora_dlmm` · `meteora_pools` (dynamic AMM v1) · `raydium_clmm` · `raydium_cpmm` · `raydium_v4` · `raydium_launchlab` · `orca` (Whirlpool)."
+                          },
+                          "volumeUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "trades": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "share": {
+                            "type": "number",
+                            "description": "Fraction of the window's volume, 0–1 (not percent)."
+                          }
+                        }
+                      },
+                      "description": "Biggest first."
+                    },
+                    "hourly": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "hour": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "volumeUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "trades": {
+                            "type": "integer",
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "Oldest first; `hour` is the bucket start."
+                    },
+                    "coverageSince": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "coverageHours": {
+                      "type": "number",
+                      "description": "Hours of the 24-hour window the tape covers."
+                    },
+                    "cursor": {
+                      "type": "integer",
+                      "description": "Last slot written."
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "windowHours": 24,
+                  "volumeUsd": 3120445357.1785517,
+                  "trades": 28259618,
+                  "buys": 16493707,
+                  "tokensTraded": 98530,
+                  "venues": [
+                    {
+                      "dex": "pumpswap",
+                      "volumeUsd": 1420441349.9695024,
+                      "trades": 15748395,
+                      "share": 0.45520468631241756
+                    },
+                    {
+                      "dex": "meteora_pools",
+                      "volumeUsd": 464739991.2308222,
+                      "trades": 40125,
+                      "share": 0.1489338661744846
+                    }
+                  ],
+                  "hourly": [
+                    {
+                      "hour": 1791082800,
+                      "volumeUsd": 136078621.887329,
+                      "trades": 1510518
+                    },
+                    {
+                      "hour": 1791086400,
+                      "volumeUsd": 110648628.7027686,
+                      "trades": 1442682
+                    }
+                  ],
+                  "coverageSince": 1790611483,
+                  "coverageHours": 24,
+                  "cursor": 453384035,
+                  "updatedAt": 1791166406
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/tokens": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solTokens",
+        "summary": "Every token traded in the last 24 hours",
+        "description": "The 24-hour board. `volume` and `trades` rank every token the tape saw; `change` (24-hour price change) and `new` (first seen in the last 24 hours, newest first) rank inside the 400 most traded tokens with at least $5,000 of volume, so a $40 pool moving 900 % is not a mover. Cached 20 seconds.\n\nNo wash flags here: a thin pool can print a large volume (compare `volume24hUsd` with `liquidityUsd` and `trades24h` before ranking on it), and many tokens share a symbol.\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "volume",
+                "trades",
+                "change",
+                "new"
+              ],
+              "default": "volume"
+            },
+            "description": "Descending; `new` = newest first."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sort": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "windowHours": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SolTokenRow"
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "sort": "trades",
+                  "windowHours": 24,
+                  "tokens": [
+                    {
+                      "token": "So11111111111111111111111111111111111111112",
+                      "symbol": "SOL",
+                      "name": "Solana",
+                      "image": "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
+                      "decimals": 9,
+                      "priceUsd": 120.98396092263611,
+                      "change24hPct": 1.1310855236659645,
+                      "volume24hUsd": 92343484.342816,
+                      "trades24h": 668125,
+                      "buys24h": 344626,
+                      "buyVolume24hUsd": 47132735.284852006,
+                      "liquidityUsd": 30496683.315842,
+                      "marketCapUsd": null,
+                      "pool": "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2",
+                      "dex": "raydium_v4",
+                      "firstSeen": 1791028889
+                    },
+                    {
+                      "token": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+                      "symbol": "SPCXx",
+                      "name": "SpaceX xStock",
+                      "image": "https://xstocks-metadata.backed.fi/logos/tokens/SPCXx.png",
+                      "decimals": 8,
+                      "priceUsd": 163.10022589848552,
+                      "change24hPct": null,
+                      "volume24hUsd": 37511133.496547684,
+                      "trades24h": 476322,
+                      "buys24h": 230903,
+                      "buyVolume24hUsd": 18759541.58185133,
+                      "liquidityUsd": 95373.03161138113,
+                      "marketCapUsd": 91333037.55386804,
+                      "pool": "B7nYoGHqCGoFRiPB4AoT1NqbqrFWJDfiEkD3WNXxSCnt",
+                      "dex": "raydium_cpmm",
+                      "firstSeen": 1791028946
+                    }
+                  ],
+                  "updatedAt": 1791166451
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_LIMIT` / `BAD_SORT`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/search": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solSearch",
+        "summary": "Find a token by mint, symbol or name",
+        "description": "A mint returns that token (when the tape has seen it trade). Anything else is an exact, case-insensitive match on symbol or name among the tokens the tape has seen, up to 20, ordered by the volume of each token's deepest pool; a leading `$` is ignored. No prefix or substring search. Expect several mints per symbol: show the mint, and pick by liquidity and volume only when the user has not named one.\n\n`volumeUsd` is the main pool's volume since the tape first saw it for a symbol or name match, and the token's 24-hour volume for a mint: a ranking hint, not a window total. Use `/chains/solana/token/{address}` for the token's numbers.\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "description": "A mint (base58), a symbol or a name."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matches. An empty `tokens` is a real answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "query": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "token": {
+                            "type": "string",
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "symbol": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "image": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "priceUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "liquidityUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "volumeUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "See above."
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "query": "Agency",
+                  "tokens": [
+                    {
+                      "token": "PGXpPuXMe4jpcjHwC4FCvtu5oMn4izLVRJVkwe3AHaM",
+                      "symbol": "Agency",
+                      "name": "Agency",
+                      "image": "https://pbs.twimg.com/profile_images/2105704660116144128/u2fzyGVC_400x400.jpg",
+                      "priceUsd": 0.000002688447447596337,
+                      "liquidityUsd": 242806.21490618165,
+                      "volumeUsd": 32772996.00219991
+                    },
+                    {
+                      "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+                      "symbol": "Agency",
+                      "name": "Agency",
+                      "image": "https://ipfs.io/ipfs/bafybeicailrr3iobedoxprzs6evwq3nqxsezdhvxbhpseyhltfmufybxuq",
+                      "priceUsd": 0.012402169398382247,
+                      "liquidityUsd": 490945.0136094359,
+                      "volumeUsd": 30097665.520332042
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_QUERY` (empty, or longer than 60 characters), or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/token/{address}": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solToken",
+        "summary": "One token: stats, pools and hourly tape",
+        "description": "Identity (from the token's metadata), price on the main pool with 1-hour and 24-hour change, fully diluted market cap, liquidity summed over the pools that traded in the last 24 hours, 24-hour volume and trade counts with the venue split, up to 20 pools, and an hourly series.\n\n**Pass `hours` of 24 or more**: the 24-hour totals are summed from the same hourly rows the series returns, so `hours=2` gives the totals of two hours. In `pools`, `volumeUsd` and `swaps` count since the tape first saw the pool, not 24 hours. Cached 10 seconds.\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "Token mint, base58, exactly as it appears on-chain."
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 720,
+              "default": 168
+            },
+            "description": "Hourly buckets in `hourly`; also the span the 24-hour totals are read from (see above)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "token": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "symbol": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "image": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "decimals": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "supply": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "Whole tokens."
+                    },
+                    "firstSeen": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "priceUsd": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "change1hPct": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "change24hPct": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "marketCapUsd": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "Price × supply."
+                    },
+                    "liquidityUsd": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "Sum over pools that traded in the last 24 hours."
+                    },
+                    "volume24hUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "trades24h": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "buys24h": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "sells24h": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "buyVolume24hUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "sellVolume24hUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "venues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "dex": {
+                            "type": "string",
+                            "description": "Venue id: `pumpswap` · `pumpfun` (bonding curve) · `meteora_dbc` · `meteora_damm_v2` · `meteora_dlmm` · `meteora_pools` (dynamic AMM v1) · `raydium_clmm` · `raydium_cpmm` · `raydium_v4` · `raydium_launchlab` · `orca` (Whirlpool)."
+                          },
+                          "volumeUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "trades": {
+                            "type": "integer",
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "24-hour venue split, biggest first."
+                    },
+                    "pools": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "pool": {
+                            "type": "string",
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": "Venue id: `pumpswap` · `pumpfun` (bonding curve) · `meteora_dbc` · `meteora_damm_v2` · `meteora_dlmm` · `meteora_pools` (dynamic AMM v1) · `raydium_clmm` · `raydium_cpmm` · `raydium_v4` · `raydium_launchlab` · `orca` (Whirlpool)."
+                          },
+                          "quote": {
+                            "type": "string",
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "priceUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "liquidityUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "volumeUsd": {
+                            "type": "number",
+                            "description": "Since the tape first saw the pool."
+                          },
+                          "swaps": {
+                            "type": "integer",
+                            "description": "Since the tape first saw the pool."
+                          },
+                          "firstSeen": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "lastTrade": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Unix time, seconds, UTC."
+                          }
+                        }
+                      },
+                      "description": "Up to 20; traded in the last hour first, then the deepest."
+                    },
+                    "hourly": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "hour": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "volumeUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "trades": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "buys": {
+                            "type": "integer",
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "Oldest first. Hours without a trade are absent."
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+                  "symbol": "Agency",
+                  "name": "Agency",
+                  "image": "https://ipfs.io/ipfs/bafybeicailrr3iobedoxprzs6evwq3nqxsezdhvxbhpseyhltfmufybxuq",
+                  "decimals": 6,
+                  "supply": 966189741.871528,
+                  "firstSeen": 1791028889,
+                  "priceUsd": 0.012471350009671632,
+                  "change1hPct": 0,
+                  "change24hPct": -33.59296229824511,
+                  "marketCapUsd": 12049690.446634114,
+                  "liquidityUsd": 492710.3227884476,
+                  "volume24hUsd": 22300513.95510154,
+                  "trades24h": 98644,
+                  "buys24h": 50875,
+                  "sells24h": 47769,
+                  "buyVolume24hUsd": 10815371.994912628,
+                  "sellVolume24hUsd": 11485141.96018891,
+                  "venues": [
+                    {
+                      "dex": "pumpswap",
+                      "volumeUsd": 12526132.33339345,
+                      "trades": 59671
+                    },
+                    {
+                      "dex": "meteora_dlmm",
+                      "volumeUsd": 9716267.646647243,
+                      "trades": 27864
+                    }
+                  ],
+                  "pools": [
+                    {
+                      "pool": "CyJwKnLiiY4fmiwqMCSWFSHxo7T9Ubshgs2uRAuJCrk5",
+                      "dex": "pumpswap",
+                      "quote": "So11111111111111111111111111111111111111112",
+                      "priceUsd": 0.012471350009671632,
+                      "liquidityUsd": 492426.2442871083,
+                      "volumeUsd": 30096468.174518585,
+                      "swaps": 152986,
+                      "firstSeen": 1791028889,
+                      "lastTrade": 1791151092
+                    },
+                    {
+                      "pool": "4MRafCAZEk9KLLDJ7YAQSuwAFFtxz3fVLUuyDKySU8Ep",
+                      "dex": "meteora_damm_v2",
+                      "quote": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                      "priceUsd": 0.017382927320372235,
+                      "liquidityUsd": 277.017254,
+                      "volumeUsd": 1947.9255100000016,
+                      "swaps": 3651,
+                      "firstSeen": 1791067406,
+                      "lastTrade": 1791124069
+                    }
+                  ],
+                  "hourly": [
+                    {
+                      "hour": 1791082800,
+                      "volumeUsd": 634272.1321694182,
+                      "trades": 3874,
+                      "buys": 2057
+                    },
+                    {
+                      "hour": 1791086400,
+                      "volumeUsd": 1392924.1494347786,
+                      "trades": 7064,
+                      "buys": 3395
+                    }
+                  ],
+                  "updatedAt": 1791166385
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_HOURS`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`TOKEN_NOT_FOUND`: this mint has not traded on a venue the tape reads since the tape started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/token/{address}/trades": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solTokenTrades",
+        "summary": "Trade tape",
+        "description": "The token's newest swaps across up to 30 of its pools, newest first: side, both amounts, USD, price, venue, pool, wallet and the transaction signature. Each page looks back at most two days from `before` (or from now): an empty page means no swap in that span. A mint the tape has never seen answers an empty list.\n\n- `side`: `buy` = the wallet bought the token, `sell` = it sold it.\n- `tokenAmount` and `quoteAmount` are what the wallet received or paid, fees included, in whole units; `priceUsd` is the pool's execution price.\n- `wallet` is the user account named in the swap instruction: often a bot or an arbitrage contract, sometimes on both sides of one transaction.\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "Token mint, base58, exactly as it appears on-chain."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": "Newest rows."
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4000000000
+            },
+            "description": "Exclusive cursor, Unix seconds: rows strictly older than it. Pass the last row's `ts` for the next page. Several swaps can share a second, so a page boundary can skip the rest of that second: overlap with `ts + 1` and drop rows whose `tx` you already have."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "token": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "trades": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ts": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "slot": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "buy",
+                              "sell"
+                            ]
+                          },
+                          "tokenAmount": {
+                            "type": "number",
+                            "description": "Whole tokens."
+                          },
+                          "quoteAmount": {
+                            "type": "number",
+                            "description": "Whole units of the pool's quote."
+                          },
+                          "usd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "priceUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": "Venue id: `pumpswap` · `pumpfun` (bonding curve) · `meteora_dbc` · `meteora_damm_v2` · `meteora_dlmm` · `meteora_pools` (dynamic AMM v1) · `raydium_clmm` · `raydium_cpmm` · `raydium_v4` · `raydium_launchlab` · `orca` (Whirlpool)."
+                          },
+                          "pool": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "wallet": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "tx": {
+                            "type": "string",
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,88}$",
+                            "description": "Transaction signature, base58."
+                          }
+                        }
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+                  "trades": [
+                    {
+                      "ts": 1791151156,
+                      "slot": 453384204,
+                      "side": "sell",
+                      "tokenAmount": 1581.186594,
+                      "quoteAmount": 0.161487883,
+                      "usd": 19.551313486445476,
+                      "priceUsd": 0.012402169398382247,
+                      "dex": "pumpswap",
+                      "pool": "CyJwKnLiiY4fmiwqMCSWFSHxo7T9Ubshgs2uRAuJCrk5",
+                      "wallet": "ckdRDD9onSwL9yHgjEc5VdRx9BPmcsyVH9TjKGYygkY",
+                      "tx": "5sT1cLSYjuD3BR4wNbGKTAcFgFLdY2FGxujWukJFQmgLm8i1qi37rQxdZS4EYyRdCuV35dU4Rn7GttkZmU4oe2op"
+                    },
+                    {
+                      "ts": 1791151147,
+                      "slot": 453384173,
+                      "side": "buy",
+                      "tokenAmount": 2879.134063,
+                      "quoteAmount": 0.295798607,
+                      "usd": 35.812234413351845,
+                      "priceUsd": 0.012401339509037218,
+                      "dex": "pumpswap",
+                      "pool": "CyJwKnLiiY4fmiwqMCSWFSHxo7T9Ubshgs2uRAuJCrk5",
+                      "wallet": "3QZv9xcDELwLqB8SggDJHfVhMTn5YhKtXMCaKUucutm3",
+                      "tx": "Vz2VPQCo2j82g6mowse5961MnUEM6koE7VSaVhtVHQKsvkCHZ9HGVMTgbw92vDSJw1ThSDiVGkwn16EucjAK6Ny"
+                    }
+                  ],
+                  "updatedAt": 1791166444
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_CURSOR`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/token/{address}/candles": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solTokenCandles",
+        "summary": "Candles",
+        "description": "OHLCV of ONE pool of the token, in USD: the main pool (traded in the last hour first, then the deepest) unless `pool` names another. Not a volume-weighted blend of every pool: use `/chains/solana/token/{address}` for totals across pools. The window holds `limit` buckets ending with the open one; buckets without a trade are absent. A swap under $1 adds to the volume but does not move the open, high, low or close. Cached 5 seconds for `1m`, 20 seconds otherwise.\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "Token mint, base58, exactly as it appears on-chain."
+          },
+          {
+            "name": "tf",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "default": "5m"
+            },
+            "description": "Timeframe."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 200
+            },
+            "description": "Buckets in the window."
+          },
+          {
+            "name": "pool",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "A pool of this token (from `/chains/solana/token/{address}` `pools`). Default: the main pool."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`pool: null` with no candles = the tape has no priced pool for this mint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "token": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "pool": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "timeframe": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "candles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "t": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "o": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "h": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "l": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "c": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "volumeUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "trades": {
+                            "type": "integer",
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "Oldest first; `t` is the bucket start."
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+                  "pool": "CyJwKnLiiY4fmiwqMCSWFSHxo7T9Ubshgs2uRAuJCrk5",
+                  "timeframe": "1h",
+                  "candles": [
+                    {
+                      "t": 1791140400,
+                      "o": 0.016581499823932228,
+                      "h": 0.0167915473875269,
+                      "l": 0.013856459444690225,
+                      "c": 0.014365569915305174,
+                      "volumeUsd": 336302.10729020054,
+                      "trades": 2009
+                    },
+                    {
+                      "t": 1791144000,
+                      "o": 0.014362537896257067,
+                      "h": 0.014962869347332729,
+                      "l": 0.011578863188337602,
+                      "c": 0.014393806600470372,
+                      "volumeUsd": 495642.36503098987,
+                      "trades": 2632
+                    }
+                  ],
+                  "updatedAt": 1791166459
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_TIMEFRAME` / `BAD_LIMIT`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/token/{address}/traders": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solTokenTraders",
+        "summary": "Who traded the token",
+        "description": "The wallets that traded the token over the window, biggest USD volume first (the top 100; `limit` slices them): bought, sold, net, trades, and an average-cost PnL over the window. The window is whole UTC hours: the current hour and the `hours` (1–48) before it, starting at `since`, so it covers a little more than `hours` × 3600 seconds. Closed hours come from an hourly (token, wallet) rollup and the current hour from the raw swaps; while the rollup has not reached back to `since` the whole window is read from raw, and the first read of a busy token can then take tens of seconds or answer `503`. The answer is cached on the Solana side: retry after a minute, or ask for fewer `hours`.\n\n- `heldAmount` is bought minus sold inside the window, not the wallet's balance.\n- `partial: true` = the wallet sold more than it bought in the window; those sells have no cost basis.\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "Token mint, base58, exactly as it appears on-chain."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            },
+            "description": ""
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 48,
+              "default": 24
+            },
+            "description": "Whole UTC hours before the current one (see `since`)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "token": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "windowHours": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "since": {
+                      "type": "integer",
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "priceUsd": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "traders": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "wallet": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "boughtUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "soldUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "netUsd": {
+                            "type": "number",
+                            "description": "Bought minus sold, USD."
+                          },
+                          "trades": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "lastTrade": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "heldAmount": {
+                            "type": "number",
+                            "description": "Whole tokens."
+                          },
+                          "heldValueUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "realizedPnlUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "unrealizedPnlUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "partial": {
+                            "type": "boolean",
+                            "description": ""
+                          }
+                        }
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+                  "windowHours": 24,
+                  "since": 1791079200,
+                  "priceUsd": 0.01420426088276189,
+                  "traders": [
+                    {
+                      "wallet": "ARu4n5mFdZogZAravu7CcizaojWnS6oqka37gdLT5SZn",
+                      "boughtUsd": 2176754.8047437067,
+                      "soldUsd": 1884286.4740241242,
+                      "netUsd": 292468.3307195825,
+                      "trades": 11466,
+                      "lastTrade": 1791152541,
+                      "heldAmount": 18044940.3278099,
+                      "heldValueUsd": 256315.04003008266,
+                      "realizedPnlUsd": 30691.394381958165,
+                      "unrealizedPnlUsd": -66844.68507145798,
+                      "partial": false
+                    },
+                    {
+                      "wallet": "MriyaNN8TMp6qRWjfr723PK7xgQK7yCt7Kg2v2PQu7X",
+                      "boughtUsd": 508194.52591024636,
+                      "soldUsd": 519052.2068625818,
+                      "netUsd": -10857.680952335417,
+                      "trades": 1436,
+                      "lastTrade": 1791152211,
+                      "heldAmount": 0,
+                      "heldValueUsd": 0,
+                      "realizedPnlUsd": 10307.184467280762,
+                      "unrealizedPnlUsd": 0,
+                      "partial": true
+                    }
+                  ],
+                  "updatedAt": 1791167327
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_HOURS`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`TOKEN_NOT_FOUND`: this mint has not traded on a venue the tape reads since the tape started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/traders": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solTraders",
+        "summary": "The day's traders",
+        "description": "Wallets ranked by realized PnL or by volume over today's UTC day (`days=2` adds yesterday), across every token the tape reads. Bots are left out by rule (`botRule`: above 3,000 trades or 300 tokens a day), and so are wallets under $1,000 of volume. Realized PnL per token = the matched amount × (average sell − average buy) inside the window, summed; `winRate` = the share of tokens with both buys and sells that sold above their average buy. Early in the UTC day the board is short, and empty until the day has rows. Cached 5 minutes; a cold `days=2` board can take longer than the API waits and answer `503`: retry later.\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pnl",
+                "volume"
+              ],
+              "default": "pnl"
+            },
+            "description": "Descending."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "description": ""
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2,
+              "default": 1
+            },
+            "description": "1 = today (UTC), 2 = today and yesterday."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "sort": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "windowDays": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "botRule": {
+                      "type": "string",
+                      "description": "The rule that removed bots, in words."
+                    },
+                    "traders": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "wallet": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "realizedPnlUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "volumeUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "trades": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "tokens": {
+                            "type": "integer",
+                            "description": "Tokens traded."
+                          },
+                          "winRate": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "0–1."
+                          }
+                        }
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "sort": "pnl",
+                  "windowDays": 1,
+                  "botRule": "wallets above 3000 trades or 300 tokens a day are left out",
+                  "traders": [],
+                  "updatedAt": 1791166631
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_LIMIT` / `BAD_DAYS` / `BAD_SORT`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/wallet/{address}": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solWallet",
+        "summary": "One wallet's tokens and PnL",
+        "description": "What a wallet bought and sold per token over the last `days` UTC days (today included), with an average-cost PnL: realized on the sold part, unrealized on what is still held at the current price. Up to 200 tokens, biggest first. Say how far back the numbers go when you show them.\n\n- Transfers are not seen: a token that arrived by transfer and was then sold counts as a sell without a buy. Such rows carry `partial: true` (counted in `partialTokens`) and their sells have no realized PnL.\n- `heldAmount` and `heldValueUsd` are bought minus sold inside the window, not the on-chain balance.\n- `likelyBot` = more than 3,000 trades or 300 tokens a day.\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "Wallet address, base58, exactly as it appears on-chain."
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 45,
+              "default": 7
+            },
+            "description": "Window in UTC days, today included."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A wallet the tape has never seen answers zeros and an empty `positions`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "wallet": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "windowDays": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "tokens": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "trades": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "volumeUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "boughtUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "soldUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "realizedPnlUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "unrealizedPnlUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "heldValueUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "winRate": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "Share of tokens with sells that closed in profit, 0–1."
+                    },
+                    "partialTokens": {
+                      "type": "integer",
+                      "description": "Tokens with `partial: true`."
+                    },
+                    "likelyBot": {
+                      "type": "boolean",
+                      "description": ""
+                    },
+                    "positions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SolPosition"
+                      },
+                      "description": "Biggest bought + sold first."
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "wallet": "3QZv9xcDELwLqB8SggDJHfVhMTn5YhKtXMCaKUucutm3",
+                  "windowDays": 7,
+                  "tokens": 3,
+                  "trades": 10,
+                  "volumeUsd": 249.92409078731498,
+                  "boughtUsd": 157.82642149850838,
+                  "soldUsd": 92.09766928880659,
+                  "realizedPnlUsd": 10.89172430885074,
+                  "unrealizedPnlUsd": -13.521686548756673,
+                  "heldValueUsd": 92.65951096979586,
+                  "winRate": 1,
+                  "partialTokens": 1,
+                  "likelyBot": false,
+                  "positions": [
+                    {
+                      "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+                      "symbol": "Agency",
+                      "name": "Agency",
+                      "image": "https://ipfs.io/ipfs/bafybeicailrr3iobedoxprzs6evwq3nqxsezdhvxbhpseyhltfmufybxuq",
+                      "priceUsd": 0.012298957291368744,
+                      "boughtUsd": 139.35060978011185,
+                      "soldUsd": 62.536948288806585,
+                      "boughtAmount": 9685.829453,
+                      "soldAmount": 3589.699624,
+                      "buys": 5,
+                      "sells": 2,
+                      "heldAmount": 6096.129829,
+                      "heldValueUsd": 74.97604040951005,
+                      "realizedPnlUsd": 10.89172430885074,
+                      "unrealizedPnlUsd": -12.72934539064596,
+                      "partial": false,
+                      "lastDay": 1791072000
+                    },
+                    {
+                      "token": "So11111111111111111111111111111111111111112",
+                      "symbol": "SOL",
+                      "name": "Solana",
+                      "image": "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
+                      "priceUsd": 120.9862,
+                      "boughtUsd": 0,
+                      "soldUsd": 29.560721,
+                      "boughtAmount": 0,
+                      "soldAmount": 0.247089203,
+                      "buys": 0,
+                      "sells": 1,
+                      "heldAmount": 0,
+                      "heldValueUsd": 0,
+                      "realizedPnlUsd": null,
+                      "unrealizedPnlUsd": 0,
+                      "partial": true,
+                      "lastDay": 1790985600
+                    }
+                  ],
+                  "updatedAt": 1791166532
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_DAYS`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/wallet/{address}/trades": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solWalletTrades",
+        "summary": "A wallet's swaps",
+        "description": "The wallet's newest swaps on the venues the tape reads, newest first, with the token and its symbol. Each page looks back at most seven days from `before` (or from now).\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "Wallet address, base58, exactly as it appears on-chain."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": "Newest rows."
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4000000000
+            },
+            "description": "Exclusive cursor, Unix seconds: rows strictly older than it. Pass the last row's `ts` for the next page. Several swaps can share a second, so a page boundary can skip the rest of that second: overlap with `ts + 1` and drop rows whose `tx` you already have."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "wallet": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "trades": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ts": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "slot": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "buy",
+                              "sell"
+                            ]
+                          },
+                          "token": {
+                            "type": "string",
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "symbol": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "tokenAmount": {
+                            "type": "number",
+                            "description": "Whole tokens."
+                          },
+                          "quoteAmount": {
+                            "type": "number",
+                            "description": "Whole units of the pool's quote."
+                          },
+                          "usd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "priceUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": "Venue id: `pumpswap` · `pumpfun` (bonding curve) · `meteora_dbc` · `meteora_damm_v2` · `meteora_dlmm` · `meteora_pools` (dynamic AMM v1) · `raydium_clmm` · `raydium_cpmm` · `raydium_v4` · `raydium_launchlab` · `orca` (Whirlpool)."
+                          },
+                          "pool": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "tx": {
+                            "type": "string",
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,88}$",
+                            "description": "Transaction signature, base58."
+                          }
+                        }
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "wallet": "3QZv9xcDELwLqB8SggDJHfVhMTn5YhKtXMCaKUucutm3",
+                  "trades": [
+                    {
+                      "ts": 1791151147,
+                      "slot": 453384173,
+                      "side": "buy",
+                      "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+                      "symbol": "Agency",
+                      "name": "Agency",
+                      "tokenAmount": 2879.134063,
+                      "quoteAmount": 0.295798607,
+                      "usd": 35.812234413351845,
+                      "priceUsd": 0.012401339509037218,
+                      "dex": "pumpswap",
+                      "pool": "CyJwKnLiiY4fmiwqMCSWFSHxo7T9Ubshgs2uRAuJCrk5",
+                      "tx": "Vz2VPQCo2j82g6mowse5961MnUEM6koE7VSaVhtVHQKsvkCHZ9HGVMTgbw92vDSJw1ThSDiVGkwn16EucjAK6Ny"
+                    },
+                    {
+                      "ts": 1791141717,
+                      "slot": 453349000,
+                      "side": "buy",
+                      "token": "DoVAVzViX8Bjy3r15nwikSaSbzE6dV4ovd28aWpJpump",
+                      "symbol": "HIGGS",
+                      "name": "Higgspad",
+                      "tokenAmount": 2231.366315,
+                      "quoteAmount": 0.040323739,
+                      "usd": 4.90003471839652,
+                      "priceUsd": 0.0021763918544292736,
+                      "dex": "pumpswap",
+                      "pool": "BFrSZakeqNzVtM3EFhroo4eRhagmmWN8BRntiQKFH6Ru",
+                      "tx": "5yzFpQRh11MNX9dVWZsNGkHN4nD1XW7KQqWXD931tsYnc2rYggjaNkzZ4bCvddXoEama9pz1hqo2DH1f8i9UBVTr"
+                    }
+                  ],
+                  "updatedAt": 1791166571
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_CURSOR`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/stream/market": {
       "get": {
         "tags": [
@@ -19263,6 +21604,207 @@
           }
         },
         "description": "One venue's share of the window."
+      },
+      "SolTokenRow": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+          },
+          "symbol": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Creator-chosen; null until the metadata worker has read it."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Creator-chosen."
+          },
+          "image": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Image URL from the token's metadata, as published by its creator."
+          },
+          "decimals": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": ""
+          },
+          "priceUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Last price on the token's main pool (traded in the last hour first, then the deepest)."
+          },
+          "change24hPct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Price now against the main pool's close 24 hours ago."
+          },
+          "volume24hUsd": {
+            "type": "number",
+            "description": "USD over the 24-hour window, every pool the tape reads."
+          },
+          "trades24h": {
+            "type": "integer",
+            "description": ""
+          },
+          "buys24h": {
+            "type": "integer",
+            "description": ""
+          },
+          "buyVolume24hUsd": {
+            "type": "number",
+            "description": ""
+          },
+          "liquidityUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Main pool: twice its quote-side reserve in USD, from the last swap whose event carried the reserve. An estimate; null when unknown."
+          },
+          "marketCapUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Price × supply: fully diluted."
+          },
+          "pool": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+          },
+          "dex": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Venue id: `pumpswap` · `pumpfun` (bonding curve) · `meteora_dbc` · `meteora_damm_v2` · `meteora_dlmm` · `meteora_pools` (dynamic AMM v1) · `raydium_clmm` · `raydium_cpmm` · `raydium_v4` · `raydium_launchlab` · `orca` (Whirlpool)."
+          },
+          "firstSeen": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Unix time, seconds, UTC."
+          }
+        },
+        "description": "One Solana token with its 24-hour tape."
+      },
+      "SolPosition": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+          },
+          "symbol": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
+          },
+          "image": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
+          },
+          "priceUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Current price on the main pool."
+          },
+          "boughtUsd": {
+            "type": "number",
+            "description": ""
+          },
+          "soldUsd": {
+            "type": "number",
+            "description": ""
+          },
+          "boughtAmount": {
+            "type": "number",
+            "description": "Whole tokens."
+          },
+          "soldAmount": {
+            "type": "number",
+            "description": "Whole tokens."
+          },
+          "buys": {
+            "type": "integer",
+            "description": ""
+          },
+          "sells": {
+            "type": "integer",
+            "description": ""
+          },
+          "heldAmount": {
+            "type": "number",
+            "description": "Bought minus sold inside the window, whole tokens (never below 0). Not the on-chain balance."
+          },
+          "heldValueUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": ""
+          },
+          "realizedPnlUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Matched amount × (average sell − average buy). Null when the window has sells but no buys."
+          },
+          "unrealizedPnlUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Held amount × (price − average buy)."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Sold more than it bought inside the window: part of the position was bought before the window (or arrived by transfer), so those sells carry no cost basis."
+          },
+          "lastDay": {
+            "type": "integer",
+            "description": "Unix time, seconds, UTC."
+          }
+        },
+        "description": "One token in a wallet's window."
       }
     }
   }

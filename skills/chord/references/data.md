@@ -8,6 +8,9 @@ milliseconds (`updatedAt`).
 All numbers come from Chord's own index of on-chain swaps ("the tape"), except `ref-price`, which is
 CoinGecko. Say which one you used.
 
+This page covers the six EVM chains. Solana has its own read-only family (`/v1/chains/solana/*`,
+base58 addresses, `updatedAt` in seconds, different coverage): see `solana.md`.
+
 ```bash
 BASE=https://api.getchord.xyz/v1
 ```

@@ -18,8 +18,8 @@ the fund-moving step: it follows the confirmation flow in `SKILL.md`, every time
 | Base | 8453 | ETH | ETH | USDC vs USDbC are different tokens |
 | BNB Chain | 56 | BNB | BNB | USDT and USDC have 18 decimals |
 
-Not supported: Ethereum mainnet, Solana, Arbitrum and every other chain; cross-chain swaps; limit
-orders; perps.
+Not supported: Solana swaps (Chord reads Solana data only: `solana.md`), Ethereum mainnet, Arbitrum
+and every other chain; cross-chain swaps; limit orders; perps.
 
 ## 0. Meta quote first (Chord's router, a fallback only when it fails)
 

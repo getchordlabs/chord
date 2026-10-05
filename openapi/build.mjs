@@ -7,7 +7,8 @@
 //
 // Scope = the Chord surface: everything the Chord app calls on chains 5042 (Arc) and 4663
 // (Robinhood Chain), the chain-keyed data routes for Avalanche (43114), Base (8453) and BNB Chain (56)
-// under /chains/{chain}/* (routes/chains.ts), plus the developer/agent endpoints. Monad-only routes and
+// under /chains/{chain}/* (routes/chains.ts), Solana's read-only tape under /chains/solana/* (routes/solana.ts), plus the
+// developer/agent endpoints. Monad-only routes and
 // the admin/app consoles are left out on purpose.
 //
 // Keep in sync with packages/api/src/routes/*.ts. When a route changes, change the schema here in the
@@ -282,6 +283,7 @@ const T = {
   bridge: "Bridge",
   rh: "Robinhood Chain data",
   chains: "Avalanche, Base, BNB Chain",
+  sol: "Solana data",
   stream: "Streaming",
   account: "Account and health",
 };
@@ -754,6 +756,130 @@ ${CHAINS_INTRO}`,
       ingestFloor: ref("IngestFloor"), updatedAt: UNIX_MS,
     }), ex(`/v1/chains/bnb/wallet/${CH_WAL}`)) }, "`BAD_ADDRESS`", {}, CH_503_STORE) }));
 
+// Solana data ──────────────────────────────────────────────────────────────────────────────────
+// routes/solana.ts (validation) → services/solTape.ts (one HTTP call to the Solana box) → packages/sol/src/queries.ts (shapes,
+// mirrored fail-open in schemas/sol.ts). Not in CHAIN_REGISTRY: base58 addresses, case-sensitive — never lower-case one here.
+// Examples captured live on 2026-10-05 (Agency, a pump.fun graduate on PumpSwap; a small manual wallet that traded it).
+const SOL_TOK = "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump";
+const SOL_WAL = "3QZv9xcDELwLqB8SggDJHfVhMTn5YhKtXMCaKUucutm3";
+// Captured at 02:17 UTC while the ingest was ~4 h behind the chain: the UTC day had no rows yet, so the board was empty (and a
+// cold days=2 board outlasted the API's 20 s). Re-capture a filled board when the tape is current.
+const SOL_BOARD_KEY = "/v1/chains/solana/traders?limit=2";
+const SOL_ADDR = { type: "string", pattern: "^[1-9A-HJ-NP-Za-km-z]{32,44}$", description: "Solana address, base58, case-sensitive. Never lower-case it." };
+const SOL_SIG = { type: "string", pattern: "^[1-9A-HJ-NP-Za-km-z]{64,88}$", description: "Transaction signature, base58." };
+const SOL_TS = int("Unix time, seconds, UTC.");
+const SOL_UPDATED = int("Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds).");
+const SOL_DEX = str("Venue id: `pumpswap` · `pumpfun` (bonding curve) · `meteora_dbc` · `meteora_damm_v2` · `meteora_dlmm` · `meteora_pools` (dynamic AMM v1) · `raydium_clmm` · `raydium_cpmm` · `raydium_v4` · `raydium_launchlab` · `orca` (Whirlpool).");
+const SOL_INTRO = `Chord's own Solana tape, read-only. No key needed.
+
+- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.
+- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.
+- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. \`coverageSince\` on \`/chains/solana/overview\` says from when totals are complete: quote that field, not a date.
+- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with \`400 BAD_ADDRESS\` when it stops being base58 (an \`L\` becomes \`l\`) and answered \`404 TOKEN_NOT_FOUND\` otherwise. Solana has no numeric chain id here: the path segment is the literal \`solana\`.
+- **Units.** Token amounts are whole tokens (decimals already applied), \`quoteAmount\` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and \`*Usd\` fields are US dollars. Timestamps, \`updatedAt\` included, are Unix **seconds**.
+- **Names are untrusted.** \`symbol\`, \`name\` and \`image\` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.
+- **Errors.** \`400 BAD_*\` for a bad parameter; \`400 UNSUPPORTED_CHAIN\` if Solana is not public on the deployment and the request has no \`X-API-Key\`; \`503 CHAIN_DATA_UNAVAILABLE\` when the Solana store cannot be read in time and \`503 CHAIN_NOT_ENABLED\` when the lane is off: retry later, never read either as "no trades".`;
+const SOL_ERR = (bad400, extra = {}) => ({
+  400: errRes(`${bad400 ? `${bad400}, or ` : ""}\`UNSUPPORTED_CHAIN\` (Solana is not public on this deployment and the request has no \`X-API-Key\`).`),
+  ...extra,
+  429: ERR[429],
+  503: errRes("`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer."),
+});
+const SOL_MINT_P = p("address", SOL_ADDR, "Token mint, base58, exactly as it appears on-chain.");
+const SOL_WAL_P = p("address", SOL_ADDR, "Wallet address, base58, exactly as it appears on-chain.");
+const SOL_404 = { 404: errRes("`TOKEN_NOT_FOUND`: this mint has not traded on a venue the tape reads since the tape started.") };
+const SOL_BEFORE = q("before", { type: "integer", minimum: 0, maximum: 4000000000 }, "Exclusive cursor, Unix seconds: rows strictly older than it. Pass the last row's `ts` for the next page. Several swaps can share a second, so a page boundary can skip the rest of that second: overlap with `ts + 1` and drop rows whose `tx` you already have.");
+
+const SolTokenRow = obj({
+  token: SOL_ADDR, symbol: nullable(str("Creator-chosen; null until the metadata worker has read it.")), name: nullable(str("Creator-chosen.")), image: nullable(str("Image URL from the token's metadata, as published by its creator.")),
+  decimals: nullable(int("")), priceUsd: nullable(num("Last price on the token's main pool (traded in the last hour first, then the deepest).")),
+  change24hPct: nullable(num("Price now against the main pool's close 24 hours ago.")),
+  volume24hUsd: num("USD over the 24-hour window, every pool the tape reads."), trades24h: int(""), buys24h: int(""), buyVolume24hUsd: num(""),
+  liquidityUsd: nullable(num("Main pool: twice its quote-side reserve in USD, from the last swap whose event carried the reserve. An estimate; null when unknown.")),
+  marketCapUsd: nullable(num("Price × supply: fully diluted.")), pool: nullable(SOL_ADDR), dex: nullable(SOL_DEX), firstSeen: nullable(SOL_TS),
+}, "One Solana token with its 24-hour tape.");
+const SolPosition = obj({
+  token: SOL_ADDR, symbol: nullable(str("")), name: nullable(str("")), image: nullable(str("")), priceUsd: nullable(num("Current price on the main pool.")),
+  boughtUsd: num(""), soldUsd: num(""), boughtAmount: num("Whole tokens."), soldAmount: num("Whole tokens."), buys: int(""), sells: int(""),
+  heldAmount: num("Bought minus sold inside the window, whole tokens (never below 0). Not the on-chain balance."), heldValueUsd: nullable(num("")),
+  realizedPnlUsd: nullable(num("Matched amount × (average sell − average buy). Null when the window has sells but no buys.")), unrealizedPnlUsd: nullable(num("Held amount × (price − average buy).")),
+  partial: bool("Sold more than it bought inside the window: part of the position was bought before the window (or arrived by transfer), so those sells carry no cost basis."),
+  lastDay: SOL_TS,
+}, "One token in a wallet's window.");
+components.schemas.SolTokenRow = SolTokenRow;
+components.schemas.SolPosition = SolPosition;
+
+add("/chains/solana/status", "get", op(T.sol, "solStatus", "Is the tape following the chain", `The ingest's own health: the last slot written, how far behind the chain it is, the age of the newest block it has written, swaps per minute, and per-venue decode counters since the ingest started (\`decode\` is keyed by venue number: 1 pumpswap · 2 pumpfun · 3 meteora_dbc · 4 meteora_damm_v2 · 5 meteora_dlmm · 6 raydium_clmm · 7 orca · 8 raydium_cpmm · 9 raydium_v4 · 10 meteora_pools · 11 raydium_launchlab; the example shows two of the eleven). \`ok: false\` or a large \`blockAgeS\` means the numbers on the other routes are behind: say so when you show them. Never cached.\n\n${SOL_INTRO}`,
+  { responses: { 200: ok("", obj({
+    chain: { type: "string", const: "solana" }, ok: bool("The ingest is healthy right now."), cursor: int("Last slot written."), genesisSlot: int("First slot of the live tape."), auditCursor: int("Last slot re-checked against `finalized` (orphaned slots removed, late ones written)."),
+    lagSlots: nullable(int("Slots between the chain head and `cursor`.")), blockAgeS: nullable(int("Age of the newest block written, seconds.")), slotsPerMin: nullable(num("")), swapsPerMin: nullable(num("")),
+    startedAt: nullable(SOL_TS), solUsd: nullable(num("SOL price the tape is using (from its own SOL/stable swaps).")),
+    decode: obj({}, "Venue number → counters since `startedAt`.", { additionalProperties: obj({ events: int(""), swaps: int(""), ok: int("Swaps whose amounts match the vaults' balance changes exactly."), bad: int("Swaps that do not match."), unchecked: int("Not checkable (a fee paid to a third account, a pool created and seeded in the same transaction)."), noParent: int(""), otherEvents: int("") }) }),
+    totals: nullable(obj({ slots: int(""), swaps: int(""), orphaned: int(""), late: int("") }, "Since `startedAt`.")),
+    venues: str("What the tape reads, in words."), notCovered: str("What it does not read, in words."), public: bool("Served to callers without a key."),
+    gate: nullable(loose("The automatic public gate: `pass`, `liveHours`, `missing24h` (missing slots in 24 hours), `hourCheck` (rollup against raw for the last closed hour), `reasons`.")),
+  }), ex("/v1/chains/solana/status")), ...SOL_ERR("") } }));
+
+add("/chains/solana/overview", "get", op(T.sol, "solOverview", "Chain totals", `Last 24 hours on the venues the tape reads: volume, trades, buys, tokens traded, venue share and hourly buckets, plus \`coverageSince\`. The window never starts before \`coverageSince\`: \`coverageHours\` under 24 means a partial day. Cached 30 seconds.\n\n${SOL_INTRO}`,
+  { responses: { 200: ok("", obj({
+    chain: { type: "string", const: "solana" }, windowHours: int(""), volumeUsd: num(""), trades: int(""), buys: int(""), tokensTraded: int(""),
+    venues: arr(obj({ dex: SOL_DEX, volumeUsd: num(""), trades: int(""), share: num("Fraction of the window's volume, 0–1 (not percent).") }), "Biggest first."),
+    hourly: arr(obj({ hour: SOL_TS, volumeUsd: num(""), trades: int("") }), "Oldest first; `hour` is the bucket start."),
+    coverageSince: nullable(SOL_TS), coverageHours: num("Hours of the 24-hour window the tape covers."), cursor: int("Last slot written."), updatedAt: SOL_UPDATED,
+  }), ex("/v1/chains/solana/overview")), ...SOL_ERR("") } }));
+
+add("/chains/solana/tokens", "get", op(T.sol, "solTokens", "Every token traded in the last 24 hours", `The 24-hour board. \`volume\` and \`trades\` rank every token the tape saw; \`change\` (24-hour price change) and \`new\` (first seen in the last 24 hours, newest first) rank inside the 400 most traded tokens with at least $5,000 of volume, so a $40 pool moving 900 % is not a mover. Cached 20 seconds.\n\nNo wash flags here: a thin pool can print a large volume (compare \`volume24hUsd\` with \`liquidityUsd\` and \`trades24h\` before ranking on it), and many tokens share a symbol.\n\n${SOL_INTRO}`,
+  { params: [q("sort", { type: "string", enum: ["volume", "trades", "change", "new"], default: "volume" }, "Descending; `new` = newest first."), q("limit", { type: "integer", minimum: 1, maximum: 200, default: 100 }, "")],
+    responses: { 200: ok("", obj({ sort: str(""), windowHours: int(""), tokens: arr(ref("SolTokenRow")), updatedAt: SOL_UPDATED }), ex("/v1/chains/solana/tokens?sort=trades&limit=2")), ...SOL_ERR("`BAD_LIMIT` / `BAD_SORT`") } }));
+
+add("/chains/solana/search", "get", op(T.sol, "solSearch", "Find a token by mint, symbol or name", `A mint returns that token (when the tape has seen it trade). Anything else is an exact, case-insensitive match on symbol or name among the tokens the tape has seen, up to 20, ordered by the volume of each token's deepest pool; a leading \`$\` is ignored. No prefix or substring search. Expect several mints per symbol: show the mint, and pick by liquidity and volume only when the user has not named one.\n\n\`volumeUsd\` is the main pool's volume since the tape first saw it for a symbol or name match, and the token's 24-hour volume for a mint: a ranking hint, not a window total. Use \`/chains/solana/token/{address}\` for the token's numbers.\n\n${SOL_INTRO}`,
+  { params: [q("q", { type: "string", minLength: 1, maxLength: 60 }, "A mint (base58), a symbol or a name.", true)],
+    responses: { 200: ok("Matches. An empty `tokens` is a real answer.", obj({ chain: { type: "string", const: "solana" }, query: str(""), tokens: arr(obj({ token: SOL_ADDR, symbol: nullable(str("")), name: nullable(str("")), image: nullable(str("")), priceUsd: nullable(num("")), liquidityUsd: nullable(num("")), volumeUsd: nullable(num("See above.")) })) }), ex("/v1/chains/solana/search?q=Agency")), ...SOL_ERR("`BAD_QUERY` (empty, or longer than 60 characters)") } }));
+
+add("/chains/solana/token/{address}", "get", op(T.sol, "solToken", "One token: stats, pools and hourly tape", `Identity (from the token's metadata), price on the main pool with 1-hour and 24-hour change, fully diluted market cap, liquidity summed over the pools that traded in the last 24 hours, 24-hour volume and trade counts with the venue split, up to 20 pools, and an hourly series.\n\n**Pass \`hours\` of 24 or more**: the 24-hour totals are summed from the same hourly rows the series returns, so \`hours=2\` gives the totals of two hours. In \`pools\`, \`volumeUsd\` and \`swaps\` count since the tape first saw the pool, not 24 hours. Cached 10 seconds.\n\n${SOL_INTRO}`,
+  { params: [SOL_MINT_P, q("hours", { type: "integer", minimum: 1, maximum: 720, default: 168 }, "Hourly buckets in `hourly`; also the span the 24-hour totals are read from (see above).")],
+    responses: { 200: ok("", obj({
+      chain: { type: "string", const: "solana" }, token: SOL_ADDR, symbol: nullable(str("")), name: nullable(str("")), image: nullable(str("")), decimals: nullable(int("")), supply: nullable(num("Whole tokens.")), firstSeen: nullable(SOL_TS),
+      priceUsd: nullable(num("")), change1hPct: nullable(num("")), change24hPct: nullable(num("")), marketCapUsd: nullable(num("Price × supply.")), liquidityUsd: nullable(num("Sum over pools that traded in the last 24 hours.")),
+      volume24hUsd: num(""), trades24h: int(""), buys24h: int(""), sells24h: int(""), buyVolume24hUsd: num(""), sellVolume24hUsd: num(""),
+      venues: arr(obj({ dex: SOL_DEX, volumeUsd: num(""), trades: int("") }), "24-hour venue split, biggest first."),
+      pools: arr(obj({ pool: SOL_ADDR, dex: SOL_DEX, quote: SOL_ADDR, priceUsd: nullable(num("")), liquidityUsd: nullable(num("")), volumeUsd: num("Since the tape first saw the pool."), swaps: int("Since the tape first saw the pool."), firstSeen: nullable(SOL_TS), lastTrade: nullable(SOL_TS) }), "Up to 20; traded in the last hour first, then the deepest."),
+      hourly: arr(obj({ hour: SOL_TS, volumeUsd: num(""), trades: int(""), buys: int("") }), "Oldest first. Hours without a trade are absent."),
+      updatedAt: SOL_UPDATED,
+    }), ex(`/v1/chains/solana/token/${SOL_TOK}?hours=24`)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_HOURS`", SOL_404) } }));
+
+add("/chains/solana/token/{address}/trades", "get", op(T.sol, "solTokenTrades", "Trade tape", `The token's newest swaps across up to 30 of its pools, newest first: side, both amounts, USD, price, venue, pool, wallet and the transaction signature. Each page looks back at most two days from \`before\` (or from now): an empty page means no swap in that span. A mint the tape has never seen answers an empty list.\n\n- \`side\`: \`buy\` = the wallet bought the token, \`sell\` = it sold it.\n- \`tokenAmount\` and \`quoteAmount\` are what the wallet received or paid, fees included, in whole units; \`priceUsd\` is the pool's execution price.\n- \`wallet\` is the user account named in the swap instruction: often a bot or an arbitrage contract, sometimes on both sides of one transaction.\n\n${SOL_INTRO}`,
+  { params: [SOL_MINT_P, q("limit", { type: "integer", minimum: 1, maximum: 200, default: 50 }, "Newest rows."), SOL_BEFORE],
+    responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, token: SOL_ADDR, trades: arr(obj({ ts: SOL_TS, slot: int(""), side: { type: "string", enum: ["buy", "sell"] }, tokenAmount: num("Whole tokens."), quoteAmount: num("Whole units of the pool's quote."), usd: nullable(num("")), priceUsd: nullable(num("")), dex: SOL_DEX, pool: nullable(SOL_ADDR), wallet: nullable(SOL_ADDR), tx: SOL_SIG })), updatedAt: SOL_UPDATED }), ex(`/v1/chains/solana/token/${SOL_TOK}/trades?limit=2`)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_CURSOR`") } }));
+
+add("/chains/solana/token/{address}/candles", "get", op(T.sol, "solTokenCandles", "Candles", `OHLCV of ONE pool of the token, in USD: the main pool (traded in the last hour first, then the deepest) unless \`pool\` names another. Not a volume-weighted blend of every pool: use \`/chains/solana/token/{address}\` for totals across pools. The window holds \`limit\` buckets ending with the open one; buckets without a trade are absent. A swap under $1 adds to the volume but does not move the open, high, low or close. Cached 5 seconds for \`1m\`, 20 seconds otherwise.\n\n${SOL_INTRO}`,
+  { params: [SOL_MINT_P, q("tf", { type: "string", enum: ["1m", "5m", "15m", "1h", "4h", "1d"], default: "5m" }, "Timeframe."), q("limit", { type: "integer", minimum: 1, maximum: 1000, default: 200 }, "Buckets in the window."), q("pool", SOL_ADDR, "A pool of this token (from `/chains/solana/token/{address}` `pools`). Default: the main pool.")],
+    responses: { 200: ok("`pool: null` with no candles = the tape has no priced pool for this mint.", obj({ chain: { type: "string", const: "solana" }, token: SOL_ADDR, pool: nullable(SOL_ADDR), timeframe: str(""), candles: arr(obj({ t: SOL_TS, o: num(""), h: num(""), l: num(""), c: num(""), volumeUsd: num(""), trades: int("") }), "Oldest first; `t` is the bucket start."), updatedAt: SOL_UPDATED }), ex(`/v1/chains/solana/token/${SOL_TOK}/candles?tf=1h&limit=8`)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_TIMEFRAME` / `BAD_LIMIT`") } }));
+
+add("/chains/solana/token/{address}/traders", "get", op(T.sol, "solTokenTraders", "Who traded the token", `The wallets that traded the token over the window, biggest USD volume first (the top 100; \`limit\` slices them): bought, sold, net, trades, and an average-cost PnL over the window. The window is whole UTC hours: the current hour and the \`hours\` (1–48) before it, starting at \`since\`, so it covers a little more than \`hours\` × 3600 seconds. Closed hours come from an hourly (token, wallet) rollup and the current hour from the raw swaps; while the rollup has not reached back to \`since\` the whole window is read from raw, and the first read of a busy token can then take tens of seconds or answer \`503\`. The answer is cached on the Solana side: retry after a minute, or ask for fewer \`hours\`.\n\n- \`heldAmount\` is bought minus sold inside the window, not the wallet's balance.\n- \`partial: true\` = the wallet sold more than it bought in the window; those sells have no cost basis.\n\n${SOL_INTRO}`,
+  { params: [SOL_MINT_P, q("limit", { type: "integer", minimum: 1, maximum: 100, default: 30 }, ""), q("hours", { type: "integer", minimum: 1, maximum: 48, default: 24 }, "Whole UTC hours before the current one (see `since`).")],
+    responses: { 200: ok("", obj({
+      chain: { type: "string", const: "solana" }, token: SOL_ADDR, windowHours: int(""), since: SOL_TS, priceUsd: nullable(num("")),
+      traders: arr(obj({ wallet: nullable(SOL_ADDR), boughtUsd: num(""), soldUsd: num(""), netUsd: num("Bought minus sold, USD."), trades: int(""), lastTrade: SOL_TS, heldAmount: num("Whole tokens."), heldValueUsd: nullable(num("")), realizedPnlUsd: nullable(num("")), unrealizedPnlUsd: nullable(num("")), partial: bool("") })),
+      updatedAt: SOL_UPDATED,
+    }), ex(`/v1/chains/solana/token/${SOL_TOK}/traders?limit=2`)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_HOURS`", SOL_404) } }));
+
+add("/chains/solana/traders", "get", op(T.sol, "solTraders", "The day's traders", `Wallets ranked by realized PnL or by volume over today's UTC day (\`days=2\` adds yesterday), across every token the tape reads. Bots are left out by rule (\`botRule\`: above 3,000 trades or 300 tokens a day), and so are wallets under $1,000 of volume. Realized PnL per token = the matched amount × (average sell − average buy) inside the window, summed; \`winRate\` = the share of tokens with both buys and sells that sold above their average buy. Early in the UTC day the board is short, and empty until the day has rows. Cached 5 minutes; a cold \`days=2\` board can take longer than the API waits and answer \`503\`: retry later.\n\n${SOL_INTRO}`,
+  { params: [q("sort", { type: "string", enum: ["pnl", "volume"], default: "pnl" }, "Descending."), q("limit", { type: "integer", minimum: 1, maximum: 100, default: 50 }, ""), q("days", { type: "integer", minimum: 1, maximum: 2, default: 1 }, "1 = today (UTC), 2 = today and yesterday.")],
+    responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, sort: str(""), windowDays: int(""), botRule: str("The rule that removed bots, in words."), traders: arr(obj({ wallet: nullable(SOL_ADDR), realizedPnlUsd: num(""), volumeUsd: num(""), trades: int(""), tokens: int("Tokens traded."), winRate: nullable(num("0–1.")) })), updatedAt: SOL_UPDATED }), ex(SOL_BOARD_KEY)), ...SOL_ERR("`BAD_LIMIT` / `BAD_DAYS` / `BAD_SORT`") } }));
+
+add("/chains/solana/wallet/{address}", "get", op(T.sol, "solWallet", "One wallet's tokens and PnL", `What a wallet bought and sold per token over the last \`days\` UTC days (today included), with an average-cost PnL: realized on the sold part, unrealized on what is still held at the current price. Up to 200 tokens, biggest first. Say how far back the numbers go when you show them.\n\n- Transfers are not seen: a token that arrived by transfer and was then sold counts as a sell without a buy. Such rows carry \`partial: true\` (counted in \`partialTokens\`) and their sells have no realized PnL.\n- \`heldAmount\` and \`heldValueUsd\` are bought minus sold inside the window, not the on-chain balance.\n- \`likelyBot\` = more than 3,000 trades or 300 tokens a day.\n\n${SOL_INTRO}`,
+  { params: [SOL_WAL_P, q("days", { type: "integer", minimum: 1, maximum: 45, default: 7 }, "Window in UTC days, today included.")],
+    responses: { 200: ok("A wallet the tape has never seen answers zeros and an empty `positions`.", obj({
+      chain: { type: "string", const: "solana" }, wallet: SOL_ADDR, windowDays: int(""), tokens: int(""), trades: int(""), volumeUsd: num(""), boughtUsd: num(""), soldUsd: num(""),
+      realizedPnlUsd: num(""), unrealizedPnlUsd: num(""), heldValueUsd: num(""), winRate: nullable(num("Share of tokens with sells that closed in profit, 0–1.")), partialTokens: int("Tokens with `partial: true`."), likelyBot: bool(""),
+      positions: arr(ref("SolPosition"), "Biggest bought + sold first."), updatedAt: SOL_UPDATED,
+    }), ex(`/v1/chains/solana/wallet/${SOL_WAL}?days=7`)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_DAYS`") } }));
+
+add("/chains/solana/wallet/{address}/trades", "get", op(T.sol, "solWalletTrades", "A wallet's swaps", `The wallet's newest swaps on the venues the tape reads, newest first, with the token and its symbol. Each page looks back at most seven days from \`before\` (or from now).\n\n${SOL_INTRO}`,
+  { params: [SOL_WAL_P, q("limit", { type: "integer", minimum: 1, maximum: 200, default: 50 }, "Newest rows."), SOL_BEFORE],
+    responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, wallet: SOL_ADDR, trades: arr(obj({ ts: SOL_TS, slot: int(""), side: { type: "string", enum: ["buy", "sell"] }, token: SOL_ADDR, symbol: nullable(str("")), name: nullable(str("")), tokenAmount: num("Whole tokens."), quoteAmount: num("Whole units of the pool's quote."), usd: nullable(num("")), priceUsd: nullable(num("")), dex: SOL_DEX, pool: nullable(SOL_ADDR), tx: SOL_SIG })), updatedAt: SOL_UPDATED }), ex(`/v1/chains/solana/wallet/${SOL_WAL}/trades?limit=2`)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_CURSOR`") } }));
+
 // Streaming (documented as operations so they appear in the reference; protocol detail lives in Concepts → Streaming) ──
 add("/stream/market", "get", op(T.stream, "streamMarket", "Server-sent events: prices", `One \`text/event-stream\` feed, no key, EventSource-friendly with automatic reconnect. Events: \`rh-ticker\` (fresh prices for chain 4663, about every 10 s, only addresses whose price moved), \`ticker\` / \`whales\` / \`defi\` (Monad), \`ping\` every 5 s. Capacity 500 clients (\`503\` beyond). Arc and Robinhood Chain boards stream faster over the WebSocket \`prices\` channel — see Concepts → Streaming.`,
   { responses: { 200: { description: "`text/event-stream`", content: { "text/event-stream": { schema: { type: "string" }, example: 'event: rh-ticker\ndata: {"items":[{"address":"0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec","priceUsd":220.97,"change24h":-0.71}]}\n\nevent: ping\ndata: 1789891855\n' } } }, 503: errRes("At capacity.") } }));
@@ -769,12 +895,12 @@ const doc = {
   openapi: "3.1.0",
   info: {
     title: "Chord API",
-    version: "2026-10-03",
-    summary: "Trade, data and agent endpoints for Arc (5042) and Robinhood Chain (4663), plus chain data for Avalanche (43114), Base (8453) and BNB Chain (56).",
+    version: "2026-10-05",
+    summary: "Trade, data and agent endpoints for Arc (5042) and Robinhood Chain (4663), plus chain data for Avalanche (43114), Base (8453), BNB Chain (56) and Solana (read-only).",
     description: `Chord is a non-custodial trading app and on-chain data index. The API has three kinds of endpoint:
 
 - **Trade**: \`/quote\` finds the best route across every venue on the chain; \`/swap\` turns it into a transaction you sign yourself. Chord never holds funds or keys.
-- **Read**: every swap on the chain, rolled up by token, venue and hour, from Chord's own index — tokens, launches, holders, top wallets, portfolio PnL, liquidity positions and pools. No key needed. Avalanche, Base and BNB Chain have the same rollups under \`/chains/{chain}/*\`.
+- **Read**: every swap on the chain, rolled up by token, venue and hour, from Chord's own index — tokens, launches, holders, top wallets, portfolio PnL, liquidity positions and pools. No key needed. Avalanche, Base and BNB Chain have the same rollups under \`/chains/{chain}/*\`; Solana has its own read-only family under \`/chains/solana/*\` (base58 addresses, case-sensitive).
 - **Agent**: the analyst (\`/ask\`) and the streams.
 
 Amounts are decimal strings in the token's smallest unit. Timestamps are Unix seconds unless the field is \`updatedAt\` (milliseconds). Reads answer anonymous callers at 60 requests a minute per IP; an \`X-API-Key\` header raises that to your plan. Every non-2xx body is \`{ error, message }\`.`,
@@ -795,6 +921,7 @@ Amounts are decimal strings in the token's smallest unit. Timestamps are Unix se
     { name: T.bridge, description: "Circle CCTP fast transfer to Arc, and LI.FI routes from 60+ chains." },
     { name: T.rh, description: "Robinhood Chain (chain 4663): chain totals, tokens and tokenized stocks from the rollup tables." },
     { name: T.chains, description: "Avalanche C-Chain (43114), Base (8453) and BNB Chain (56): chain totals, the 24-hour token board, prints, one token's tape, venue share and a wallet's PnL, from Chord's own index of every swap on those chains. One set of routes, the chain in the path." },
+    { name: T.sol, description: "Solana, read-only: chain totals, the 24-hour token board, search, one token's stats, prints, candles and traders, the day's trader board, and a wallet's PnL, from Chord's own tape of the swap events of 11 Solana venues (PumpSwap, pump.fun, Meteora, Raydium, Orca). Prop AMMs and order books are not read. Addresses are base58 and case-sensitive; the path segment is the literal `solana`. Read the notes on each operation before comparing these numbers with an all-market source." },
     { name: T.stream, description: "Server-sent events and the public WebSocket." },
     { name: T.account, description: "Your key, and the service's own health." },
   ],

@@ -3823,5 +3823,436 @@
     ]
    }
   ]
+ },
+ "/v1/chains/solana/status": {
+  "chain": "solana",
+  "ok": false,
+  "cursor": 453384220,
+  "genesisSlot": 452927437,
+  "auditCursor": 453383708,
+  "lagSlots": 2065,
+  "blockAgeS": 15287,
+  "slotsPerMin": 273,
+  "swapsPerMin": 33344,
+  "startedAt": 1791163969,
+  "solUsd": 121.06980743427287,
+  "decode": {
+   "1": {
+    "events": 412502,
+    "swaps": 392156,
+    "ok": 392155,
+    "bad": 1,
+    "unchecked": 0,
+    "noParent": 0,
+    "otherEvents": 20346
+   },
+   "2": {
+    "events": 127002,
+    "swaps": 108165,
+    "ok": 108151,
+    "bad": 14,
+    "unchecked": 0,
+    "noParent": 0,
+    "otherEvents": 18837
+   }
+  },
+  "totals": {
+   "slots": 5931,
+   "swaps": 740575,
+   "orphaned": 0,
+   "late": 0
+  },
+  "venues": "PumpSwap, pump.fun, Meteora (DAMM v2, DLMM, DBC, dynamic pools), Raydium (CLMM, CPMM, v4, LaunchLab) and Orca",
+  "notCovered": "prop AMMs such as SolFi / HumidiFi and order books such as Phoenix are not read, so SOL/USDC-style majors are understated",
+  "public": true,
+  "gate": {
+   "pass": false,
+   "at": 1791166182,
+   "liveHours": 38.1,
+   "missing24h": 0,
+   "hourCheck": {
+    "hour": 497545,
+    "hourlyDiff": 0,
+    "candleDiff": 0
+   },
+   "reasons": [
+    "ingest not healthy right now"
+   ]
+  }
+ },
+ "/v1/chains/solana/overview": {
+  "chain": "solana",
+  "windowHours": 24,
+  "volumeUsd": 3120445357.1785517,
+  "trades": 28259618,
+  "buys": 16493707,
+  "tokensTraded": 98530,
+  "venues": [
+   {
+    "dex": "pumpswap",
+    "volumeUsd": 1420441349.9695024,
+    "trades": 15748395,
+    "share": 0.45520468631241756
+   },
+   {
+    "dex": "meteora_pools",
+    "volumeUsd": 464739991.2308222,
+    "trades": 40125,
+    "share": 0.1489338661744846
+   }
+  ],
+  "hourly": [
+   {
+    "hour": 1791082800,
+    "volumeUsd": 136078621.887329,
+    "trades": 1510518
+   },
+   {
+    "hour": 1791086400,
+    "volumeUsd": 110648628.7027686,
+    "trades": 1442682
+   }
+  ],
+  "coverageSince": 1790611483,
+  "coverageHours": 24,
+  "cursor": 453384035,
+  "updatedAt": 1791166406
+ },
+ "/v1/chains/solana/tokens?sort=trades&limit=2": {
+  "sort": "trades",
+  "windowHours": 24,
+  "tokens": [
+   {
+    "token": "So11111111111111111111111111111111111111112",
+    "symbol": "SOL",
+    "name": "Solana",
+    "image": "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
+    "decimals": 9,
+    "priceUsd": 120.98396092263611,
+    "change24hPct": 1.1310855236659645,
+    "volume24hUsd": 92343484.342816,
+    "trades24h": 668125,
+    "buys24h": 344626,
+    "buyVolume24hUsd": 47132735.284852006,
+    "liquidityUsd": 30496683.315842,
+    "marketCapUsd": null,
+    "pool": "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2",
+    "dex": "raydium_v4",
+    "firstSeen": 1791028889
+   },
+   {
+    "token": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+    "symbol": "SPCXx",
+    "name": "SpaceX xStock",
+    "image": "https://xstocks-metadata.backed.fi/logos/tokens/SPCXx.png",
+    "decimals": 8,
+    "priceUsd": 163.10022589848552,
+    "change24hPct": null,
+    "volume24hUsd": 37511133.496547684,
+    "trades24h": 476322,
+    "buys24h": 230903,
+    "buyVolume24hUsd": 18759541.58185133,
+    "liquidityUsd": 95373.03161138113,
+    "marketCapUsd": 91333037.55386804,
+    "pool": "B7nYoGHqCGoFRiPB4AoT1NqbqrFWJDfiEkD3WNXxSCnt",
+    "dex": "raydium_cpmm",
+    "firstSeen": 1791028946
+   }
+  ],
+  "updatedAt": 1791166451
+ },
+ "/v1/chains/solana/search?q=Agency": {
+  "chain": "solana",
+  "query": "Agency",
+  "tokens": [
+   {
+    "token": "PGXpPuXMe4jpcjHwC4FCvtu5oMn4izLVRJVkwe3AHaM",
+    "symbol": "Agency",
+    "name": "Agency",
+    "image": "https://pbs.twimg.com/profile_images/2105704660116144128/u2fzyGVC_400x400.jpg",
+    "priceUsd": 2.688447447596337e-06,
+    "liquidityUsd": 242806.21490618165,
+    "volumeUsd": 32772996.00219991
+   },
+   {
+    "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+    "symbol": "Agency",
+    "name": "Agency",
+    "image": "https://ipfs.io/ipfs/bafybeicailrr3iobedoxprzs6evwq3nqxsezdhvxbhpseyhltfmufybxuq",
+    "priceUsd": 0.012402169398382247,
+    "liquidityUsd": 490945.0136094359,
+    "volumeUsd": 30097665.520332042
+   }
+  ]
+ },
+ "/v1/chains/solana/token/7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump?hours=24": {
+  "chain": "solana",
+  "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+  "symbol": "Agency",
+  "name": "Agency",
+  "image": "https://ipfs.io/ipfs/bafybeicailrr3iobedoxprzs6evwq3nqxsezdhvxbhpseyhltfmufybxuq",
+  "decimals": 6,
+  "supply": 966189741.871528,
+  "firstSeen": 1791028889,
+  "priceUsd": 0.012471350009671632,
+  "change1hPct": 0,
+  "change24hPct": -33.59296229824511,
+  "marketCapUsd": 12049690.446634114,
+  "liquidityUsd": 492710.3227884476,
+  "volume24hUsd": 22300513.95510154,
+  "trades24h": 98644,
+  "buys24h": 50875,
+  "sells24h": 47769,
+  "buyVolume24hUsd": 10815371.994912628,
+  "sellVolume24hUsd": 11485141.96018891,
+  "venues": [
+   {
+    "dex": "pumpswap",
+    "volumeUsd": 12526132.33339345,
+    "trades": 59671
+   },
+   {
+    "dex": "meteora_dlmm",
+    "volumeUsd": 9716267.646647243,
+    "trades": 27864
+   }
+  ],
+  "pools": [
+   {
+    "pool": "CyJwKnLiiY4fmiwqMCSWFSHxo7T9Ubshgs2uRAuJCrk5",
+    "dex": "pumpswap",
+    "quote": "So11111111111111111111111111111111111111112",
+    "priceUsd": 0.012471350009671632,
+    "liquidityUsd": 492426.2442871083,
+    "volumeUsd": 30096468.174518585,
+    "swaps": 152986,
+    "firstSeen": 1791028889,
+    "lastTrade": 1791151092
+   },
+   {
+    "pool": "4MRafCAZEk9KLLDJ7YAQSuwAFFtxz3fVLUuyDKySU8Ep",
+    "dex": "meteora_damm_v2",
+    "quote": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "priceUsd": 0.017382927320372235,
+    "liquidityUsd": 277.017254,
+    "volumeUsd": 1947.9255100000016,
+    "swaps": 3651,
+    "firstSeen": 1791067406,
+    "lastTrade": 1791124069
+   }
+  ],
+  "hourly": [
+   {
+    "hour": 1791082800,
+    "volumeUsd": 634272.1321694182,
+    "trades": 3874,
+    "buys": 2057
+   },
+   {
+    "hour": 1791086400,
+    "volumeUsd": 1392924.1494347786,
+    "trades": 7064,
+    "buys": 3395
+   }
+  ],
+  "updatedAt": 1791166385
+ },
+ "/v1/chains/solana/token/7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump/trades?limit=2": {
+  "chain": "solana",
+  "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+  "trades": [
+   {
+    "ts": 1791151156,
+    "slot": 453384204,
+    "side": "sell",
+    "tokenAmount": 1581.186594,
+    "quoteAmount": 0.161487883,
+    "usd": 19.551313486445476,
+    "priceUsd": 0.012402169398382247,
+    "dex": "pumpswap",
+    "pool": "CyJwKnLiiY4fmiwqMCSWFSHxo7T9Ubshgs2uRAuJCrk5",
+    "wallet": "ckdRDD9onSwL9yHgjEc5VdRx9BPmcsyVH9TjKGYygkY",
+    "tx": "5sT1cLSYjuD3BR4wNbGKTAcFgFLdY2FGxujWukJFQmgLm8i1qi37rQxdZS4EYyRdCuV35dU4Rn7GttkZmU4oe2op"
+   },
+   {
+    "ts": 1791151147,
+    "slot": 453384173,
+    "side": "buy",
+    "tokenAmount": 2879.134063,
+    "quoteAmount": 0.295798607,
+    "usd": 35.812234413351845,
+    "priceUsd": 0.012401339509037218,
+    "dex": "pumpswap",
+    "pool": "CyJwKnLiiY4fmiwqMCSWFSHxo7T9Ubshgs2uRAuJCrk5",
+    "wallet": "3QZv9xcDELwLqB8SggDJHfVhMTn5YhKtXMCaKUucutm3",
+    "tx": "Vz2VPQCo2j82g6mowse5961MnUEM6koE7VSaVhtVHQKsvkCHZ9HGVMTgbw92vDSJw1ThSDiVGkwn16EucjAK6Ny"
+   }
+  ],
+  "updatedAt": 1791166444
+ },
+ "/v1/chains/solana/token/7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump/candles?tf=1h&limit=8": {
+  "chain": "solana",
+  "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+  "pool": "CyJwKnLiiY4fmiwqMCSWFSHxo7T9Ubshgs2uRAuJCrk5",
+  "timeframe": "1h",
+  "candles": [
+   {
+    "t": 1791140400,
+    "o": 0.016581499823932228,
+    "h": 0.0167915473875269,
+    "l": 0.013856459444690225,
+    "c": 0.014365569915305174,
+    "volumeUsd": 336302.10729020054,
+    "trades": 2009
+   },
+   {
+    "t": 1791144000,
+    "o": 0.014362537896257067,
+    "h": 0.014962869347332729,
+    "l": 0.011578863188337602,
+    "c": 0.014393806600470372,
+    "volumeUsd": 495642.36503098987,
+    "trades": 2632
+   }
+  ],
+  "updatedAt": 1791166459
+ },
+ "/v1/chains/solana/traders?limit=2": {
+  "chain": "solana",
+  "sort": "pnl",
+  "windowDays": 1,
+  "botRule": "wallets above 3000 trades or 300 tokens a day are left out",
+  "traders": [],
+  "updatedAt": 1791166631
+ },
+ "/v1/chains/solana/wallet/3QZv9xcDELwLqB8SggDJHfVhMTn5YhKtXMCaKUucutm3?days=7": {
+  "chain": "solana",
+  "wallet": "3QZv9xcDELwLqB8SggDJHfVhMTn5YhKtXMCaKUucutm3",
+  "windowDays": 7,
+  "tokens": 3,
+  "trades": 10,
+  "volumeUsd": 249.92409078731498,
+  "boughtUsd": 157.82642149850838,
+  "soldUsd": 92.09766928880659,
+  "realizedPnlUsd": 10.89172430885074,
+  "unrealizedPnlUsd": -13.521686548756673,
+  "heldValueUsd": 92.65951096979586,
+  "winRate": 1,
+  "partialTokens": 1,
+  "likelyBot": false,
+  "positions": [
+   {
+    "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+    "symbol": "Agency",
+    "name": "Agency",
+    "image": "https://ipfs.io/ipfs/bafybeicailrr3iobedoxprzs6evwq3nqxsezdhvxbhpseyhltfmufybxuq",
+    "priceUsd": 0.012298957291368744,
+    "boughtUsd": 139.35060978011185,
+    "soldUsd": 62.536948288806585,
+    "boughtAmount": 9685.829453,
+    "soldAmount": 3589.699624,
+    "buys": 5,
+    "sells": 2,
+    "heldAmount": 6096.129829,
+    "heldValueUsd": 74.97604040951005,
+    "realizedPnlUsd": 10.89172430885074,
+    "unrealizedPnlUsd": -12.72934539064596,
+    "partial": false,
+    "lastDay": 1791072000
+   },
+   {
+    "token": "So11111111111111111111111111111111111111112",
+    "symbol": "SOL",
+    "name": "Solana",
+    "image": "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
+    "priceUsd": 120.9862,
+    "boughtUsd": 0,
+    "soldUsd": 29.560721,
+    "boughtAmount": 0,
+    "soldAmount": 0.247089203,
+    "buys": 0,
+    "sells": 1,
+    "heldAmount": 0,
+    "heldValueUsd": 0,
+    "realizedPnlUsd": null,
+    "unrealizedPnlUsd": 0,
+    "partial": true,
+    "lastDay": 1790985600
+   }
+  ],
+  "updatedAt": 1791166532
+ },
+ "/v1/chains/solana/wallet/3QZv9xcDELwLqB8SggDJHfVhMTn5YhKtXMCaKUucutm3/trades?limit=2": {
+  "chain": "solana",
+  "wallet": "3QZv9xcDELwLqB8SggDJHfVhMTn5YhKtXMCaKUucutm3",
+  "trades": [
+   {
+    "ts": 1791151147,
+    "slot": 453384173,
+    "side": "buy",
+    "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+    "symbol": "Agency",
+    "name": "Agency",
+    "tokenAmount": 2879.134063,
+    "quoteAmount": 0.295798607,
+    "usd": 35.812234413351845,
+    "priceUsd": 0.012401339509037218,
+    "dex": "pumpswap",
+    "pool": "CyJwKnLiiY4fmiwqMCSWFSHxo7T9Ubshgs2uRAuJCrk5",
+    "tx": "Vz2VPQCo2j82g6mowse5961MnUEM6koE7VSaVhtVHQKsvkCHZ9HGVMTgbw92vDSJw1ThSDiVGkwn16EucjAK6Ny"
+   },
+   {
+    "ts": 1791141717,
+    "slot": 453349000,
+    "side": "buy",
+    "token": "DoVAVzViX8Bjy3r15nwikSaSbzE6dV4ovd28aWpJpump",
+    "symbol": "HIGGS",
+    "name": "Higgspad",
+    "tokenAmount": 2231.366315,
+    "quoteAmount": 0.040323739,
+    "usd": 4.90003471839652,
+    "priceUsd": 0.0021763918544292736,
+    "dex": "pumpswap",
+    "pool": "BFrSZakeqNzVtM3EFhroo4eRhagmmWN8BRntiQKFH6Ru",
+    "tx": "5yzFpQRh11MNX9dVWZsNGkHN4nD1XW7KQqWXD931tsYnc2rYggjaNkzZ4bCvddXoEama9pz1hqo2DH1f8i9UBVTr"
+   }
+  ],
+  "updatedAt": 1791166571
+ },
+ "/v1/chains/solana/token/7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump/traders?limit=2": {
+  "chain": "solana",
+  "token": "7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump",
+  "windowHours": 24,
+  "since": 1791079200,
+  "priceUsd": 0.01420426088276189,
+  "traders": [
+   {
+    "wallet": "ARu4n5mFdZogZAravu7CcizaojWnS6oqka37gdLT5SZn",
+    "boughtUsd": 2176754.8047437067,
+    "soldUsd": 1884286.4740241242,
+    "netUsd": 292468.3307195825,
+    "trades": 11466,
+    "lastTrade": 1791152541,
+    "heldAmount": 18044940.3278099,
+    "heldValueUsd": 256315.04003008266,
+    "realizedPnlUsd": 30691.394381958165,
+    "unrealizedPnlUsd": -66844.68507145798,
+    "partial": false
+   },
+   {
+    "wallet": "MriyaNN8TMp6qRWjfr723PK7xgQK7yCt7Kg2v2PQu7X",
+    "boughtUsd": 508194.52591024636,
+    "soldUsd": 519052.2068625818,
+    "netUsd": -10857.680952335417,
+    "trades": 1436,
+    "lastTrade": 1791152211,
+    "heldAmount": 0,
+    "heldValueUsd": 0,
+    "realizedPnlUsd": 10307.184467280762,
+    "unrealizedPnlUsd": 0,
+    "partial": true
+   }
+  ],
+  "updatedAt": 1791167327
  }
 }
