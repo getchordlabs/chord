@@ -4659,5 +4659,117 @@
    }
   ],
   "nextBefore": 1791303523
+ },
+ "/v1/chains/solana/smart-traders?days=7&limit=2": {
+  "chain": "solana",
+  "windowDays": 7,
+  "from": 1790726400,
+  "coverageSince": 1790419777,
+  "computedAt": 1791304962,
+  "tookMs": 11141,
+  "population": {
+   "profitable": 16007,
+   "cadence": 3755,
+   "sniper": 86
+  },
+  "checked": {
+   "candidates": 250,
+   "kept": 25,
+   "flags": {
+    "cadence": 0,
+    "sniper": 0,
+    "burst": 92,
+    "sameslot": 125,
+    "arb": 8,
+    "scalp": 101,
+    "launch": 27
+   },
+   "suspect": 0,
+   "ineligible": 69,
+   "readErrors": 0,
+   "clustered": 0
+  },
+  "rules": {
+   "pricing": "PnL counts only swaps in pools quoted in SOL, USDC or USDT (direct USD); a position with more than 10 % of its amount traded through pools quoted in another token is left out (unpriced)",
+   "averageCost": "realized = sold amount (up to what was bought in the window) × (average sell − average buy); tokens bought before the window are not priced",
+   "suspect": "a position returning more than 1000× its cost, or one sell above $1,000,000 into a token whose deepest pool now holds less than 1/20 of it, is left out; a wallet whose profit came mostly from such positions is left out",
+   "cadence": "more than 500 swaps on any day",
+   "sniper": "more than 150 tokens on any day",
+   "burst": "8+ transactions inside one minute, in 3+ different minutes",
+   "sameslot": "5+ sells within 2 s of buying the same token (sandwich / bundle / launch sniper)",
+   "arb": "10+ transactions (and 20 %+ of all) that buy and sell the same token",
+   "cluster": "wallets that made their first buy of the same 3+ tokens within 2 s of each other are one operator: only the best score stays (siblings on its row, checked.clustered)",
+   "scalp": "median hold under 60 s over 5+ closed positions (sold before anyone could follow)",
+   "launch": "3+ closed positions, and at least half of them, first bought within 2 s of that pool's first swap (creator / bundle wallet)",
+   "eligibility": "volume ≥ $2000, ≥ 5 tokens bought and sold, ≥ 10 swaps, realized ≥ $1000, win rate ≥ 30 %",
+   "score": "realized × (0.35 + 0.65 × win rate shrunk toward 50 % with 20 phantom positions) × (0.5 + 0.5 × profitable days / active days) × (0.5 when one token made > 80 % of the profit, 0.75 when > 60 %) × exp(−hours since last trade / 48)"
+  },
+  "traders": [
+   {
+    "wallet": "9LXWa7V3AE15VfBupcx5gDts2ix3Y9NzbcKZKjkkq6hV",
+    "score": 37132.17771163606,
+    "realizedPnlUsd": 43978.0170266694,
+    "roi": 0.4170270878884252,
+    "winRate": 0.7761627906976745,
+    "winRateAdj": 0.760989010989011,
+    "closedTokens": 344,
+    "winningTokens": 267,
+    "tokens": 459,
+    "trades": 1356,
+    "volumeUsd": 314916.44803633285,
+    "activeDays": 7,
+    "profitableDays": 7,
+    "medianHoldS": 177.9890558719635,
+    "unrealizedPnlUsd": -61.60543642516731,
+    "heldValueUsd": 2038.5111692911005,
+    "costSoldUsd": 105456.02025361871,
+    "bestToken": {
+     "token": "Am6SB1xhuwyv6hENfR2uHj2fvKeo87KN8vVw28RcrmEa",
+     "symbol": "Cassie",
+     "name": "Cassie The Chimpanzee",
+     "image": "https://metadata.j7tracker.io/images/1c2700b89272443f",
+     "realizedPnlUsd": 7868.563813198551
+    },
+    "bestShare": 0.17892038671108912,
+    "unpricedTokens": 62,
+    "suspectTokens": 0,
+    "launchTokens": 20,
+    "siblings": 0,
+    "lastTrade": 1791304899
+   },
+   {
+    "wallet": "cATq48AALCiD2hECKZDgKHp3VoSHbXc4aDxSzgQLbc3",
+    "score": 32503.036821818743,
+    "realizedPnlUsd": 63356.15881453157,
+    "roi": 0.5491717745407618,
+    "winRate": 0.6666666666666666,
+    "winRateAdj": 0.5853658536585366,
+    "closedTokens": 21,
+    "winningTokens": 14,
+    "tokens": 25,
+    "trades": 100,
+    "volumeUsd": 308927.798739281,
+    "activeDays": 7,
+    "profitableDays": 4,
+    "medianHoldS": 1102.3087236881256,
+    "unrealizedPnlUsd": 0,
+    "heldValueUsd": 0,
+    "costSoldUsd": 115366.74270543561,
+    "bestToken": {
+     "token": "9m4Swt3D8aTzzeDEaA5xmCA8Sjd5uvWrhvMKTocjpump",
+     "symbol": "GTA6 Coin",
+     "name": "GTA6 Coin",
+     "image": "https://gateway.pinata.cloud/ipfs/bafkreibbdrekbfek6cbxrzi4meqbxzjnxzaycvlfnghnde3kr2rrz3vxne",
+     "realizedPnlUsd": 19491.505347944916
+    },
+    "bestShare": 0.3076497330749522,
+    "unpricedTokens": 0,
+    "suspectTokens": 0,
+    "launchTokens": 7,
+    "siblings": 0,
+    "lastTrade": 1791285568
+   }
+  ],
+  "sort": "score"
  }
 }
