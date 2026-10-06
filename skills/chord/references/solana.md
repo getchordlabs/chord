@@ -56,6 +56,7 @@ BASE=https://api.getchord.xyz/v1/chains/solana
 | Latest prints | | `GET $BASE/token/MINT/trades?limit=50[&before=TS]` |
 | Who traded a token | | `GET $BASE/token/MINT/traders?hours=24&limit=20` (hours 1–48) |
 | Today's best traders | | `GET $BASE/traders?sort=pnl\|volume&days=1&limit=20` |
+| Smart traders (several days, bots removed) | | `GET $BASE/smart-traders?days=7&sort=score\|pnl\|roi\|winrate&limit=20` (days 1, 3 or 7) |
 | A wallet's tokens and PnL | | `GET $BASE/wallet/ADDR?days=7` (days 1–45) |
 | A wallet's swaps | | `GET $BASE/wallet/ADDR/trades?limit=50[&before=TS]` |
 | Freshness | | `GET $BASE/status` |
@@ -77,6 +78,12 @@ Notes per call:
   afterwards: retry once after a minute or use a shorter `hours`.
 - `traders` (board): UTC day (`days=2` adds yesterday), bots left out (`botRule`: over 3,000 trades or
   300 tokens a day) and wallets under $1,000 of volume. Empty early in the UTC day.
+- `smart-traders`: the wallets with repeated profit over 1, 3 or 7 UTC days (today included, never before
+  `coverageSince` — `from` says where the window really starts). PnL counts only swaps in pools quoted in
+  SOL / USDC / USDT; a position returning over 1,000× or selling more than the market could pay is left out.
+  Bots are removed by named rules (`checked.flags`: cadence, sniper, burst, sameslot, arb, scalp) and the
+  rank is a luck-shrunk `score` (`rules.score`). Rebuilt every 10 minutes (`computedAt`); `503` right after
+  a deploy until the first build.
 - `wallet/ADDR`: `likelyBot` = over 3,000 trades or 300 tokens a day. A wallet the tape has never seen
   answers zeros, not an error.
 
