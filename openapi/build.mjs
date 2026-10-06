@@ -883,6 +883,80 @@ add("/chains/solana/wallet/{address}/trades", "get", op(T.sol, "solWalletTrades"
   { params: [SOL_WAL_P, q("limit", { type: "integer", minimum: 1, maximum: 200, default: 50 }, "Newest rows."), SOL_BEFORE],
     responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, wallet: SOL_ADDR, trades: arr(obj({ ts: SOL_TS, slot: int(""), side: { type: "string", enum: ["buy", "sell"] }, token: SOL_ADDR, symbol: nullable(str("")), name: nullable(str("")), tokenAmount: num("Whole tokens."), quoteAmount: num("Whole units of the pool's quote."), usd: nullable(num("")), priceUsd: nullable(num("")), dex: SOL_DEX, pool: nullable(SOL_ADDR), tx: SOL_SIG })), updatedAt: SOL_UPDATED }), ex(`/v1/chains/solana/wallet/${SOL_WAL}/trades?limit=2`)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_CURSOR`") } }));
 
+// Solana liquidity (LP) ─────────────────────────────────────────────────────────────────────────
+// routes/solana.ts → services/solTape.ts → packages/sol/src/lpQueries.ts. Examples captured live on 2026-10-06: the SOL/USDC
+// Meteora DLMM pool below and an LP wallet with closed positions in it.
+const SOL_LP_POOL = "HTvjzsfX3yU6BUodCjZ5vZkUrAxMDTrBs3CJaq43ashR";
+const SOL_LP_WAL = "GwBsj9GJdFrATQs1k9EYUyfaatKZDiViy8tkU9JP3TUL";
+const SOL_LP_POS = "BJMyRCurUG45Lst2tZf2RMVbxwCopyWzxzHjgQz5ET6m";
+const SOL_LP_INTRO = `Liquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.
+
+- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.
+- **Since.** \`since\` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is \`partial: true\` and carries no PnL.
+- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.
+- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. \`lower\` / \`upper\` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.
+- **Amounts** are whole tokens in the pool's own order (\`mintA\` / \`mintB\`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (\`verified\`).
+- **Addresses** are base58 and case-sensitive, as on the other Solana routes.`;
+const SOL_LP_SIDES = { mintA: nullable(SOL_ADDR), symbolA: nullable(str("Creator-chosen.")), mintB: nullable(SOL_ADDR), symbolB: nullable(str("Creator-chosen.")) };
+const SOL_LP_DEX = str("`meteora_dlmm` · `meteora_damm_v2` · `raydium_clmm` · `pumpswap`.");
+const SolLpPosition = obj({
+  position: nullable(SOL_ADDR), dex: SOL_LP_DEX, pool: nullable(SOL_ADDR), owner: nullable(SOL_ADDR), ...SOL_LP_SIDES,
+  lower: nullable(int("DLMM bin id or CLMM tick.")), upper: nullable(int("")), status: { type: "string", enum: ["open", "closed"] },
+  openedAt: nullable(SOL_TS), closedAt: nullable(SOL_TS), firstEvent: SOL_TS, lastEvent: SOL_TS, events: int(""),
+  depositedA: nullable(num("Whole tokens.")), depositedB: nullable(num("")), withdrawnA: nullable(num("")), withdrawnB: nullable(num("")), feesA: nullable(num("Claimed.")), feesB: nullable(num("Claimed.")),
+  depositedUsd: num(""), withdrawnUsd: num(""), feesClaimedUsd: num(""),
+  realizedPnlUsd: nullable(num("Withdrawn + fees − deposited; null unless closed, not partial and fully priced.")),
+  partial: bool("The tape did not see the open (opened before `since`); PumpSwap: more came out than the tape saw going in."), unpricedEvents: int("Value events without a USD price."),
+}, "One Solana LP position.");
+components.schemas.SolLpPosition = SolLpPosition;
+const SOL_LP_EVENT = obj({ ts: SOL_TS, slot: int(""), signature: nullable(SOL_SIG), dex: SOL_LP_DEX, kind: { type: "string", enum: ["add", "remove", "fee", "open", "close"] },
+  pool: nullable(SOL_ADDR), position: nullable(SOL_ADDR), owner: nullable(SOL_ADDR), amountA: nullable(num("Whole tokens.")), amountB: nullable(num("")), usd: nullable(num("")),
+  lower: nullable(int("")), upper: nullable(int("")), verified: nullable(bool("true = matches the vault balance changes; null = could not be checked (shared vault, first deposit of a new pool)")) });
+const SOL_LP_STATUS = q("status", { type: "string", enum: ["open", "closed", "all"], default: "all" }, "Which positions.");
+const SOL_LP_HOURS = q("hours", { type: "integer", minimum: 1, maximum: 168, default: 24 }, "Window in hours, never before `since`.");
+const SOL_LP_POOL_P = p("address", SOL_ADDR, "Pool address, base58.");
+
+add("/chains/solana/lp/pools", "get", op(T.sol, "solLpPools", "Liquidity pools by LP activity", `Every pool where liquidity moved in the window, ranked: \`fees\` (claimed fees, default), \`deposits\`, \`withdrawals\`, \`net\` (net inflow), \`lps\` (distinct LPs) or \`tvl\`. Each row has the pool's TVL estimate and swap volume from the swap tape (TVL is null for most DLMM and CLMM pools: their swap events carry no reserve), deposits, withdrawals, claimed fees, counts and open positions. Cached 60 seconds.\n\n${SOL_LP_INTRO}`,
+  { params: [q("sort", { type: "string", enum: ["fees", "deposits", "withdrawals", "net", "lps", "tvl"], default: "fees" }, ""), q("limit", { type: "integer", minimum: 1, maximum: 100, default: 50 }, ""), SOL_LP_HOURS],
+    responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, sort: str(""), windowHours: int(""), since: SOL_TS, pools: int("Pools with activity in the window."),
+      rows: arr(obj({ pool: SOL_ADDR, dex: SOL_LP_DEX, ...SOL_LP_SIDES, tvlUsd: nullable(num("")), priceUsd: nullable(num("")), token: nullable(SOL_ADDR), swapVolumeUsd: nullable(num("")),
+        depositsUsd: num(""), withdrawalsUsd: num(""), netFlowUsd: num(""), feesClaimedUsd: num(""), adds: int(""), removes: int(""), claims: int(""), opens: int(""), closes: int(""), lps: int(""), openPositions: nullable(int("")) })),
+      updatedAt: SOL_UPDATED }), ex("/v1/chains/solana/lp/pools?sort=fees&limit=2")), ...SOL_ERR("`BAD_LIMIT` / `BAD_HOURS` / `BAD_SORT`") } }));
+
+add("/chains/solana/lp/top", "get", op(T.sol, "solLpTop", "LP wallets", `Wallets ranked over the LP positions active in the window: \`fees\` (claimed, default), \`deposits\` or \`pnl\` (realized). Many leaders are vaults and rebalancing bots; a short window is not a track record. Cached 60 seconds.\n\n${SOL_LP_INTRO}`,
+  { params: [q("sort", { type: "string", enum: ["fees", "deposits", "pnl"], default: "fees" }, ""), q("limit", { type: "integer", minimum: 1, maximum: 100, default: 50 }, ""), SOL_LP_HOURS],
+    responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, sort: str(""), windowHours: int(""), since: SOL_TS,
+      rows: arr(obj({ wallet: nullable(SOL_ADDR), positions: int(""), open: int(""), pools: int(""), depositedUsd: num(""), withdrawnUsd: num(""), feesClaimedUsd: num(""), realizedPnlUsd: nullable(num("")), realizedPositions: int(""), winRate: nullable(num("0–1.")) })),
+      updatedAt: SOL_UPDATED }), ex("/v1/chains/solana/lp/top?sort=fees&limit=2")), ...SOL_ERR("`BAD_LIMIT` / `BAD_HOURS` / `BAD_SORT`") } }));
+
+add("/chains/solana/lp/pool/{address}", "get", op(T.sol, "solLpPool", "One pool's liquidity", `Deposits, withdrawals, net flow and claimed fees over the window, and by hour; open positions and their owners; the pair with decimals, TVL estimate and swap volume. Cached 20 seconds.\n\n${SOL_LP_INTRO}`,
+  { params: [SOL_LP_POOL_P, SOL_LP_HOURS],
+    responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, pool: SOL_ADDR, dex: SOL_LP_DEX, windowHours: int(""), since: SOL_TS, ...SOL_LP_SIDES, decimalsA: int(""), decimalsB: int(""),
+      tvlUsd: nullable(num("")), priceUsd: nullable(num("")), token: nullable(SOL_ADDR), firstLpEvent: SOL_TS, swapVolumeUsd: nullable(num("")), depositsUsd: num(""), withdrawalsUsd: num(""), netFlowUsd: num(""), feesClaimedUsd: num(""),
+      openPositions: int(""), openOwners: int(""), hourly: arr(obj({ hour: SOL_TS, depositsUsd: num(""), withdrawalsUsd: num(""), feesClaimedUsd: num(""), adds: int(""), removes: int(""), claims: int(""), opens: int(""), closes: int(""), lps: int("") })),
+      updatedAt: SOL_UPDATED }), ex(`/v1/chains/solana/lp/pool/${SOL_LP_POOL}`)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_HOURS`", { 404: errRes("`POOL_NOT_FOUND`: no liquidity event in this pool since LP decoding started, or its venue is not read.") }) } }));
+
+add("/chains/solana/lp/pool/{address}/positions", "get", op(T.sol, "solLpPoolPositions", "A pool's positions", `The pool's positions, most recently active first. Cached 20 seconds.\n\n${SOL_LP_INTRO}`,
+  { params: [SOL_LP_POOL_P, SOL_LP_STATUS, q("limit", { type: "integer", minimum: 1, maximum: 200, default: 50 }, "")],
+    responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, pool: SOL_ADDR, status: str(""), since: nullable(SOL_TS), positions: arr(ref("SolLpPosition")), updatedAt: SOL_UPDATED }),
+      ex(`/v1/chains/solana/lp/pool/${SOL_LP_POOL}/positions?status=open&limit=2`)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_STATUS` / `BAD_LIMIT`") } }));
+
+add("/chains/solana/lp/wallet/{address}", "get", op(T.sol, "solLpWallet", "A wallet's LP positions", `The wallet's positions as owner (DLMM: the position's owner, not an operator acting for it), most recently active first, with totals over every position of the \`status\` asked: deposited, withdrawn, claimed fees, realized PnL and win rate over positions seen open to close. Cached 15 seconds.\n\n${SOL_LP_INTRO}`,
+  { params: [SOL_WAL_P, SOL_LP_STATUS, q("limit", { type: "integer", minimum: 1, maximum: 200, default: 100 }, "Rows; totals cover every position.")],
+    responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, wallet: SOL_ADDR, status: str(""), since: nullable(SOL_TS), positions: int(""), open: int(""), closed: int(""), pools: int(""),
+      depositedUsd: num(""), withdrawnUsd: num(""), feesClaimedUsd: num(""), realizedPnlUsd: nullable(num("")), realizedPositions: int(""), winRate: nullable(num("0–1.")), rows: arr(ref("SolLpPosition")), updatedAt: SOL_UPDATED }),
+      ex(`/v1/chains/solana/lp/wallet/${SOL_LP_WAL}?limit=2`)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_STATUS` / `BAD_LIMIT`") } }));
+
+for (const [by, opId, title, key] of [
+  ["pool", "solLpPoolEvents", "A pool's liquidity events", `/v1/chains/solana/lp/pool/${SOL_LP_POOL}/events?limit=2`],
+  ["wallet", "solLpWalletEvents", "A wallet's liquidity events", `/v1/chains/solana/lp/wallet/${SOL_LP_WAL}/events?limit=2`],
+  ["position", "solLpPositionEvents", "One position's events", `/v1/chains/solana/lp/position/${SOL_LP_POS}/events?limit=2`],
+]) {
+  add(`/chains/solana/lp/${by}/{address}/events`, "get", op(T.sol, opId, title, `Adds, removes, fee claims, opens and closes, newest first${by === "wallet" ? " (the wallet as the position's owner)" : ""}. A close row of a DLMM \`close_position2\` or a Raydium CLMM position has no \`pool\`: the instruction does not carry it.\n\n${SOL_LP_INTRO}`,
+    { params: [p("address", SOL_ADDR, `${by[0].toUpperCase()}${by.slice(1)} address, base58.`), q("limit", { type: "integer", minimum: 1, maximum: 200, default: 50 }, ""), SOL_BEFORE],
+      responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, [by === "wallet" ? "owner" : by]: SOL_ADDR, events: arr(SOL_LP_EVENT), nextBefore: nullable(SOL_TS) }), ex(key)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_CURSOR`") } }));
+}
+
 // Streaming (documented as operations so they appear in the reference; protocol detail lives in Concepts → Streaming) ──
 add("/stream/market", "get", op(T.stream, "streamMarket", "Server-sent events: prices", `One \`text/event-stream\` feed, no key, EventSource-friendly with automatic reconnect. Events: \`rh-ticker\` (fresh prices for chain 4663, about every 10 s, only addresses whose price moved), \`ticker\` / \`whales\` / \`defi\` (Monad), \`ping\` every 5 s. Capacity 500 clients (\`503\` beyond). Arc and Robinhood Chain boards stream faster over the WebSocket \`prices\` channel — see Concepts → Streaming.`,
   { responses: { 200: { description: "`text/event-stream`", content: { "text/event-stream": { schema: { type: "string" }, example: 'event: rh-ticker\ndata: {"items":[{"address":"0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec","priceUsd":220.97,"change24h":-0.71}]}\n\nevent: ping\ndata: 1789891855\n' } } }, 503: errRes("At capacity.") } }));
@@ -924,7 +998,7 @@ Amounts are decimal strings in the token's smallest unit. Timestamps are Unix se
     { name: T.bridge, description: "Circle CCTP fast transfer to Arc, and LI.FI routes from 60+ chains." },
     { name: T.rh, description: "Robinhood Chain (chain 4663): chain totals, tokens and tokenized stocks from the rollup tables." },
     { name: T.chains, description: "Avalanche C-Chain (43114), Base (8453) and BNB Chain (56): chain totals, the 24-hour token board, prints, one token's tape, venue share and a wallet's PnL, from Chord's own index of every swap on those chains. One set of routes, the chain in the path." },
-    { name: T.sol, description: "Solana, read-only: chain totals, the 24-hour token board, search, one token's stats, prints, candles and traders, the day's trader board, and a wallet's PnL, from Chord's own tape of the swap events of 11 Solana venues (PumpSwap, pump.fun, Meteora, Raydium, Orca). Prop AMMs and order books are not read. Addresses are base58 and case-sensitive; the path segment is the literal `solana`. Read the notes on each operation before comparing these numbers with an all-market source." },
+    { name: T.sol, description: "Solana, read-only: chain totals, the 24-hour token board, search, one token's stats, prints, candles and traders, the day's trader board, a wallet's PnL, and liquidity (LP pools, positions, events, LP wallets on Meteora DLMM / DAMM v2, Raydium CLMM and PumpSwap), from Chord's own tape of the swap events of 11 Solana venues (PumpSwap, pump.fun, Meteora, Raydium, Orca). Prop AMMs and order books are not read. Addresses are base58 and case-sensitive; the path segment is the literal `solana`. Read the notes on each operation before comparing these numbers with an all-market source." },
     { name: T.stream, description: "Server-sent events and the public WebSocket." },
     { name: T.account, description: "Your key, and the service's own health." },
   ],

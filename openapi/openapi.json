@@ -70,7 +70,7 @@
     },
     {
       "name": "Solana data",
-      "description": "Solana, read-only: chain totals, the 24-hour token board, search, one token's stats, prints, candles and traders, the day's trader board, and a wallet's PnL, from Chord's own tape of the swap events of 11 Solana venues (PumpSwap, pump.fun, Meteora, Raydium, Orca). Prop AMMs and order books are not read. Addresses are base58 and case-sensitive; the path segment is the literal `solana`. Read the notes on each operation before comparing these numbers with an all-market source."
+      "description": "Solana, read-only: chain totals, the 24-hour token board, search, one token's stats, prints, candles and traders, the day's trader board, a wallet's PnL, and liquidity (LP pools, positions, events, LP wallets on Meteora DLMM / DAMM v2, Raydium CLMM and PumpSwap), from Chord's own tape of the swap events of 11 Solana venues (PumpSwap, pump.fun, Meteora, Raydium, Orca). Prop AMMs and order books are not read. Addresses are base58 and case-sensitive; the path segment is the literal `solana`. Read the notes on each operation before comparing these numbers with an all-market source."
     },
     {
       "name": "Streaming",
@@ -19039,6 +19039,2010 @@
         }
       }
     },
+    "/chains/solana/lp/pools": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solLpPools",
+        "summary": "Liquidity pools by LP activity",
+        "description": "Every pool where liquidity moved in the window, ranked: `fees` (claimed fees, default), `deposits`, `withdrawals`, `net` (net inflow), `lps` (distinct LPs) or `tvl`. Each row has the pool's TVL estimate and swap volume from the swap tape (TVL is null for most DLMM and CLMM pools: their swap events carry no reserve), deposits, withdrawals, claimed fees, counts and open positions. Cached 60 seconds.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
+        "parameters": [
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fees",
+                "deposits",
+                "withdrawals",
+                "net",
+                "lps",
+                "tvl"
+              ],
+              "default": "fees"
+            },
+            "description": ""
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "description": ""
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 168,
+              "default": 24
+            },
+            "description": "Window in hours, never before `since`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "sort": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "windowHours": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "since": {
+                      "type": "integer",
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "pools": {
+                      "type": "integer",
+                      "description": "Pools with activity in the window."
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "pool": {
+                            "type": "string",
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": "`meteora_dlmm` · `meteora_damm_v2` · `raydium_clmm` · `pumpswap`."
+                          },
+                          "mintA": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "symbolA": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Creator-chosen."
+                          },
+                          "mintB": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "symbolB": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Creator-chosen."
+                          },
+                          "tvlUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "priceUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "token": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "swapVolumeUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "depositsUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "withdrawalsUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "netFlowUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "feesClaimedUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "adds": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "removes": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "claims": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "opens": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "closes": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "lps": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "openPositions": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          }
+                        }
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "sort": "fees",
+                  "windowHours": 24,
+                  "since": 1791301995,
+                  "pools": 862,
+                  "rows": [
+                    {
+                      "pool": "7fDzFPYhdtNm5NbqvZYRcjB879DxH4dRjmMhbHSYqM5J",
+                      "dex": "meteora_damm_v2",
+                      "mintA": "TfLEzpE2rvwng5WPDP7XqsMoNLfgk2mKXNxJUvQs8c1",
+                      "symbolA": "LOCAL",
+                      "mintB": "So11111111111111111111111111111111111111112",
+                      "symbolB": "SOL",
+                      "tvlUsd": 27625.24059411423,
+                      "priceUsd": 0.00007144600292746474,
+                      "token": "TfLEzpE2rvwng5WPDP7XqsMoNLfgk2mKXNxJUvQs8c1",
+                      "swapVolumeUsd": 4454.320941113588,
+                      "depositsUsd": 0,
+                      "withdrawalsUsd": 0,
+                      "netFlowUsd": 0,
+                      "feesClaimedUsd": 4161.145469719044,
+                      "adds": 0,
+                      "removes": 0,
+                      "claims": 2,
+                      "opens": 0,
+                      "closes": 0,
+                      "lps": 1,
+                      "openPositions": 1
+                    },
+                    {
+                      "pool": "HbjYfcWZBjCBYTJpZkLGxqArVmZVu3mQcRudb6Wg1sVh",
+                      "dex": "meteora_dlmm",
+                      "mintA": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+                      "symbolA": "PUMP",
+                      "mintB": "So11111111111111111111111111111111111111112",
+                      "symbolB": "SOL",
+                      "tvlUsd": null,
+                      "priceUsd": 0.006306820783643733,
+                      "token": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+                      "swapVolumeUsd": 19055.704227499944,
+                      "depositsUsd": 7769.8327865424735,
+                      "withdrawalsUsd": 41.92886719122702,
+                      "netFlowUsd": 7727.903919351246,
+                      "feesClaimedUsd": 3075.699010802388,
+                      "adds": 11,
+                      "removes": 1,
+                      "claims": 10,
+                      "opens": 0,
+                      "closes": 0,
+                      "lps": 7,
+                      "openPositions": 7
+                    }
+                  ],
+                  "updatedAt": 1791303661
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_LIMIT` / `BAD_HOURS` / `BAD_SORT`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/lp/top": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solLpTop",
+        "summary": "LP wallets",
+        "description": "Wallets ranked over the LP positions active in the window: `fees` (claimed, default), `deposits` or `pnl` (realized). Many leaders are vaults and rebalancing bots; a short window is not a track record. Cached 60 seconds.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
+        "parameters": [
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fees",
+                "deposits",
+                "pnl"
+              ],
+              "default": "fees"
+            },
+            "description": ""
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "description": ""
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 168,
+              "default": 24
+            },
+            "description": "Window in hours, never before `since`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "sort": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "windowHours": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "since": {
+                      "type": "integer",
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "wallet": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "positions": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "open": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "pools": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "depositedUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "withdrawnUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "feesClaimedUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "realizedPnlUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "realizedPositions": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "winRate": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "0–1."
+                          }
+                        }
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "sort": "fees",
+                  "windowHours": 24,
+                  "since": 1791301995,
+                  "rows": [
+                    {
+                      "wallet": "4FP4tZxbFqAbdnpTxNLjq2U9H2mmxQ2WhCxrqQ2jadFu",
+                      "positions": 1,
+                      "open": 1,
+                      "pools": 1,
+                      "depositedUsd": 0,
+                      "withdrawnUsd": 0,
+                      "feesClaimedUsd": 4161.145469719044,
+                      "realizedPnlUsd": null,
+                      "realizedPositions": 0,
+                      "winRate": null
+                    },
+                    {
+                      "wallet": "7bAvDPmybUxnHE16aSUooFG5LxExc6DfAcjcRGfLXdJT",
+                      "positions": 1,
+                      "open": 1,
+                      "pools": 1,
+                      "depositedUsd": 7713.205912149275,
+                      "withdrawnUsd": 0,
+                      "feesClaimedUsd": 3070.9286966812124,
+                      "realizedPnlUsd": null,
+                      "realizedPositions": 0,
+                      "winRate": null
+                    }
+                  ],
+                  "updatedAt": 1791303661
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_LIMIT` / `BAD_HOURS` / `BAD_SORT`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/lp/pool/{address}": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solLpPool",
+        "summary": "One pool's liquidity",
+        "description": "Deposits, withdrawals, net flow and claimed fees over the window, and by hour; open positions and their owners; the pair with decimals, TVL estimate and swap volume. Cached 20 seconds.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "Pool address, base58."
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 168,
+              "default": 24
+            },
+            "description": "Window in hours, never before `since`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "pool": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "dex": {
+                      "type": "string",
+                      "description": "`meteora_dlmm` · `meteora_damm_v2` · `raydium_clmm` · `pumpswap`."
+                    },
+                    "windowHours": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "since": {
+                      "type": "integer",
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "mintA": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "symbolA": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Creator-chosen."
+                    },
+                    "mintB": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "symbolB": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Creator-chosen."
+                    },
+                    "decimalsA": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "decimalsB": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "tvlUsd": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "priceUsd": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "token": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "firstLpEvent": {
+                      "type": "integer",
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "swapVolumeUsd": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "depositsUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "withdrawalsUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "netFlowUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "feesClaimedUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "openPositions": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "openOwners": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "hourly": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "hour": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "depositsUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "withdrawalsUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "feesClaimedUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "adds": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "removes": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "claims": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "opens": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "closes": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "lps": {
+                            "type": "integer",
+                            "description": ""
+                          }
+                        }
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "pool": "HTvjzsfX3yU6BUodCjZ5vZkUrAxMDTrBs3CJaq43ashR",
+                  "dex": "meteora_dlmm",
+                  "windowHours": 24,
+                  "since": 1791301995,
+                  "mintA": "So11111111111111111111111111111111111111112",
+                  "symbolA": "SOL",
+                  "decimalsA": 9,
+                  "mintB": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                  "symbolB": "USDC",
+                  "decimalsB": 6,
+                  "tvlUsd": null,
+                  "priceUsd": 120.90833585378545,
+                  "token": "So11111111111111111111111111111111111111112",
+                  "firstLpEvent": 1791302002,
+                  "swapVolumeUsd": 657350.330032,
+                  "depositsUsd": 46262.672679370095,
+                  "withdrawalsUsd": 12314.010901404514,
+                  "netFlowUsd": 33948.66177796558,
+                  "feesClaimedUsd": 25.931564176688006,
+                  "openPositions": 22,
+                  "openOwners": 17,
+                  "hourly": [
+                    {
+                      "hour": 1791298800,
+                      "depositsUsd": 30397.05064594894,
+                      "withdrawalsUsd": 7196.542626796252,
+                      "feesClaimedUsd": 0.370617802409548,
+                      "adds": 52,
+                      "removes": 28,
+                      "claims": 30,
+                      "opens": 24,
+                      "closes": 0,
+                      "lps": 10
+                    },
+                    {
+                      "hour": 1791302400,
+                      "depositsUsd": 15865.622033421156,
+                      "withdrawalsUsd": 5117.468274608262,
+                      "feesClaimedUsd": 25.56094637427846,
+                      "adds": 56,
+                      "removes": 35,
+                      "claims": 36,
+                      "opens": 27,
+                      "closes": 0,
+                      "lps": 15
+                    }
+                  ],
+                  "updatedAt": 1791303661
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_HOURS`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`POOL_NOT_FOUND`: no liquidity event in this pool since LP decoding started, or its venue is not read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/lp/pool/{address}/positions": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solLpPoolPositions",
+        "summary": "A pool's positions",
+        "description": "The pool's positions, most recently active first. Cached 20 seconds.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "Pool address, base58."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ],
+              "default": "all"
+            },
+            "description": "Which positions."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "pool": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "since": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "positions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SolLpPosition"
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "pool": "HTvjzsfX3yU6BUodCjZ5vZkUrAxMDTrBs3CJaq43ashR",
+                  "status": "open",
+                  "since": 1791301995,
+                  "positions": [
+                    {
+                      "position": "6gDiPzm69sdQMAAMUjSwY8n1ruPXYpy6Yx5tTt3PBgPv",
+                      "dex": "meteora_dlmm",
+                      "pool": "HTvjzsfX3yU6BUodCjZ5vZkUrAxMDTrBs3CJaq43ashR",
+                      "owner": "GDzKV9YibjzWNtFCeGSAXntzv8e2tU1UcLPV1hoXxXJM",
+                      "mintA": "So11111111111111111111111111111111111111112",
+                      "symbolA": "SOL",
+                      "mintB": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                      "symbolB": "USDC",
+                      "lower": -21194,
+                      "upper": -21170,
+                      "status": "open",
+                      "openedAt": 1791303634,
+                      "closedAt": null,
+                      "firstEvent": 1791303634,
+                      "lastEvent": 1791303634,
+                      "events": 2,
+                      "depositedA": 0,
+                      "depositedB": 65.188341,
+                      "withdrawnA": 0,
+                      "withdrawnB": 0,
+                      "feesA": 0,
+                      "feesB": 0,
+                      "depositedUsd": 65.188341,
+                      "withdrawnUsd": 0,
+                      "feesClaimedUsd": 0,
+                      "realizedPnlUsd": null,
+                      "partial": false,
+                      "unpricedEvents": 0
+                    },
+                    {
+                      "position": "G8LWKkSM58cGfty8Huw7PAsaRz86LqyaysUhMLL8HdD3",
+                      "dex": "meteora_dlmm",
+                      "pool": "HTvjzsfX3yU6BUodCjZ5vZkUrAxMDTrBs3CJaq43ashR",
+                      "owner": "zmpMLRAH2Nt5ZDaax1jXH9QdmVRzw7rHm84sKpZa6wy",
+                      "mintA": "So11111111111111111111111111111111111111112",
+                      "symbolA": "SOL",
+                      "mintB": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                      "symbolB": "USDC",
+                      "lower": -21167,
+                      "upper": -21091,
+                      "status": "open",
+                      "openedAt": 1791302020,
+                      "closedAt": null,
+                      "firstEvent": 1791302020,
+                      "lastEvent": 1791303567,
+                      "events": 25,
+                      "depositedA": 22.506085353,
+                      "depositedB": 1668.168769,
+                      "withdrawnA": 16.697187434,
+                      "withdrawnB": 1367.959384,
+                      "feesA": 0.001835888,
+                      "feesB": 0.267907,
+                      "depositedUsd": 4385.0568295447565,
+                      "withdrawnUsd": 3383.4942419848394,
+                      "feesClaimedUsd": 0.48990795627555367,
+                      "realizedPnlUsd": null,
+                      "partial": false,
+                      "unpricedEvents": 0
+                    }
+                  ],
+                  "updatedAt": 1791303662
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_STATUS` / `BAD_LIMIT`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/lp/wallet/{address}": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solLpWallet",
+        "summary": "A wallet's LP positions",
+        "description": "The wallet's positions as owner (DLMM: the position's owner, not an operator acting for it), most recently active first, with totals over every position of the `status` asked: deposited, withdrawn, claimed fees, realized PnL and win rate over positions seen open to close. Cached 15 seconds.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "Wallet address, base58, exactly as it appears on-chain."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ],
+              "default": "all"
+            },
+            "description": "Which positions."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            },
+            "description": "Rows; totals cover every position."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "wallet": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "since": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "positions": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "open": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "closed": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "pools": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "depositedUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "withdrawnUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "feesClaimedUsd": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "realizedPnlUsd": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "realizedPositions": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "winRate": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "0–1."
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SolLpPosition"
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "wallet": "GwBsj9GJdFrATQs1k9EYUyfaatKZDiViy8tkU9JP3TUL",
+                  "status": "all",
+                  "since": 1791301995,
+                  "positions": 6,
+                  "open": 1,
+                  "closed": 5,
+                  "pools": 1,
+                  "depositedUsd": 75816.33043309217,
+                  "withdrawnUsd": 75753.276828783,
+                  "feesClaimedUsd": 52.68063852704718,
+                  "realizedPnlUsd": -83.25162531591923,
+                  "realizedPositions": 4,
+                  "winRate": 0.5,
+                  "rows": [
+                    {
+                      "position": "9FSWX8ctaKQKYsTpxuuXEMWVXYm3NGm9cDCLYvs6zhE7",
+                      "dex": "meteora_dlmm",
+                      "pool": "5whNk71ua6aRtNKazDqEeAimmfzuX9epJcjh4isQKprn",
+                      "owner": "GwBsj9GJdFrATQs1k9EYUyfaatKZDiViy8tkU9JP3TUL",
+                      "mintA": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+                      "symbolA": "SPCXx",
+                      "mintB": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                      "symbolB": "USDC",
+                      "lower": 688,
+                      "upper": 693,
+                      "status": "open",
+                      "openedAt": 1791303527,
+                      "closedAt": null,
+                      "firstEvent": 1791303527,
+                      "lastEvent": 1791303527,
+                      "events": 2,
+                      "depositedA": 87.25797003,
+                      "depositedB": 0,
+                      "withdrawnA": 0,
+                      "withdrawnB": 0,
+                      "feesA": 0,
+                      "feesB": 0,
+                      "depositedUsd": 15125.346891374138,
+                      "withdrawnUsd": 0,
+                      "feesClaimedUsd": 0,
+                      "realizedPnlUsd": null,
+                      "partial": false,
+                      "unpricedEvents": 0
+                    },
+                    {
+                      "position": "BJMyRCurUG45Lst2tZf2RMVbxwCopyWzxzHjgQz5ET6m",
+                      "dex": "meteora_dlmm",
+                      "pool": "5whNk71ua6aRtNKazDqEeAimmfzuX9epJcjh4isQKprn",
+                      "owner": "GwBsj9GJdFrATQs1k9EYUyfaatKZDiViy8tkU9JP3TUL",
+                      "mintA": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+                      "symbolA": "SPCXx",
+                      "mintB": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                      "symbolB": "USDC",
+                      "lower": 691,
+                      "upper": 693,
+                      "status": "closed",
+                      "openedAt": 1791303350,
+                      "closedAt": 1791303523,
+                      "firstEvent": 1791303350,
+                      "lastEvent": 1791303523,
+                      "events": 5,
+                      "depositedA": 0,
+                      "depositedB": 15169.346751,
+                      "withdrawnA": 87.22116669,
+                      "withdrawnB": 0,
+                      "feesA": 0.03680336,
+                      "feesB": 0,
+                      "depositedUsd": 15169.346751,
+                      "withdrawnUsd": 15118.967379175197,
+                      "feesClaimedUsd": 6.379515665752227,
+                      "realizedPnlUsd": -43.99985615904916,
+                      "partial": false,
+                      "unpricedEvents": 0
+                    }
+                  ],
+                  "updatedAt": 1791303635
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_STATUS` / `BAD_LIMIT`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/lp/pool/{address}/events": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solLpPoolEvents",
+        "summary": "A pool's liquidity events",
+        "description": "Adds, removes, fee claims, opens and closes, newest first. A close row of a DLMM `close_position2` or a Raydium CLMM position has no `pool`: the instruction does not carry it.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "Pool address, base58."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": ""
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4000000000
+            },
+            "description": "Exclusive cursor, Unix seconds: rows strictly older than it. Pass the last row's `ts` for the next page. Several swaps can share a second, so a page boundary can skip the rest of that second: overlap with `ts + 1` and drop rows whose `tx` you already have."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "pool": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ts": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "slot": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "signature": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,88}$",
+                            "description": "Transaction signature, base58."
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": "`meteora_dlmm` · `meteora_damm_v2` · `raydium_clmm` · `pumpswap`."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "add",
+                              "remove",
+                              "fee",
+                              "open",
+                              "close"
+                            ]
+                          },
+                          "pool": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "position": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "owner": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "amountA": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Whole tokens."
+                          },
+                          "amountB": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "usd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "lower": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "upper": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "verified": {
+                            "type": [
+                              "boolean",
+                              "null"
+                            ],
+                            "description": "true = matches the vault balance changes; null = could not be checked (shared vault, first deposit of a new pool)"
+                          }
+                        }
+                      }
+                    },
+                    "nextBefore": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Unix time, seconds, UTC."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "pool": "HTvjzsfX3yU6BUodCjZ5vZkUrAxMDTrBs3CJaq43ashR",
+                  "events": [
+                    {
+                      "ts": 1791303634,
+                      "slot": 453953506,
+                      "signature": "5bPcr5RdHzhoYFECwNaxp6FFwiv1xCcMxkGhLfrzZJaHos6UWJdnCey9FgUhfUC8kZqLgsrBy2ifzw8b9oQsyajc",
+                      "dex": "meteora_dlmm",
+                      "kind": "add",
+                      "pool": "HTvjzsfX3yU6BUodCjZ5vZkUrAxMDTrBs3CJaq43ashR",
+                      "position": "6gDiPzm69sdQMAAMUjSwY8n1ruPXYpy6Yx5tTt3PBgPv",
+                      "owner": "GDzKV9YibjzWNtFCeGSAXntzv8e2tU1UcLPV1hoXxXJM",
+                      "amountA": 0,
+                      "amountB": 65.188341,
+                      "usd": 65.188341,
+                      "lower": null,
+                      "upper": null,
+                      "verified": true
+                    },
+                    {
+                      "ts": 1791303634,
+                      "slot": 453953506,
+                      "signature": "5bPcr5RdHzhoYFECwNaxp6FFwiv1xCcMxkGhLfrzZJaHos6UWJdnCey9FgUhfUC8kZqLgsrBy2ifzw8b9oQsyajc",
+                      "dex": "meteora_dlmm",
+                      "kind": "open",
+                      "pool": "HTvjzsfX3yU6BUodCjZ5vZkUrAxMDTrBs3CJaq43ashR",
+                      "position": "6gDiPzm69sdQMAAMUjSwY8n1ruPXYpy6Yx5tTt3PBgPv",
+                      "owner": "GDzKV9YibjzWNtFCeGSAXntzv8e2tU1UcLPV1hoXxXJM",
+                      "amountA": 0,
+                      "amountB": 0,
+                      "usd": null,
+                      "lower": -21194,
+                      "upper": -21170,
+                      "verified": null
+                    }
+                  ],
+                  "nextBefore": 1791303634
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_CURSOR`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/lp/wallet/{address}/events": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solLpWalletEvents",
+        "summary": "A wallet's liquidity events",
+        "description": "Adds, removes, fee claims, opens and closes, newest first (the wallet as the position's owner). A close row of a DLMM `close_position2` or a Raydium CLMM position has no `pool`: the instruction does not carry it.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "Wallet address, base58."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": ""
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4000000000
+            },
+            "description": "Exclusive cursor, Unix seconds: rows strictly older than it. Pass the last row's `ts` for the next page. Several swaps can share a second, so a page boundary can skip the rest of that second: overlap with `ts + 1` and drop rows whose `tx` you already have."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "owner": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ts": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "slot": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "signature": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,88}$",
+                            "description": "Transaction signature, base58."
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": "`meteora_dlmm` · `meteora_damm_v2` · `raydium_clmm` · `pumpswap`."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "add",
+                              "remove",
+                              "fee",
+                              "open",
+                              "close"
+                            ]
+                          },
+                          "pool": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "position": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "owner": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "amountA": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Whole tokens."
+                          },
+                          "amountB": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "usd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "lower": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "upper": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "verified": {
+                            "type": [
+                              "boolean",
+                              "null"
+                            ],
+                            "description": "true = matches the vault balance changes; null = could not be checked (shared vault, first deposit of a new pool)"
+                          }
+                        }
+                      }
+                    },
+                    "nextBefore": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Unix time, seconds, UTC."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "owner": "GwBsj9GJdFrATQs1k9EYUyfaatKZDiViy8tkU9JP3TUL",
+                  "events": [
+                    {
+                      "ts": 1791303527,
+                      "slot": 453953116,
+                      "signature": "843tuGhTxg7i7CEFuJsFfJPhxhRMcL4mr2gDaHifmm8d9Gfzd7AKgHXXj6gCzNgos9tyjcSLCVXrvwWKodsTq5u",
+                      "dex": "meteora_dlmm",
+                      "kind": "add",
+                      "pool": "5whNk71ua6aRtNKazDqEeAimmfzuX9epJcjh4isQKprn",
+                      "position": "9FSWX8ctaKQKYsTpxuuXEMWVXYm3NGm9cDCLYvs6zhE7",
+                      "owner": "GwBsj9GJdFrATQs1k9EYUyfaatKZDiViy8tkU9JP3TUL",
+                      "amountA": 87.25797003,
+                      "amountB": 0,
+                      "usd": 15125.346891374138,
+                      "lower": null,
+                      "upper": null,
+                      "verified": true
+                    },
+                    {
+                      "ts": 1791303527,
+                      "slot": 453953116,
+                      "signature": "843tuGhTxg7i7CEFuJsFfJPhxhRMcL4mr2gDaHifmm8d9Gfzd7AKgHXXj6gCzNgos9tyjcSLCVXrvwWKodsTq5u",
+                      "dex": "meteora_dlmm",
+                      "kind": "open",
+                      "pool": "5whNk71ua6aRtNKazDqEeAimmfzuX9epJcjh4isQKprn",
+                      "position": "9FSWX8ctaKQKYsTpxuuXEMWVXYm3NGm9cDCLYvs6zhE7",
+                      "owner": "GwBsj9GJdFrATQs1k9EYUyfaatKZDiViy8tkU9JP3TUL",
+                      "amountA": 0,
+                      "amountB": 0,
+                      "usd": null,
+                      "lower": 688,
+                      "upper": 693,
+                      "verified": null
+                    }
+                  ],
+                  "nextBefore": 1791303527
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_CURSOR`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/solana/lp/position/{address}/events": {
+      "get": {
+        "tags": [
+          "Solana data"
+        ],
+        "operationId": "solLpPositionEvents",
+        "summary": "One position's events",
+        "description": "Adds, removes, fee claims, opens and closes, newest first. A close row of a DLMM `close_position2` or a Raydium CLMM position has no `pool`: the instruction does not carry it.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "Position address, base58."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": ""
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4000000000
+            },
+            "description": "Exclusive cursor, Unix seconds: rows strictly older than it. Pass the last row's `ts` for the next page. Several swaps can share a second, so a page boundary can skip the rest of that second: overlap with `ts + 1` and drop rows whose `tx` you already have."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "solana"
+                    },
+                    "position": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ts": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "slot": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "signature": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,88}$",
+                            "description": "Transaction signature, base58."
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": "`meteora_dlmm` · `meteora_damm_v2` · `raydium_clmm` · `pumpswap`."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "add",
+                              "remove",
+                              "fee",
+                              "open",
+                              "close"
+                            ]
+                          },
+                          "pool": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "position": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "owner": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "amountA": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Whole tokens."
+                          },
+                          "amountB": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "usd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "lower": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "upper": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "verified": {
+                            "type": [
+                              "boolean",
+                              "null"
+                            ],
+                            "description": "true = matches the vault balance changes; null = could not be checked (shared vault, first deposit of a new pool)"
+                          }
+                        }
+                      }
+                    },
+                    "nextBefore": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Unix time, seconds, UTC."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "solana",
+                  "position": "BJMyRCurUG45Lst2tZf2RMVbxwCopyWzxzHjgQz5ET6m",
+                  "events": [
+                    {
+                      "ts": 1791303523,
+                      "slot": 453953100,
+                      "signature": "2e9A11ocj5EURDZJj7DYtFPQN7D62Xjdg1sW9aAyN8RJ4RmFBf9N73D29G11zJnJGc8HUnzQQ1WkH1KWduaggb5p",
+                      "dex": "meteora_dlmm",
+                      "kind": "close",
+                      "pool": null,
+                      "position": "BJMyRCurUG45Lst2tZf2RMVbxwCopyWzxzHjgQz5ET6m",
+                      "owner": "GwBsj9GJdFrATQs1k9EYUyfaatKZDiViy8tkU9JP3TUL",
+                      "amountA": null,
+                      "amountB": null,
+                      "usd": null,
+                      "lower": null,
+                      "upper": null,
+                      "verified": null
+                    },
+                    {
+                      "ts": 1791303523,
+                      "slot": 453953100,
+                      "signature": "2e9A11ocj5EURDZJj7DYtFPQN7D62Xjdg1sW9aAyN8RJ4RmFBf9N73D29G11zJnJGc8HUnzQQ1WkH1KWduaggb5p",
+                      "dex": "meteora_dlmm",
+                      "kind": "fee",
+                      "pool": "5whNk71ua6aRtNKazDqEeAimmfzuX9epJcjh4isQKprn",
+                      "position": "BJMyRCurUG45Lst2tZf2RMVbxwCopyWzxzHjgQz5ET6m",
+                      "owner": "GwBsj9GJdFrATQs1k9EYUyfaatKZDiViy8tkU9JP3TUL",
+                      "amountA": 0.03680336,
+                      "amountB": 0,
+                      "usd": 6.379515665752227,
+                      "lower": null,
+                      "upper": null,
+                      "verified": true
+                    }
+                  ],
+                  "nextBefore": 1791303523
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_CURSOR`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`CHAIN_DATA_UNAVAILABLE` (the Solana store did not answer in time) or `CHAIN_NOT_ENABLED` (the lane is off on this deployment). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/stream/market": {
       "get": {
         "tags": [
@@ -21825,6 +23829,186 @@
           }
         },
         "description": "One token in a wallet's window."
+      },
+      "SolLpPosition": {
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+          },
+          "dex": {
+            "type": "string",
+            "description": "`meteora_dlmm` · `meteora_damm_v2` · `raydium_clmm` · `pumpswap`."
+          },
+          "pool": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+          },
+          "owner": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+          },
+          "mintA": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+          },
+          "symbolA": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Creator-chosen."
+          },
+          "mintB": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+          },
+          "symbolB": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Creator-chosen."
+          },
+          "lower": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "DLMM bin id or CLMM tick."
+          },
+          "upper": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": ""
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "openedAt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Unix time, seconds, UTC."
+          },
+          "closedAt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Unix time, seconds, UTC."
+          },
+          "firstEvent": {
+            "type": "integer",
+            "description": "Unix time, seconds, UTC."
+          },
+          "lastEvent": {
+            "type": "integer",
+            "description": "Unix time, seconds, UTC."
+          },
+          "events": {
+            "type": "integer",
+            "description": ""
+          },
+          "depositedA": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Whole tokens."
+          },
+          "depositedB": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": ""
+          },
+          "withdrawnA": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": ""
+          },
+          "withdrawnB": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": ""
+          },
+          "feesA": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Claimed."
+          },
+          "feesB": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Claimed."
+          },
+          "depositedUsd": {
+            "type": "number",
+            "description": ""
+          },
+          "withdrawnUsd": {
+            "type": "number",
+            "description": ""
+          },
+          "feesClaimedUsd": {
+            "type": "number",
+            "description": ""
+          },
+          "realizedPnlUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Withdrawn + fees − deposited; null unless closed, not partial and fully priced."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "The tape did not see the open (opened before `since`); PumpSwap: more came out than the tape saw going in."
+          },
+          "unpricedEvents": {
+            "type": "integer",
+            "description": "Value events without a USD price."
+          }
+        },
+        "description": "One Solana LP position."
       }
     }
   }
