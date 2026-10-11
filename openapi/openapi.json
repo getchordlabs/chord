@@ -6484,7 +6484,7 @@
         ],
         "operationId": "lpPool",
         "summary": "One pool",
-        "description": "The pool row plus a 7-day hourly series, the top providers over 7 days, the health score with its parts and reasons, launch facts (who launched it, how much of the liquidity the launcher holds and has pulled), and `mint` — what a wallet needs to add liquidity here (the position manager, the pool key, Permit2, tick spacing).",
+        "description": "The pool row plus its hourly series (the last 168 hours by default; `hours` up to 720), the top providers over 7 days, the health score with its parts and reasons, launch facts (who launched it, how much of the liquidity the launcher holds and has pulled), and `mint` — what a wallet needs to add liquidity here (the position manager, the pool key, Permit2, tick spacing).",
         "parameters": [
           {
             "name": "pool",
@@ -6510,6 +6510,16 @@
               ]
             },
             "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad."
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": ""
+            },
+            "description": "Hours of the hourly series, 24 to 720 (default 168)"
           }
         ],
         "responses": {
