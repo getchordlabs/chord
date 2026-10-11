@@ -5160,12 +5160,12 @@
   "from": "2026-10-05",
   "to": "2026-10-11",
   "agents": {
-   "calls": 5,
-   "reads": 5,
-   "quotes": 0,
+   "calls": 9,
+   "reads": 7,
+   "quotes": 2,
    "swapTx": 0,
    "asks": 0,
-   "callers": 1
+   "callers": 2
   },
   "web": {
    "calls": 0,
@@ -5177,8 +5177,8 @@
   },
   "bySource": {
    "mcp": {
-    "calls": 5,
-    "reads": 5,
+    "calls": 6,
+    "reads": 6,
     "quotes": 0,
     "swapTx": 0,
     "asks": 0,
@@ -5201,20 +5201,20 @@
     "callers": 0
    },
    "api": {
-    "calls": 0,
-    "reads": 0,
+    "calls": 1,
+    "reads": 1,
     "quotes": 0,
     "swapTx": 0,
     "asks": 0,
-    "callers": 0
+    "callers": 1
    },
    "anon": {
-    "calls": 0,
+    "calls": 2,
     "reads": 0,
-    "quotes": 0,
+    "quotes": 2,
     "swapTx": 0,
     "asks": 0,
-    "callers": 0
+    "callers": 1
    },
    "web": {
     "calls": 0,
@@ -5244,7 +5244,33 @@
    }
   ],
   "since": "2026-10-11",
-  "updatedAt": "2026-10-11T17:33:08.931Z"
+  "onchain": {
+   "swaps": 1,
+   "wallets": 1,
+   "volumeUsd": 190,
+   "unpriced": 0,
+   "bySource": {},
+   "daily": [
+    {
+     "day": "2026-10-05",
+     "swaps": 0,
+     "volumeUsd": 0
+    },
+    {
+     "day": "2026-10-06",
+     "swaps": 0,
+     "volumeUsd": 0
+    }
+   ],
+   "coverage": [
+    {
+     "chain": 5042,
+     "fromBlock": 20268312,
+     "cursor": 25453341
+    }
+   ]
+  },
+  "updatedAt": "2026-10-11T18:22:55.946Z"
  },
  "/v1/status": {
   "at": "2026-10-11T17:33:09.133Z",

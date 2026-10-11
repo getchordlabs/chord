@@ -23614,7 +23614,7 @@
         ],
         "operationId": "agentStats",
         "summary": "Agent traffic per chain",
-        "description": "How much programmatic traffic a chain sees through Chord, by the surface it came through: `mcp` (the hosted MCP), `api` (an API key), `x402` and `wallet` (not live yet), `anon` (keyless scripts), and `web` (people in Chord's own app; their board reads are not counted). `agents` adds up everything that is not `web`. Counts are requests answered 2xx; `swapTx` is swap transactions BUILT, not swaps executed on chain. `callers` is distinct callers over the window. `since` is the first day with any count: the counters started on 2026-10-11, earlier days are unknown, not zero.",
+        "description": "How much programmatic traffic a chain sees through Chord, by the surface it came through: `mcp` (the hosted MCP), `api` (an API key), `x402` and `wallet` (not live yet), `anon` (keyless scripts), and `web` (people in Chord's own app; their board reads are not counted). `agents` adds up everything that is not `web`. Counts are requests answered 2xx; `swapTx` is swap transactions BUILT; what executed is under `onchain`, read from the router's events on each chain. `callers` is distinct callers over the window. `since` is the first day with any count: the counters started on 2026-10-11, earlier days are unknown, not zero.",
         "parameters": [
           {
             "name": "chain",
@@ -23742,6 +23742,83 @@
                       ],
                       "description": ""
                     },
+                    "onchain": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "swaps": {
+                          "type": "integer",
+                          "description": "Swaps executed through Chord's router in the window, from the router's own `Swap` events."
+                        },
+                        "wallets": {
+                          "type": "integer",
+                          "description": "Distinct `sender` addresses. A swap relayed by another contract has that contract as sender."
+                        },
+                        "volumeUsd": {
+                          "type": "number",
+                          "description": "USD of the swaps that have a dollar-stable leg (that leg's own amount)."
+                        },
+                        "unpriced": {
+                          "type": "integer",
+                          "description": "Swaps with no stable leg: counted in `swaps`, not in `volumeUsd`. Never estimated."
+                        },
+                        "bySource": {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "description": "Swaps whose transaction was built through a known surface in the two hours before it landed, by surface. The rest are unlabelled."
+                        },
+                        "daily": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "day": {
+                                "type": "string",
+                                "description": ""
+                              },
+                              "swaps": {
+                                "type": "integer",
+                                "description": ""
+                              },
+                              "volumeUsd": {
+                                "type": "number",
+                                "description": ""
+                              }
+                            }
+                          },
+                          "description": "Oldest first."
+                        },
+                        "coverage": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "chain": {
+                                "type": "integer",
+                                "description": ""
+                              },
+                              "fromBlock": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "First block this record covers. Swaps before it are not known, not zero."
+                              },
+                              "cursor": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "Last block read."
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "description": "What actually executed on chain. Null for Solana (Chord has no router there) and when the record cannot be read."
+                    },
                     "updatedAt": {
                       "type": "string",
                       "description": "ISO time."
@@ -23754,12 +23831,12 @@
                   "from": "2026-10-05",
                   "to": "2026-10-11",
                   "agents": {
-                    "calls": 5,
-                    "reads": 5,
-                    "quotes": 0,
+                    "calls": 9,
+                    "reads": 7,
+                    "quotes": 2,
                     "swapTx": 0,
                     "asks": 0,
-                    "callers": 1
+                    "callers": 2
                   },
                   "web": {
                     "calls": 0,
@@ -23771,8 +23848,8 @@
                   },
                   "bySource": {
                     "mcp": {
-                      "calls": 5,
-                      "reads": 5,
+                      "calls": 6,
+                      "reads": 6,
                       "quotes": 0,
                       "swapTx": 0,
                       "asks": 0,
@@ -23795,20 +23872,20 @@
                       "callers": 0
                     },
                     "api": {
-                      "calls": 0,
-                      "reads": 0,
+                      "calls": 1,
+                      "reads": 1,
                       "quotes": 0,
                       "swapTx": 0,
                       "asks": 0,
-                      "callers": 0
+                      "callers": 1
                     },
                     "anon": {
-                      "calls": 0,
+                      "calls": 2,
                       "reads": 0,
-                      "quotes": 0,
+                      "quotes": 2,
                       "swapTx": 0,
                       "asks": 0,
-                      "callers": 0
+                      "callers": 1
                     },
                     "web": {
                       "calls": 0,
@@ -23838,7 +23915,33 @@
                     }
                   ],
                   "since": "2026-10-11",
-                  "updatedAt": "2026-10-11T17:33:08.931Z"
+                  "onchain": {
+                    "swaps": 1,
+                    "wallets": 1,
+                    "volumeUsd": 190,
+                    "unpriced": 0,
+                    "bySource": {},
+                    "daily": [
+                      {
+                        "day": "2026-10-05",
+                        "swaps": 0,
+                        "volumeUsd": 0
+                      },
+                      {
+                        "day": "2026-10-06",
+                        "swaps": 0,
+                        "volumeUsd": 0
+                      }
+                    ],
+                    "coverage": [
+                      {
+                        "chain": 5042,
+                        "fromBlock": 20268312,
+                        "cursor": 25453341
+                      }
+                    ]
+                  },
+                  "updatedAt": "2026-10-11T18:22:55.946Z"
                 }
               }
             }

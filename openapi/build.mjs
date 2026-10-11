@@ -1119,7 +1119,7 @@ add("/status", "get", op(T.agents, "statusSummary", "Uptime history, measured fr
   }), ex("/v1/status")), 503: ERR[503] } }));
 
 add("/agent/stats", "get", op(T.agents, "agentStats", "Agent traffic per chain",
-  "How much programmatic traffic a chain sees through Chord, by the surface it came through: `mcp` (the hosted MCP), `api` (an API key), `x402` and `wallet` (not live yet), `anon` (keyless scripts), and `web` (people in Chord's own app; their board reads are not counted). `agents` adds up everything that is not `web`. Counts are requests answered 2xx; `swapTx` is swap transactions BUILT, not swaps executed on chain. `callers` is distinct callers over the window. `since` is the first day with any count: the counters started on 2026-10-11, earlier days are unknown, not zero.",
+  "How much programmatic traffic a chain sees through Chord, by the surface it came through: `mcp` (the hosted MCP), `api` (an API key), `x402` and `wallet` (not live yet), `anon` (keyless scripts), and `web` (people in Chord's own app; their board reads are not counted). `agents` adds up everything that is not `web`. Counts are requests answered 2xx; `swapTx` is swap transactions BUILT; what executed is under `onchain`, read from the router's events on each chain. `callers` is distinct callers over the window. `since` is the first day with any count: the counters started on 2026-10-11, earlier days are unknown, not zero.",
   { params: [
     q("chain", str("", { enum: ["all", ...CHAIN_KEYS] }), "A chain key or id, or `all` (every chain plus chain-free calls such as Ask). Default `all`."),
     q("days", { type: "integer", minimum: 1, maximum: 90, default: 30 }, "Window in UTC days, today included."),
@@ -1128,7 +1128,15 @@ add("/agent/stats", "get", op(T.agents, "agentStats", "Agent traffic per chain",
     agents: ref("AgentCounts"), web: ref("AgentCounts"),
     bySource: obj(Object.fromEntries(["mcp", "x402", "wallet", "api", "anon", "web"].map((k) => [k, ref("AgentCounts")]))),
     daily: arr(obj({ day: str(""), calls: int(""), reads: int(""), quotes: int(""), swapTx: int(""), asks: int("") }), "Oldest first; programmatic callers only."),
-    since: nullable(str("")), updatedAt: str("ISO time."),
+    since: nullable(str("")),
+    onchain: nullable(obj({
+      swaps: int("Swaps executed through Chord's router in the window, from the router's own `Swap` events."), wallets: int("Distinct `sender` addresses. A swap relayed by another contract has that contract as sender."),
+      volumeUsd: num("USD of the swaps that have a dollar-stable leg (that leg's own amount)."), unpriced: int("Swaps with no stable leg: counted in `swaps`, not in `volumeUsd`. Never estimated."),
+      bySource: loose("Swaps whose transaction was built through a known surface in the two hours before it landed, by surface. The rest are unlabelled."),
+      daily: arr(obj({ day: str(""), swaps: int(""), volumeUsd: num("") }), "Oldest first."),
+      coverage: arr(obj({ chain: int(""), fromBlock: nullable(int("First block this record covers. Swaps before it are not known, not zero.")), cursor: nullable(int("Last block read.")) })),
+    }, "What actually executed on chain. Null for Solana (Chord has no router there) and when the record cannot be read.")),
+    updatedAt: str("ISO time."),
   }), ex("/v1/agent/stats?chain=arc&days=7")) }, [400, 429, 503]) }));
 
 add("/mcp", "post", op(T.agents, "mcp", "Hosted MCP server",
