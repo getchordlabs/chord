@@ -4771,5 +4771,131 @@
    }
   ],
   "sort": "score"
+ },
+ "/v1/backtest?symbol=BTC&interval=4h&strategy=supertrend&days=365": {
+  "strategy": "supertrend",
+  "params": {
+   "atr": 10,
+   "mult": 3
+  },
+  "side": "both",
+  "metrics": {
+   "totalReturnPct": -29.7396335093976,
+   "buyHoldPct": -24.840856481481477,
+   "cagrPct": -29.77364346765159,
+   "maxDrawdownPct": 43.938798730789316,
+   "sharpe": -0.67928989324471,
+   "trades": 58,
+   "winRatePct": 37.93103448275862,
+   "profitFactor": 0.7686488016790433,
+   "avgWinPct": 4.190301346373836,
+   "avgLossPct": -3.3314820839884187,
+   "exposurePct": 99.58847736625515,
+   "feesPaidPct": 5.2199999999999935
+  },
+  "equity": [
+   {
+    "t": 1760227200000,
+    "equity": 1,
+    "hold": 1.000244140625
+   },
+   {
+    "t": 1760342400000,
+    "equity": 1,
+    "hold": 1.0321994357638888
+   }
+  ],
+  "trades": [
+   {
+    "side": "long",
+    "entryT": 1760356800000,
+    "entry": 114153,
+    "exitT": 1760601600000,
+    "exit": 110526,
+    "retPct": -3.267314656645025,
+    "reason": "signal",
+    "bars": 17
+   },
+   {
+    "side": "short",
+    "entryT": 1760601600000,
+    "entry": 110526,
+    "exitT": 1760947200000,
+    "exit": 111160,
+    "retPct": -0.6636206865353033,
+    "reason": "signal",
+    "bars": 24
+   }
+  ],
+  "symbol": "BTC",
+  "source": "hyperliquid",
+  "interval": "4h",
+  "from": 1760212800000,
+  "to": 1791705600000,
+  "bars": 2188,
+  "assumptions": "Signal on bar close, fill at next open; 4.5 bps fee per side; Hyperliquid perp candles, no funding; no slippage."
+ },
+ "/v1/fx/lake": {
+  "state": "idle",
+  "lastError": null,
+  "lastAt": 0,
+  "files": 0,
+  "snapshotAt": 1791737879748,
+  "from": "2016-01",
+  "minuteDays": 400,
+  "symbols": {
+   "EURUSD": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   },
+   "GBPUSD": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   },
+   "USDJPY": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   },
+   "USDCHF": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   },
+   "AUDUSD": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   },
+   "USDCAD": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   },
+   "USDSEK": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   },
+   "NZDUSD": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   },
+   "EURJPY": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   },
+   "GBPJPY": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   },
+   "EURGBP": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   },
+   "XAUUSD": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   },
+   "XAGUSD": {
+    "hourThrough": "2026-09",
+    "minuteThrough": "2026-10-10"
+   }
+  }
  }
 }

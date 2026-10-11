@@ -153,3 +153,29 @@ APR figures annualise one window of fees: say which window (`interval`) and that
 - `503 NOT_READY` means a rollup has not run on this deployment; retry once later, then report.
 - Robinhood Chain stock tokens trade around the clock on-chain while the underlying exchange does
   not: see `stocks.md`.
+
+## 10. Backtests (Hyperliquid perps, FX, gold)
+
+`GET /v1/backtest` replays one bar-close strategy over stored candles. It is a simulation: nothing
+is traded, and it is not about the six chains above (the candles are Hyperliquid perps and
+Dukascopy FX / metals).
+
+```
+GET /v1/backtest?symbol=BTC&interval=4h&strategy=supertrend&days=365
+```
+
+- `symbol`: a Hyperliquid coin id, matched without case (`BTC`, `ETH`, `kPEPE`), or `EURUSD`,
+  `GBPUSD`, `USDJPY`, `USDCHF`, `AUDUSD`, `USDCAD`, `USDSEK`, `NZDUSD`, `EURJPY`, `GBPJPY`, `EURGBP`,
+  `XAUUSD` (`gold`), `XAGUSD` (`silver`).
+- `interval`: `1m` `5m` `15m` `30m` `1h` `4h` `1d`. `days`: 1 to 3650 (default 365), ending now.
+- `strategy` and its parameters: `supertrend` (`atr` 10, `mult` 3) · `ema_cross` (`fast` 20,
+  `slow` 50) · `rsi` (`length` 14, `lower` 30, `upper` 70) · `donchian` (`length` 20) · `buy_hold`.
+- Optional: `side` (`long` / `short` / `both`), `feeBps` per side (default 4.5 on Hyperliquid, 1 on
+  FX), `stopPct`, `takePct`, `leverage` (0.1 to 20).
+
+The model: signal on a closed bar, fill at the next bar's open, one position at a time, no funding
+and no slippage. The answer repeats it in `assumptions`: quote that sentence with the result. Every
+time field here is Unix MILLISECONDS. `from`, `to` and `bars` are the window that was really tested,
+which can be shorter than `days` (the store holds about seven months of 1h Hyperliquid bars, years
+of 4h and 1d). Fewer than 50 bars is a `400` whose message says what the store keeps: try a coarser
+interval. Compare `metrics.totalReturnPct` with `metrics.buyHoldPct` before calling a strategy good.

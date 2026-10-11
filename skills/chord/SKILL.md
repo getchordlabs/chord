@@ -82,6 +82,7 @@ everything is under `/v1/chains/solana/*` (`references/solana.md`).
 | Anything on Solana: a pump.fun / Meteora / Raydium token, board, chart, who traded it, a wallet's PnL | `chord.py token\|price\|board solana ...`, then `/v1/chains/solana/*` (read-only; never lower-case a mint) | `references/solana.md` |
 | A wallet's PnL | `/v1/portfolio/{w}/pnl?chain=ID` (5042, 4663, 143) · `/v1/chains/{key}/wallet/{w}` (43114, 8453, 56) | `references/data.md` |
 | LP pools, fee APR, LP positions | `/v1/lp/pools?chain=ID`, `/v1/lp/positions?chain=ID&owner=W` (5042, 4663, 143) | `references/data.md` |
+| Backtest a strategy (supertrend, EMA cross, RSI, Donchian) on a perp, FX pair or gold | `GET /v1/backtest?symbol=BTC&interval=4h&strategy=supertrend&days=365` (simulated; quote `assumptions` with the result) | `references/data.md` |
 | Open question: analysis, levels, "is this token safe", wallet balances, comparisons, BTC or macro context | `chord.py ask "QUESTION"` (wraps `POST /v1/ask`, `"stream": false`; needs a key) | `references/ask.md` |
 | Chord's analyst picks | `GET /v1/ask/picks` (public) | `references/ask.md` |
 | Contract, ticker or address looks suspicious | the rules below | `references/safety.md` |

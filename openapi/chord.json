@@ -73,6 +73,10 @@
       "description": "Solana, read-only: chain totals, the 24-hour token board, search, one token's stats, prints, candles and traders, the day's trader board, a wallet's PnL, and liquidity (LP pools, positions, events, LP wallets on Meteora DLMM / DAMM v2, Raydium CLMM and PumpSwap), from Chord's own tape of the swap events of 11 Solana venues (PumpSwap, pump.fun, Meteora, Raydium, Orca). Prop AMMs and order books are not read. Addresses are base58 and case-sensitive; the path segment is the literal `solana`. Read the notes on each operation before comparing these numbers with an all-market source."
     },
     {
+      "name": "Backtests",
+      "description": "Bar-close strategy backtests over Chord's stored candles: any Hyperliquid perp, 13 FX pairs and metals. Simulated, nothing is traded."
+    },
+    {
       "name": "Streaming",
       "description": "Server-sent events and the public WebSocket."
     },
@@ -21567,6 +21571,658 @@
           },
           "503": {
             "description": "`WS_LIVE_DISABLED` or at capacity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/backtest": {
+      "get": {
+        "tags": [
+          "Backtests"
+        ],
+        "operationId": "backtest",
+        "summary": "Backtest a strategy",
+        "description": "One bar-close strategy replayed over stored candles of a Hyperliquid perp or an FX pair / metal. Simulated: nothing is traded.\n\n**Model** (the same text comes back in `assumptions`):\n- A signal is computed on a CLOSED bar and filled at the NEXT bar's open.\n- One position at a time, all-in (equity × `leverage`), long, short or both.\n- `feeBps` is charged per side on notional. Default 4.5 for Hyperliquid, 1 for FX.\n- `stopPct` / `takePct` are checked inside each bar against its high and low. When both could hit in the same bar the stop is taken first; a bar that opens beyond the level fills at its open.\n- A position still open at the last bar is closed at that bar's close (`reason: \"end\"`). Equity at or below zero ends the run.\n- No funding, no spread beyond the fee, no slippage. FX uses Dukascopy BID prices.\n\n**Strategies and their parameters** (pass only the ones you want to change):\n\n| `strategy` | Rule | Parameters (default) |\n| --- | --- | --- |\n| `supertrend` | Long while the Supertrend direction is up, short while it is down. | `atr` (10), `mult` (3) |\n| `ema_cross` | Long while EMA(`fast`) is above EMA(`slow`), short while below. | `fast` (20), `slow` (50) |\n| `rsi` | Long when RSI falls below `lower`, short when it rises above `upper`, flat again when RSI crosses back through 50. | `length` (14), `lower` (30), `upper` (70) |\n| `donchian` | Long on a close above the highest high of the previous `length` bars, short on a close below their lowest low; held until the opposite breakout. | `length` (20) |\n| `buy_hold` | Always long. | none |\n\n**Symbols**: any Hyperliquid perp by its coin id, matched without case (`BTC`, `eth`, `kPEPE`); a leading `$` and a trailing `USDT` / `USD` / `-PERP` are dropped. FX and metals: `EURUSD`, `GBPUSD`, `USDJPY`, `USDCHF`, `AUDUSD`, `USDCAD`, `USDSEK`, `NZDUSD`, `EURJPY`, `GBPJPY`, `EURGBP`, `XAUUSD` (also `gold`), `XAGUSD` (also `silver`).\n\n**How much history there is**: the window is the last `days` ending now, cut to what the store holds. Hyperliquid candles start from what its API served when the store was built (1m a few days, 15m about seven weeks, 1h about seven months, 4h and 1d years) and grow from there; FX has 1h bars since 2016 and 1m bars for about the last 400 days (`/fx/lake` shows how far each symbol is filled). Fewer than 50 bars in the window is a `400` whose message says what the store keeps. Read `from`, `to` and `bars` in the answer for the window that was really tested.",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "BTC"
+            },
+            "description": "A Hyperliquid perp coin id or an FX / metal symbol (list above)."
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "30m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "default": "1h"
+            },
+            "description": "Bar size. 5m and 30m are resampled from finer stored bars."
+          },
+          {
+            "name": "strategy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "supertrend",
+                "ema_cross",
+                "rsi",
+                "donchian",
+                "buy_hold"
+              ],
+              "default": "supertrend"
+            },
+            "description": ""
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3650,
+              "default": 365
+            },
+            "description": "Length of the window, ending now."
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "long",
+                "short",
+                "both"
+              ],
+              "default": "both"
+            },
+            "description": "Which signals are traded."
+          },
+          {
+            "name": "atr",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 10
+            },
+            "description": "`supertrend`: ATR length."
+          },
+          {
+            "name": "mult",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 3
+            },
+            "description": "`supertrend`: band width in ATRs."
+          },
+          {
+            "name": "fast",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 20
+            },
+            "description": "`ema_cross`: fast EMA length."
+          },
+          {
+            "name": "slow",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 50
+            },
+            "description": "`ema_cross`: slow EMA length."
+          },
+          {
+            "name": "length",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            },
+            "description": "`rsi`: RSI length (default 14). `donchian`: channel length in bars (default 20)."
+          },
+          {
+            "name": "lower",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 30
+            },
+            "description": "`rsi`: go long below this."
+          },
+          {
+            "name": "upper",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 70
+            },
+            "description": "`rsi`: go short above this."
+          },
+          {
+            "name": "feeBps",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Fee per side in basis points of notional. Default 4.5 (Hyperliquid) or 1 (FX)."
+          },
+          {
+            "name": "stopPct",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "description": "Stop-loss, percent from entry. Omitted = none."
+          },
+          {
+            "name": "takePct",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "description": "Take-profit, percent from entry. Omitted = none."
+          },
+          {
+            "name": "leverage",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 20,
+              "default": 1
+            },
+            "description": "Position size as a multiple of equity. Values outside 0.1–20 are clamped."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "strategy": {
+                      "type": "string",
+                      "enum": [
+                        "supertrend",
+                        "ema_cross",
+                        "rsi",
+                        "donchian",
+                        "buy_hold"
+                      ],
+                      "default": "supertrend"
+                    },
+                    "params": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      },
+                      "description": "The parameters the run used, defaults filled in."
+                    },
+                    "side": {
+                      "type": "string",
+                      "description": "long, short or both."
+                    },
+                    "metrics": {
+                      "type": "object",
+                      "properties": {
+                        "totalReturnPct": {
+                          "type": "number",
+                          "description": "Return of the strategy over the window, after fees."
+                        },
+                        "buyHoldPct": {
+                          "type": "number",
+                          "description": "Return of holding the asset over the same bars."
+                        },
+                        "cagrPct": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Annualised return. Null when the tested window is shorter than three months, or equity ended at zero."
+                        },
+                        "maxDrawdownPct": {
+                          "type": "number",
+                          "description": "Largest peak-to-trough fall of equity, as a positive number."
+                        },
+                        "sharpe": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Mean over standard deviation of per-bar returns, annualised by the bar size. Null when equity never moved."
+                        },
+                        "trades": {
+                          "type": "integer",
+                          "description": "Closed trades in the window."
+                        },
+                        "winRatePct": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Share of trades that made money. Null with no trades."
+                        },
+                        "profitFactor": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Sum of winning returns over sum of losing returns. Null when nothing lost."
+                        },
+                        "avgWinPct": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Null with no winning trade."
+                        },
+                        "avgLossPct": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Negative. Null with no losing trade."
+                        },
+                        "exposurePct": {
+                          "type": "number",
+                          "description": "Share of bars spent in a position."
+                        },
+                        "feesPaidPct": {
+                          "type": "number",
+                          "description": "Sum of the fees charged (each side of each trade, times leverage), in percent."
+                        }
+                      }
+                    },
+                    "equity": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "t": {
+                            "type": "integer",
+                            "description": "Unix time in MILLISECONDS (every time field of this endpoint is; the rest of the API uses seconds)."
+                          },
+                          "equity": {
+                            "type": "number",
+                            "description": "Strategy equity, starting at 1."
+                          },
+                          "hold": {
+                            "type": "number",
+                            "description": "Buy-and-hold equity, starting at 1."
+                          }
+                        }
+                      },
+                      "description": "The equity curve, thinned to about 300 points."
+                    },
+                    "trades": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "long",
+                              "short"
+                            ]
+                          },
+                          "entryT": {
+                            "type": "integer",
+                            "description": "Unix time in MILLISECONDS (every time field of this endpoint is; the rest of the API uses seconds)."
+                          },
+                          "entry": {
+                            "type": "number",
+                            "description": "Fill price: the open of the bar after the signal."
+                          },
+                          "exitT": {
+                            "type": "integer",
+                            "description": "Unix time in MILLISECONDS (every time field of this endpoint is; the rest of the API uses seconds)."
+                          },
+                          "exit": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "retPct": {
+                            "type": "number",
+                            "description": "Return of the trade after both fees, leverage applied."
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "signal",
+                              "stop",
+                              "take",
+                              "end"
+                            ],
+                            "description": "`end` = still open at the last bar, closed there."
+                          },
+                          "bars": {
+                            "type": "integer",
+                            "description": "Bars held."
+                          }
+                        }
+                      },
+                      "description": "The most recent 200 trades, oldest first."
+                    },
+                    "symbol": {
+                      "type": "string",
+                      "description": "The symbol as resolved: the Hyperliquid coin id or the FX symbol."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hyperliquid",
+                        "dukascopy"
+                      ]
+                    },
+                    "interval": {
+                      "type": "string",
+                      "enum": [
+                        "1m",
+                        "5m",
+                        "15m",
+                        "30m",
+                        "1h",
+                        "4h",
+                        "1d"
+                      ],
+                      "default": "1h"
+                    },
+                    "from": {
+                      "type": "integer",
+                      "description": "Unix time in MILLISECONDS (every time field of this endpoint is; the rest of the API uses seconds)."
+                    },
+                    "to": {
+                      "type": "integer",
+                      "description": "Unix time in MILLISECONDS (every time field of this endpoint is; the rest of the API uses seconds)."
+                    },
+                    "bars": {
+                      "type": "integer",
+                      "description": "Bars the run used. `from` and `to` are the first and last of them."
+                    },
+                    "assumptions": {
+                      "type": "string",
+                      "description": "The model of this run in one sentence: fill rule, fee, leverage, price source."
+                    }
+                  }
+                },
+                "example": {
+                  "strategy": "supertrend",
+                  "params": {
+                    "atr": 10,
+                    "mult": 3
+                  },
+                  "side": "both",
+                  "metrics": {
+                    "totalReturnPct": -29.7396335093976,
+                    "buyHoldPct": -24.840856481481477,
+                    "cagrPct": -29.77364346765159,
+                    "maxDrawdownPct": 43.938798730789316,
+                    "sharpe": -0.67928989324471,
+                    "trades": 58,
+                    "winRatePct": 37.93103448275862,
+                    "profitFactor": 0.7686488016790433,
+                    "avgWinPct": 4.190301346373836,
+                    "avgLossPct": -3.3314820839884187,
+                    "exposurePct": 99.58847736625515,
+                    "feesPaidPct": 5.2199999999999935
+                  },
+                  "equity": [
+                    {
+                      "t": 1760227200000,
+                      "equity": 1,
+                      "hold": 1.000244140625
+                    },
+                    {
+                      "t": 1760342400000,
+                      "equity": 1,
+                      "hold": 1.0321994357638888
+                    }
+                  ],
+                  "trades": [
+                    {
+                      "side": "long",
+                      "entryT": 1760356800000,
+                      "entry": 114153,
+                      "exitT": 1760601600000,
+                      "exit": 110526,
+                      "retPct": -3.267314656645025,
+                      "reason": "signal",
+                      "bars": 17
+                    },
+                    {
+                      "side": "short",
+                      "entryT": 1760601600000,
+                      "entry": 110526,
+                      "exitT": 1760947200000,
+                      "exit": 111160,
+                      "retPct": -0.6636206865353033,
+                      "reason": "signal",
+                      "bars": 24
+                    }
+                  ],
+                  "symbol": "BTC",
+                  "source": "hyperliquid",
+                  "interval": "4h",
+                  "from": 1760212800000,
+                  "to": 1791705600000,
+                  "bars": 2188,
+                  "assumptions": "Signal on bar close, fill at next open; 4.5 bps fee per side; Hyperliquid perp candles, no funding; no slippage."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fx/lake": {
+      "get": {
+        "tags": [
+          "Backtests"
+        ],
+        "operationId": "fxLake",
+        "summary": "FX store coverage",
+        "description": "How far the FX / metal candle store behind `/backtest` is filled, per symbol: the last month of 1h bars and the last day of 1m bars. `state` is `running` while a fill pass is in progress.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "running",
+                        "idle"
+                      ]
+                    },
+                    "lastError": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "lastAt": {
+                      "type": "integer",
+                      "description": "Unix ms of the last fill pass, 0 when none ran in this process."
+                    },
+                    "files": {
+                      "type": "integer",
+                      "description": "Files written by the last pass."
+                    },
+                    "snapshotAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    },
+                    "from": {
+                      "type": "string",
+                      "description": "First month of the 1h store, `YYYY-MM`."
+                    },
+                    "minuteDays": {
+                      "type": "integer",
+                      "description": "How many days back the 1m store reaches."
+                    },
+                    "symbols": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "hourThrough": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Last month with 1h bars, `YYYY-MM`."
+                          },
+                          "minuteThrough": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Last day with 1m bars, `YYYY-MM-DD`."
+                          }
+                        }
+                      },
+                      "description": "Keyed by symbol."
+                    }
+                  }
+                },
+                "example": {
+                  "state": "idle",
+                  "lastError": null,
+                  "lastAt": 0,
+                  "files": 0,
+                  "snapshotAt": 1791737879748,
+                  "from": "2016-01",
+                  "minuteDays": 400,
+                  "symbols": {
+                    "EURUSD": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    },
+                    "GBPUSD": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    },
+                    "USDJPY": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    },
+                    "USDCHF": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    },
+                    "AUDUSD": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    },
+                    "USDCAD": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    },
+                    "USDSEK": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    },
+                    "NZDUSD": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    },
+                    "EURJPY": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    },
+                    "GBPJPY": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    },
+                    "EURGBP": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    },
+                    "XAUUSD": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    },
+                    "XAGUSD": {
+                      "hourThrough": "2026-09",
+                      "minuteThrough": "2026-10-10"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
             "content": {
               "application/json": {
                 "schema": {

@@ -285,6 +285,7 @@ const T = {
   rh: "Robinhood Chain data",
   chains: "Avalanche, Base, BNB Chain",
   sol: "Solana data",
+  backtest: "Backtests",
   stream: "Streaming",
   account: "Account and health",
 };
@@ -992,6 +993,78 @@ add("/stream/market", "get", op(T.stream, "streamMarket", "Server-sent events: p
 add("/ws/live", "get", op(T.stream, "wsLive", "WebSocket: live candles, trades and board feeds", `Upgrade to a WebSocket. No key needed, rate-limit exempt, up to 8 channels per connection. With an API key (\`X-API-Key\`, or \`?apiKey=\` from a browser) the connection joins a separate pool: up to 64 channels per connection and 20 connections per key (\`429\` beyond). Subscribe with \`{op:"sub", channel:"candles", token, tf}\`, \`{op:"sub", channel:"trades", token}\` or \`{op:"sub", channel:"prices", chain}\` (chain \`5042\`, \`4663\` or \`143\`); the server pushes \`candle\`, \`trades\` and \`prices\` frames (every print within ~400 ms; on 5042 / 4663 each item also carries the token's live 24h volume and trade counts), \`new\` frames for tokens trading for the first time (5042 / 4663), \`ping\` every 25 s, and \`error\` with a code (\`bad_op\` · \`bad_token\` · \`bad_tf\` · \`bad_chain\` · \`channel_cap\`). Full protocol under Concepts → Streaming.`,
   { responses: { 101: { description: "Switching protocols." }, 429: errRes("This API key already holds its maximum of live connections."), 503: errRes("`WS_LIVE_DISABLED` or at capacity.") } }));
 
+// Backtests ────────────────────────────────────────────────────────────────────────────────────
+// routes/backtest.ts → services/backtest.ts (the model, DEFAULTS, the 50-bar floor) + services/hlLake.ts / fxLake.ts (the two
+// candle stores). Example captured live on 2026-10-11 (board #192: an outside agent had to work the parameters out from answers).
+const BT_INTERVAL = { type: "string", enum: ["1m", "5m", "15m", "30m", "1h", "4h", "1d"], default: "1h" };
+const BT_STRATEGY = { type: "string", enum: ["supertrend", "ema_cross", "rsi", "donchian", "buy_hold"], default: "supertrend" };
+const BT_MS = int("Unix time in MILLISECONDS (every time field of this endpoint is; the rest of the API uses seconds).");
+add("/backtest", "get", op(T.backtest, "backtest", "Backtest a strategy", `One bar-close strategy replayed over stored candles of a Hyperliquid perp or an FX pair / metal. Simulated: nothing is traded.
+
+**Model** (the same text comes back in \`assumptions\`):
+- A signal is computed on a CLOSED bar and filled at the NEXT bar's open.
+- One position at a time, all-in (equity × \`leverage\`), long, short or both.
+- \`feeBps\` is charged per side on notional. Default 4.5 for Hyperliquid, 1 for FX.
+- \`stopPct\` / \`takePct\` are checked inside each bar against its high and low. When both could hit in the same bar the stop is taken first; a bar that opens beyond the level fills at its open.
+- A position still open at the last bar is closed at that bar's close (\`reason: "end"\`). Equity at or below zero ends the run.
+- No funding, no spread beyond the fee, no slippage. FX uses Dukascopy BID prices.
+
+**Strategies and their parameters** (pass only the ones you want to change):
+
+| \`strategy\` | Rule | Parameters (default) |
+| --- | --- | --- |
+| \`supertrend\` | Long while the Supertrend direction is up, short while it is down. | \`atr\` (10), \`mult\` (3) |
+| \`ema_cross\` | Long while EMA(\`fast\`) is above EMA(\`slow\`), short while below. | \`fast\` (20), \`slow\` (50) |
+| \`rsi\` | Long when RSI falls below \`lower\`, short when it rises above \`upper\`, flat again when RSI crosses back through 50. | \`length\` (14), \`lower\` (30), \`upper\` (70) |
+| \`donchian\` | Long on a close above the highest high of the previous \`length\` bars, short on a close below their lowest low; held until the opposite breakout. | \`length\` (20) |
+| \`buy_hold\` | Always long. | none |
+
+**Symbols**: any Hyperliquid perp by its coin id, matched without case (\`BTC\`, \`eth\`, \`kPEPE\`); a leading \`$\` and a trailing \`USDT\` / \`USD\` / \`-PERP\` are dropped. FX and metals: \`EURUSD\`, \`GBPUSD\`, \`USDJPY\`, \`USDCHF\`, \`AUDUSD\`, \`USDCAD\`, \`USDSEK\`, \`NZDUSD\`, \`EURJPY\`, \`GBPJPY\`, \`EURGBP\`, \`XAUUSD\` (also \`gold\`), \`XAGUSD\` (also \`silver\`).
+
+**How much history there is**: the window is the last \`days\` ending now, cut to what the store holds. Hyperliquid candles start from what its API served when the store was built (1m a few days, 15m about seven weeks, 1h about seven months, 4h and 1d years) and grow from there; FX has 1h bars since 2016 and 1m bars for about the last 400 days (\`/fx/lake\` shows how far each symbol is filled). Fewer than 50 bars in the window is a \`400\` whose message says what the store keeps. Read \`from\`, \`to\` and \`bars\` in the answer for the window that was really tested.`,
+  { params: [
+      q("symbol", { type: "string", default: "BTC" }, "A Hyperliquid perp coin id or an FX / metal symbol (list above)."),
+      q("interval", BT_INTERVAL, "Bar size. 5m and 30m are resampled from finer stored bars."),
+      q("strategy", BT_STRATEGY, ""),
+      q("days", { type: "integer", minimum: 1, maximum: 3650, default: 365 }, "Length of the window, ending now."),
+      q("side", { type: "string", enum: ["long", "short", "both"], default: "both" }, "Which signals are traded."),
+      q("atr", { type: "number", default: 10 }, "`supertrend`: ATR length."),
+      q("mult", { type: "number", default: 3 }, "`supertrend`: band width in ATRs."),
+      q("fast", { type: "number", default: 20 }, "`ema_cross`: fast EMA length."),
+      q("slow", { type: "number", default: 50 }, "`ema_cross`: slow EMA length."),
+      q("length", { type: "number" }, "`rsi`: RSI length (default 14). `donchian`: channel length in bars (default 20)."),
+      q("lower", { type: "number", default: 30 }, "`rsi`: go long below this."),
+      q("upper", { type: "number", default: 70 }, "`rsi`: go short above this."),
+      q("feeBps", { type: "number", minimum: 0 }, "Fee per side in basis points of notional. Default 4.5 (Hyperliquid) or 1 (FX)."),
+      q("stopPct", { type: "number", exclusiveMinimum: 0 }, "Stop-loss, percent from entry. Omitted = none."),
+      q("takePct", { type: "number", exclusiveMinimum: 0 }, "Take-profit, percent from entry. Omitted = none."),
+      q("leverage", { type: "number", minimum: 0.1, maximum: 20, default: 1 }, "Position size as a multiple of equity. Values outside 0.1–20 are clamped."),
+    ],
+    responses: withErr({ 200: ok("", obj({
+      strategy: BT_STRATEGY, params: { type: "object", additionalProperties: { type: "number" }, description: "The parameters the run used, defaults filled in." },
+      side: str("long, short or both."),
+      metrics: obj({
+        totalReturnPct: num("Return of the strategy over the window, after fees."), buyHoldPct: num("Return of holding the asset over the same bars."),
+        cagrPct: nullable(num("Annualised return. Null when the tested window is shorter than three months, or equity ended at zero.")), maxDrawdownPct: num("Largest peak-to-trough fall of equity, as a positive number."),
+        sharpe: nullable(num("Mean over standard deviation of per-bar returns, annualised by the bar size. Null when equity never moved.")),
+        trades: int("Closed trades in the window."), winRatePct: nullable(num("Share of trades that made money. Null with no trades.")),
+        profitFactor: nullable(num("Sum of winning returns over sum of losing returns. Null when nothing lost.")),
+        avgWinPct: nullable(num("Null with no winning trade.")), avgLossPct: nullable(num("Negative. Null with no losing trade.")), exposurePct: num("Share of bars spent in a position."), feesPaidPct: num("Sum of the fees charged (each side of each trade, times leverage), in percent."),
+      }),
+      equity: arr(obj({ t: BT_MS, equity: num("Strategy equity, starting at 1."), hold: num("Buy-and-hold equity, starting at 1.") }), "The equity curve, thinned to about 300 points."),
+      trades: arr(obj({ side: { type: "string", enum: ["long", "short"] }, entryT: BT_MS, entry: num("Fill price: the open of the bar after the signal."), exitT: BT_MS, exit: num(""), retPct: num("Return of the trade after both fees, leverage applied."), reason: { type: "string", enum: ["signal", "stop", "take", "end"], description: "`end` = still open at the last bar, closed there." }, bars: int("Bars held.") }), "The most recent 200 trades, oldest first."),
+      symbol: str("The symbol as resolved: the Hyperliquid coin id or the FX symbol."), source: { type: "string", enum: ["hyperliquid", "dukascopy"] }, interval: BT_INTERVAL,
+      from: BT_MS, to: BT_MS, bars: int("Bars the run used. `from` and `to` are the first and last of them."),
+      assumptions: str("The model of this run in one sentence: fill rule, fee, leverage, price source."),
+    }), ex("/v1/backtest?symbol=BTC&interval=4h&strategy=supertrend&days=365")) }, [400, 503]) }));
+
+add("/fx/lake", "get", op(T.backtest, "fxLake", "FX store coverage", "How far the FX / metal candle store behind `/backtest` is filled, per symbol: the last month of 1h bars and the last day of 1m bars. `state` is `running` while a fill pass is in progress.",
+  { responses: withErr({ 200: ok("", obj({
+      state: { type: "string", enum: ["off", "running", "idle"] }, lastError: nullable(str("")), lastAt: int("Unix ms of the last fill pass, 0 when none ran in this process."), files: int("Files written by the last pass."),
+      snapshotAt: UNIX_MS, from: str("First month of the 1h store, `YYYY-MM`."), minuteDays: int("How many days back the 1m store reaches."),
+      symbols: { type: "object", additionalProperties: obj({ hourThrough: nullable(str("Last month with 1h bars, `YYYY-MM`.")), minuteThrough: nullable(str("Last day with 1m bars, `YYYY-MM-DD`.")) }), description: "Keyed by symbol." },
+    }), ex("/v1/fx/lake")) }, [503]) }));
+
 // Account and health ───────────────────────────────────────────────────────────────────────────
 add("/me", "get", op(T.account, "me", "Your key's plan and usage", "The tier, limits and usage (today, this month) behind an API key. Keys are created on getchord.xyz/developer after a Google sign-in.", { security: [{ ApiKey: [] }], responses: withErr({ 200: ok("", obj({ email: nullable(str("")), tier: { type: "string", enum: ["free", "builder", "pro"] }, limits: obj({ rpm: int(""), monthly: int(""), priceUsd: num(""), label: str("") }), usage: obj({ today: int(""), month: int("") }) }), { email: "you@example.com", tier: "free", limits: { rpm: 60, monthly: 100000, priceUsd: 0, label: "Free" }, usage: { today: 41, month: 1209 } }) }, [401]) }));
 add("/health", "get", op(T.account, "health", "Service health", "Engine, cache and pool-sync state. `503` when the routing engine is unreachable.", { responses: withErr({ 200: ok("", obj({ status: str(""), version: str(""), uptime: num("Seconds."), engine: obj({ status: str(""), latencyMs: int("") }), redis: obj({ status: str("") }), poolCount: int(""), lastSyncBlock: int("") }), ex("/v1/health")) }, [503]) }));
@@ -1028,6 +1101,7 @@ Amounts are decimal strings in the token's smallest unit. Timestamps are Unix se
     { name: T.rh, description: "Robinhood Chain (chain 4663): chain totals, tokens and tokenized stocks from the rollup tables." },
     { name: T.chains, description: "Avalanche C-Chain (43114), Base (8453) and BNB Chain (56): chain totals, the 24-hour token board, prints, one token's tape, venue share and a wallet's PnL, from Chord's own index of every swap on those chains. One set of routes, the chain in the path." },
     { name: T.sol, description: "Solana, read-only: chain totals, the 24-hour token board, search, one token's stats, prints, candles and traders, the day's trader board, a wallet's PnL, and liquidity (LP pools, positions, events, LP wallets on Meteora DLMM / DAMM v2, Raydium CLMM and PumpSwap), from Chord's own tape of the swap events of 11 Solana venues (PumpSwap, pump.fun, Meteora, Raydium, Orca). Prop AMMs and order books are not read. Addresses are base58 and case-sensitive; the path segment is the literal `solana`. Read the notes on each operation before comparing these numbers with an all-market source." },
+    { name: T.backtest, description: "Bar-close strategy backtests over Chord's stored candles: any Hyperliquid perp, 13 FX pairs and metals. Simulated, nothing is traded." },
     { name: T.stream, description: "Server-sent events and the public WebSocket." },
     { name: T.account, description: "Your key, and the service's own health." },
   ],
