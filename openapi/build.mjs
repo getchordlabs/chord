@@ -262,6 +262,7 @@ const components = {
     Session: { type: "http", scheme: "bearer", description: "A Google sign-in session minted by the app (`nts_…`). Only the browser surfaces use it; agents use `ApiKey`." },
   },
   schemas: {
+    AgentCounts: obj({ calls: int("Requests answered 2xx."), reads: int(""), quotes: int(""), swapTx: int("Swap transactions built, not executed."), asks: int("Questions to the analyst."), callers: int("Distinct callers in the window.") }, "Counts for one surface or a sum of surfaces."),
     Error: obj({ error: str("Stable machine code, e.g. `INVALID_PARAMS`, `NOT_READY`, `RATE_LIMIT_EXCEEDED`."), message: str("For humans."), statusCode: int("HTTP status, when included.") }, "Every non-2xx body.", { required: ["error"], example: { error: "INVALID_PARAMS", message: "amount must be an integer string in the token's smallest unit" } }),
     Coverage, TokenLite, ArcTokenRow, ArcTrendingRow, ArcGraduatedRow, RhTokenRow, RhStockRow, RouteLeg, QuoteResponse, SwapTx, MetaAttempt, MetaQuote, Candle, TradeRow, StatsWindow, SmartWallet, PnlToken, LpEvent, PoolListRow, LpPosition, LpLeaderRow, SimResult, LauncherStat, IngestFloor, ChainCoverage, ChainTokenRow, ChainVenueShare,
   },
@@ -274,6 +275,7 @@ const add = (path, method, operation) => { (paths[path] ??= {})[method] = operat
 const T = {
   swap: "Quote and swap",
   meta: "Meta aggregator",
+  agents: "Agents and status",
   arc: "Arc data",
   tokens: "Tokens and charts",
   wallets: "Top wallets",
@@ -1067,6 +1069,81 @@ add("/fx/lake", "get", op(T.backtest, "fxLake", "FX store coverage", "How far th
 
 // Account and health ───────────────────────────────────────────────────────────────────────────
 add("/me", "get", op(T.account, "me", "Your key's plan and usage", "The tier, limits and usage (today, this month) behind an API key. Keys are created on getchord.xyz/developer after a Google sign-in.", { security: [{ ApiKey: [] }], responses: withErr({ 200: ok("", obj({ email: nullable(str("")), tier: { type: "string", enum: ["free", "builder", "pro"] }, limits: obj({ rpm: int(""), monthly: int(""), priceUsd: num(""), label: str("") }), usage: obj({ today: int(""), month: int("") }) }), { email: "you@example.com", tier: "free", limits: { rpm: 60, monthly: 100000, priceUsd: 0, label: "Free" }, usage: { today: 41, month: 1209 } }) }, [401]) }));
+// ── Agents and status (docs/prompts/chain-ai-infra.md W1–W3; routes/chains.ts, routes/health.ts, routes/mcp.ts, routes/agent.ts, packages/edge) ──
+const CAP_ROUTE = nullable(obj({ method: str("`GET` or `POST`."), path: str("Path under the host, with `{address}` / `{wallet}` placeholders to fill."), query: loose("Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too.") }, "The route that serves this capability on this chain, or null when the chain does not have it."));
+const CAP_NAMES = ["overview", "tokens", "search", "token", "trades", "candles", "wallet", "walletTrades", "smartMoney", "holders", "lpPools", "lpPositions", "quote", "swap"];
+const CHAIN_KEYS = ["monad", "robinhood", "arc", "avalanche", "base", "bnb", "solana"];
+
+add("/chains", "get", op(T.agents, "chainsDirectory", "Every chain and the route of each capability",
+  "The directory an agent starts from. One entry per chain Chord serves, with its constants (native asset, wrapped native, dollar anchors with real decimals, explorer) and, for each capability, the route that serves it on that chain. A capability the chain does not have is `null`: the data routes grew chain by chain, so this is the one place that says where to read what. Solana is listed with `id: null` and base58, case-sensitive addresses. A chain that is not public yet appears only for a caller with an API key.",
+  { responses: withErr({ 200: ok("", obj({
+    chains: arr(obj({
+      key: str("Chain key, the value every `chain` parameter accepts.", { enum: CHAIN_KEYS }), id: nullable(int("EVM chain id; null for Solana.")), name: str(""), short: str("Short label."),
+      addressFormat: str("`evm` (0x, case-insensitive) or `base58` (case-sensitive).", { enum: ["evm", "base58"] }),
+      native: obj({ symbol: str(""), decimals: int("") }), wrappedNative: str("The token the native asset is stored under."),
+      anchors: arr(obj({ symbol: str(""), address: str(""), decimals: int("Read on chain. BNB Chain's dollar stables have 18."), stableUsd: nullable(num("1 for a dollar stable; null for a rate anchor.")) })),
+      explorer: str(""), blockTimeSec: num("Measured average."),
+      capabilities: obj(Object.fromEntries(CAP_NAMES.map((c) => [c, CAP_ROUTE]))),
+      mcp: str("The hosted MCP endpoint pinned to this chain."),
+    })),
+    capabilities: arr(str(""), "Every capability name, in table order."), updatedAt: str("ISO time."),
+  }), ex("/v1/chains")) }, [429]) }));
+
+add("/health/chains", "get", op(T.agents, "chainHealth", "Health of every chain, one generic row each",
+  "What the status page is built from, readable directly. `quotes.engine` is the routing engine's own state (`ok`, `starting` after a deploy, `stale` when its pool sync stopped, `down`); `quotes.canary` is the small quote the status probe sends. `data.ageSec` is how old the newest indexed trade is and `data.maxAgeSec` the age past which the chain's data counts as delayed. `quotes` is null where Chord does not route (Solana), `data` is null where no tape runs. Answers from a 15-second memo.",
+  { responses: withErr({ 200: ok("", obj({
+    at: str("ISO time the rows were read."),
+    chains: arr(obj({
+      key: str("", { enum: CHAIN_KEYS }), id: nullable(int("")), name: str(""),
+      quotes: nullable(obj({ engine: str(""), latencyMs: nullable(int("Round trip from the API to the engine.")), lastSyncBlock: nullable(int("")), canary: nullable(obj({ inputMint: str(""), outputMint: str(""), amount: WEI }, "10 units of the chain's first dollar stable into its wrapped native (Arc: into EURC).")) })),
+      data: nullable(obj({ ageSec: nullable(int("Null = the age could not be read.")), maxAgeSec: int("") })),
+    })),
+  }), ex("/v1/health/chains")) }, [429]) }));
+
+add("/status", "get", op(T.agents, "statusSummary", "Uptime history, measured from outside Chord's servers",
+  "Served by Cloudflare, not by the API's own servers, so it answers while they do not. A probe runs every minute: it reads `GET /health/chains` and requests one small quote per chain down the public path. Components are `api`, `quotes:<chain>` and `data:<chain>`. Uptime is the share of SAMPLED minutes that were not down; `sampledMin` says how many minutes each window really holds, and a day with no samples has `level: null`: it is never counted as up. An incident opens on the second bad check in a row and closes on the second good one. The same data as a page: https://getchord.xyz/status",
+  { responses: { 200: ok("", obj({
+    at: str("ISO time."), overall: str("", { enum: ["operational", "degraded", "outage", "unknown"] }),
+    lastProbeAgeSec: nullable(int("Seconds since the last probe. Above about 180 every status reads `unknown`.")), since: nullable(str("First UTC day with a sample.")),
+    probe: obj({ from: str(""), everySec: int(""), openAfterMin: int("") }),
+    components: arr(obj({
+      id: str("`api`, `quotes:<chain>` or `data:<chain>`."), group: str("", { enum: ["api", "quotes", "data"] }), chain: nullable(str("")), name: str(""),
+      status: str("", { enum: ["operational", "degraded", "down", "unknown"] }), note: nullable(str("Why it is not operational.")),
+      ms: nullable(int("Last probe: the API call, or the canary quote, in milliseconds. Null for data components.")), ageSec: nullable(int("Data components: seconds behind the chain.")),
+      uptime: obj({ h24: nullable(num("")), d7: nullable(num("")), d30: nullable(num("")), d90: nullable(num("")) }, "Percent of sampled minutes not down. Null = nothing sampled."),
+      sampledMin: obj({ h24: int(""), d7: int(""), d30: int(""), d90: int("") }, "Minutes actually sampled in each window."),
+      avgMs30d: nullable(int("")),
+      days: arr(obj({ day: str("UTC day."), level: nullable(int("Worst level that day: 0 down, 1 degraded, 2 operational; null = no samples.")), downMin: int(""), degMin: int(""), sampled: int("") }), "Oldest first, 90 entries."),
+    })),
+    incidents: arr(obj({ id: str("Component id."), name: str(""), group: str(""), start: str("ISO."), end: nullable(str("ISO; null while open.")), minutes: int(""), worst: str(""), note: nullable(str("")) }), "Newest first, last 30 days."),
+  }), ex("/v1/status")), 503: ERR[503] } }));
+
+add("/agent/stats", "get", op(T.agents, "agentStats", "Agent traffic per chain",
+  "How much programmatic traffic a chain sees through Chord, by the surface it came through: `mcp` (the hosted MCP), `api` (an API key), `x402` and `wallet` (not live yet), `anon` (keyless scripts), and `web` (people in Chord's own app; their board reads are not counted). `agents` adds up everything that is not `web`. Counts are requests answered 2xx; `swapTx` is swap transactions BUILT, not swaps executed on chain. `callers` is distinct callers over the window. `since` is the first day with any count: the counters started on 2026-10-11, earlier days are unknown, not zero.",
+  { params: [
+    q("chain", str("", { enum: ["all", ...CHAIN_KEYS] }), "A chain key or id, or `all` (every chain plus chain-free calls such as Ask). Default `all`."),
+    q("days", { type: "integer", minimum: 1, maximum: 90, default: 30 }, "Window in UTC days, today included."),
+  ], responses: withErr({ 200: ok("", obj({
+    chain: str(""), days: int(""), from: str("UTC day."), to: str("UTC day."),
+    agents: ref("AgentCounts"), web: ref("AgentCounts"),
+    bySource: obj(Object.fromEntries(["mcp", "x402", "wallet", "api", "anon", "web"].map((k) => [k, ref("AgentCounts")]))),
+    daily: arr(obj({ day: str(""), calls: int(""), reads: int(""), quotes: int(""), swapTx: int(""), asks: int("") }), "Oldest first; programmatic callers only."),
+    since: nullable(str("")), updatedAt: str("ISO time."),
+  }), ex("/v1/agent/stats?chain=arc&days=7")) }, [400, 429, 503]) }));
+
+add("/mcp", "post", op(T.agents, "mcp", "Hosted MCP server",
+  "Model Context Protocol over stateless Streamable HTTP: POST one JSON-RPC message (or a batch of up to 20), get JSON back. Methods: `initialize`, `ping`, `tools/list`, `tools/call`. 17 tools; every data tool takes a `chain`. `?chain=<key>` pins a default chain and names the server `chord-<key>`. The handshake and the tool list need no credentials and are not metered; a tool call is an ordinary request to this API made as the caller, so it is limited and metered exactly like the REST call it wraps. Send a key as `X-API-Key`, `Authorization: Bearer`, or `?apiKey=`. A tool-level failure is a normal result with `isError: true` and a sentence the model can act on. Guide: https://getchord.xyz/docs/agents/mcp/",
+  { params: [q("chain", str("", { enum: CHAIN_KEYS }), "Default chain for this endpoint."), q("apiKey", str(""), "Your key, for connectors that cannot set a header.")],
+    body: bodyJson(loose("A JSON-RPC 2.0 message, or an array of them."), { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "chord_search", arguments: { query: "EURC" } } }),
+    responses: { 200: ok("The JSON-RPC response. A tool result carries one text block: `{chain, route, data}` as JSON.", loose("JSON-RPC 2.0 response."), ex("POST /v1/mcp?chain=arc tools/call chord_search")), 202: { description: "A notification: nothing to answer." }, 400: ERR[400] } }));
+
+add("/mcp/tools.json", "get", op(T.agents, "mcpTools", "The MCP tools as a function-calling manifest",
+  "The same tool list as OpenAI-style function definitions, for frameworks that take a manifest instead of speaking MCP. Always current: it is printed from the list the MCP server serves.",
+  { responses: { 200: ok("", obj({
+    name: str(""), version: str(""), base_url: str(""), mcp: str("The hosted MCP endpoint."), auth: obj({ header: str(""), required: bool("") }),
+    tools: arr(obj({ type: str(""), function: obj({ name: str(""), description: str(""), parameters: loose("JSON Schema of the arguments.") }) })),
+  }), ex("/v1/mcp/tools.json")) } }));
+
 add("/health", "get", op(T.account, "health", "Service health", "Engine, cache and pool-sync state. `503` when the routing engine is unreachable.", { responses: withErr({ 200: ok("", obj({ status: str(""), version: str(""), uptime: num("Seconds."), engine: obj({ status: str(""), latencyMs: int("") }), redis: obj({ status: str("") }), poolCount: int(""), lastSyncBlock: int("") }), ex("/v1/health")) }, [503]) }));
 
 // ── document ──────────────────────────────────────────────────────────────────────────────────
@@ -1089,6 +1166,7 @@ Amounts are decimal strings in the token's smallest unit. Timestamps are Unix se
   servers: [{ url: "https://api.getchord.xyz/v1", description: "Production" }],
   tags: [
     { name: T.swap, description: "Best-route quotes across every venue on the chain, and the unsigned transaction to execute them." },
+    { name: T.agents, description: "What an agent starts from: the chain directory (which capability lives on which route, per chain), the hosted MCP server, per-chain health, the public status history, and how much agent traffic each chain sees." },
     { name: T.meta, description: "One quote and one unsigned transaction on any Chord chain, for agents. Chord's own router answers first; a third-party aggregator (KyberSwap, Monorail, LI.FI, Relay) only when Chord fails, never for a better price. Every answer names the provider, and a fallback transaction is returned only when its router is on Chord's allowlist and it passed a simulation run as the taker." },
     { name: T.arc, description: "Arc (chain 5042): chain totals, every token traded, launches, launchers, holders — from Chord's own rollup and index tables." },
     { name: T.tokens, description: "Curated lists, candles, trade tapes, windowed stats and logos. Address-keyed routes serve both chains." },

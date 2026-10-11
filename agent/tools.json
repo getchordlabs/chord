@@ -1,7 +1,8 @@
 {
   "name": "chord",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "base_url": "https://api.getchord.xyz",
+  "mcp": "https://api.getchord.xyz/v1/mcp",
   "auth": {
     "header": "X-API-Key",
     "required": false,
@@ -11,161 +12,96 @@
     {
       "type": "function",
       "function": {
+        "name": "chord_chains",
+        "description": "The chains Chord serves, with their native asset, anchors and which capabilities each one has (overview, tokens, trades, candles, wallet PnL, smart money, holders, LP, quote, swap). Call this first when unsure what a chain supports.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_status",
+        "description": "Live health of every chain: routing engine state, how old the newest indexed trade is, and the public status page link.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
         "name": "chord_overview",
-        "description": "What the Chord index holds right now on chain 4663: 24h volume, swap count, tokens traded, and the venues with their share. Use first to orient.",
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "chord_search_tokens",
-        "description": "Find listed tokens on chain 4663 by symbol, name or address. Returns up to 10 matches with addresses and whether each is a tokenized stock.",
+        "description": "A chain's last 24 hours on the venues Chord indexes: volume, swaps, venue share, hourly buckets.",
         "parameters": {
           "type": "object",
           "properties": {
-            "query": {
+            "chain": {
               "type": "string",
-              "description": "Symbol, name fragment, or 0x address"
+              "enum": [
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
+              ],
+              "description": "Chain key. chord_chains lists what each chain supports."
             }
           },
           "required": [
-            "query"
-          ],
-          "additionalProperties": false
+            "chain"
+          ]
         }
       }
     },
     {
       "type": "function",
       "function": {
-        "name": "chord_price",
-        "description": "Live price, 24h change, 24h volume and trade count for one token, from Chord's own index of on-chain trades.",
+        "name": "chord_tokens",
+        "description": "The chain's 24h token board: price, volume, trades, change. Sort names differ by chain; a wrong one is answered with the allowed list.",
         "parameters": {
           "type": "object",
           "properties": {
-            "token": {
+            "chain": {
               "type": "string",
-              "description": "Symbol like NVDA or USDG, or a 0x address"
-            }
-          },
-          "required": [
-            "token"
-          ],
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "chord_stocks",
-        "description": "Every tokenized stock and ETF on the chain with price, 24h change, 24h volume, trades, traders, buy share, after-hours share of the last 7 days, and the gap to the issuer's reference price (NAV) where published. Sorted by 24h volume.",
-        "parameters": {
-          "type": "object",
-          "properties": {
+              "enum": [
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
+              ],
+              "description": "Chain key. chord_chains lists what each chain supports."
+            },
+            "sort": {
+              "type": "string",
+              "description": "Board order, e.g. volume, trades, change."
+            },
             "limit": {
               "type": "integer",
-              "default": 50,
-              "description": "How many rows, by 24h volume"
-            }
-          },
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "chord_stock",
-        "description": "One tokenized stock in depth: the screener row plus activity windows (5m/1h/6h/24h buys, sells, volume, wallets), all-time high, first trade, and the pools it traded in over the last 24h.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "token": {
-              "type": "string",
-              "description": "Symbol like SPY or a 0x address"
+              "minimum": 1,
+              "maximum": 200,
+              "description": "Rows to return (default 50)."
             }
           },
           "required": [
-            "token"
-          ],
-          "additionalProperties": false
+            "chain"
+          ]
         }
       }
     },
     {
       "type": "function",
       "function": {
-        "name": "chord_quote",
-        "description": "Best route to swap one token for another across every venue on the chain. Amount is human units (e.g. \"0.5\" ETH). Returns the expected output, price impact, the venues on the route, and the raw quote to pass to chord_swap_tx.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "tokenIn": {
-              "type": "string",
-              "description": "Symbol or address to pay with, e.g. ETH, USDG"
-            },
-            "tokenOut": {
-              "type": "string",
-              "description": "Symbol or address to receive, e.g. NVDA"
-            },
-            "amount": {
-              "type": "string",
-              "description": "Amount of tokenIn in human units, as a string"
-            },
-            "slippageBps": {
-              "type": "integer",
-              "default": 100,
-              "description": "Slippage tolerance in basis points, default 100 = 1%"
-            }
-          },
-          "required": [
-            "tokenIn",
-            "tokenOut",
-            "amount"
-          ],
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "chord_swap_tx",
-        "description": "Turn a quote from chord_quote into an UNSIGNED transaction (to, data, value, gasLimit) for the given wallet. Chord never signs or holds funds: send the result to the agent's wallet to sign and broadcast on chain 4663. An ERC-20 input needs an allowance for the returned `to` first.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "quote": {
-              "description": "The `quote` object returned by chord_quote"
-            },
-            "wallet": {
-              "type": "string",
-              "description": "The wallet that will sign and receive"
-            },
-            "slippageBps": {
-              "type": "integer",
-              "default": 100
-            }
-          },
-          "required": [
-            "quote",
-            "wallet"
-          ],
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "chord_meta_quote",
-        "description": "USE THIS FIRST for any swap quote. One quote on any Chord chain (monad, robinhood, arc, avalanche, base, bnb) that always ends in a route or an honest 'no route anywhere': Chord's own router answers first; a third-party aggregator (KyberSwap, Monorail, LI.FI, Relay) answers ONLY when Chord fails, and `provider` + `fallbackReason` say who answered and why. Pass `wallet` to also get the UNSIGNED transaction, the approval it needs and a simulation run as that wallet. Amount is human units (`amount`) for a listed token, or smallest units (`amountRaw`) for any address.",
+        "name": "chord_search",
+        "description": "Find a token on one chain by symbol, name or address. Returns candidates with their addresses; similar tickers are common, so compare addresses.",
         "parameters": {
           "type": "object",
           "properties": {
@@ -177,61 +113,31 @@
                 "arc",
                 "avalanche",
                 "base",
-                "bnb"
+                "bnb",
+                "solana"
               ],
-              "default": "robinhood",
-              "description": "Chain key"
+              "description": "Chain key. chord_chains lists what each chain supports."
             },
-            "tokenIn": {
+            "query": {
               "type": "string",
-              "description": "Symbol or 0x address to pay with; `native` for the chain's gas token"
-            },
-            "tokenOut": {
-              "type": "string",
-              "description": "Symbol or 0x address to receive; `native` for the chain's gas token"
-            },
-            "amount": {
-              "type": "string",
-              "description": "Amount of tokenIn in human units, e.g. \"25\" (needs a listed token)"
-            },
-            "amountRaw": {
-              "type": "string",
-              "description": "Amount of tokenIn in its smallest unit (use this for an unlisted address)"
-            },
-            "slippageBps": {
-              "type": "integer",
-              "default": 50,
-              "description": "Slippage tolerance in basis points, default 50 = 0.5%"
-            },
-            "wallet": {
-              "type": "string",
-              "description": "The wallet that will sign and receive. With it the answer carries the unsigned transaction, the approval and a simulation"
+              "description": "Symbol, name or address."
             }
           },
           "required": [
-            "tokenIn",
-            "tokenOut"
-          ],
-          "additionalProperties": false
+            "chain",
+            "query"
+          ]
         }
       }
     },
     {
       "type": "function",
       "function": {
-        "name": "chord_meta_swap_tx",
-        "description": "The UNSIGNED transaction for a swap through Chord's meta-aggregator (Chord's router first, a third-party aggregator only when Chord fails). Give the `quoteId` of a chord_meta_quote answer from the last 2 minutes, or the full pair + amount. Returns `transaction` {to, data, value, gas, chainId}, the `approval` {token, spender, amount} to send first when it is not null, and `simulation` (run as the wallet: ok + the amount it receives). Chord never signs or holds funds. Fund-moving: show the person provider, amountOut, minAmountOut and the approval, and get a clear yes before signing.",
+        "name": "chord_token",
+        "description": "One token on one chain: price, 24h volume and trades, pools or venues, and what the index knows about it.",
         "parameters": {
           "type": "object",
           "properties": {
-            "wallet": {
-              "type": "string",
-              "description": "The wallet that will sign and receive"
-            },
-            "quoteId": {
-              "type": "string",
-              "description": "`quoteId` from chord_meta_quote (valid 2 minutes). Without it, give chain + tokens + amount"
-            },
             "chain": {
               "type": "string",
               "enum": [
@@ -240,30 +146,176 @@
                 "arc",
                 "avalanche",
                 "base",
-                "bnb"
-              ]
+                "bnb",
+                "solana"
+              ],
+              "description": "Chain key. chord_chains lists what each chain supports."
             },
-            "tokenIn": {
-              "type": "string"
-            },
-            "tokenOut": {
-              "type": "string"
-            },
-            "amount": {
-              "type": "string"
-            },
-            "amountRaw": {
-              "type": "string"
-            },
-            "slippageBps": {
-              "type": "integer",
-              "default": 50
+            "address": {
+              "type": "string",
+              "description": "Token address: 0x… on EVM chains, the base58 mint on Solana (case-sensitive)."
             }
           },
           "required": [
+            "chain",
+            "address"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_trades",
+        "description": "The newest swaps of a token, with side, size in USD, price, venue and the wallet where it is known.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "type": "string",
+              "enum": [
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
+              ],
+              "description": "Chain key. chord_chains lists what each chain supports."
+            },
+            "address": {
+              "type": "string",
+              "description": "Token address: 0x… on EVM chains, the base58 mint on Solana (case-sensitive)."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Rows to return (default 30)."
+            }
+          },
+          "required": [
+            "chain",
+            "address"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_candles",
+        "description": "OHLCV candles of a token from Chord's own index.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "type": "string",
+              "enum": [
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
+              ],
+              "description": "Chain key. chord_chains lists what each chain supports."
+            },
+            "address": {
+              "type": "string",
+              "description": "Token address: 0x… on EVM chains, the base58 mint on Solana (case-sensitive)."
+            },
+            "tf": {
+              "type": "string",
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "description": "Candle size (default 1h)."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "description": "Rows to return (default 200)."
+            }
+          },
+          "required": [
+            "chain",
+            "address"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_wallet",
+        "description": "A wallet's trading result on one chain: realised and open PnL per token. Windows differ by chain and are stated in the answer.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "type": "string",
+              "enum": [
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
+              ],
+              "description": "Chain key. chord_chains lists what each chain supports."
+            },
+            "wallet": {
+              "type": "string",
+              "description": "Wallet address: 0x… on EVM chains, base58 on Solana."
+            }
+          },
+          "required": [
+            "chain",
             "wallet"
-          ],
-          "additionalProperties": false
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_wallet_trades",
+        "description": "A wallet's recent swaps on one chain. Not every chain has this; chord_chains says which.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "type": "string",
+              "enum": [
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
+              ],
+              "description": "Chain key. chord_chains lists what each chain supports."
+            },
+            "wallet": {
+              "type": "string",
+              "description": "Wallet address: 0x… on EVM chains, base58 on Solana."
+            }
+          },
+          "required": [
+            "chain",
+            "wallet"
+          ]
         }
       }
     },
@@ -271,125 +323,82 @@
       "type": "function",
       "function": {
         "name": "chord_smart_money",
-        "description": "The wallets that traded best on the chain, ranked from the tape with routers and bots removed: profit, volume, trades, win rate, best token.",
+        "description": "Wallets ranked by profit on one chain, bots removed. Not every chain has this board.",
         "parameters": {
           "type": "object",
           "properties": {
-            "window": {
+            "chain": {
               "type": "string",
               "enum": [
-                "24h",
-                "7d",
-                "30d",
-                "all"
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
               ],
-              "default": "7d"
+              "description": "Chain key. chord_chains lists what each chain supports."
             },
-            "limit": {
-              "type": "integer",
-              "default": 20
-            }
-          },
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "chord_wallet_pnl",
-        "description": "One wallet's book on the chain: realized and open profit per token from an average-cost read of its swaps, plus totals. Balances that arrived by transfer have no cost basis and are excluded.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "wallet": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "wallet"
-          ],
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "chord_arc_overview",
-        "description": "What the Chord index holds on Arc (chain 5042, USDC-native) right now: 24h volume in USDC, swap count, tokens traded, venues with their share, and how far back the records go. Arc is indexed by Chord itself from every Uniswap pool and launchpad on the chain.",
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "chord_arc_tokens",
-        "description": "Tokens traded on Arc in the last 24h with price, 24h change, volume, buy/sell split, trades and attributed traders. Most Arc tokens are unlisted (no logo yet) but carry their on-chain symbol and name; `listed` says which have curated metadata.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "limit": {
-              "type": "integer",
-              "default": 50
-            },
-            "sort": {
-              "type": "string",
-              "enum": [
-                "volume",
-                "trades",
-                "traders",
-                "change"
-              ],
-              "default": "volume"
-            }
-          },
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "chord_arc_token",
-        "description": "One Arc token in depth: identity (on-chain symbol/name/decimals), 24h figures, an hourly volume/price series for the requested window, venue split, and every indexed pool holding it (V3/V2 pool addresses or V4 poolIds with hooks).",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "address": {
-              "type": "string",
-              "description": "Token address on Arc"
-            },
-            "hours": {
-              "type": "integer",
-              "default": 168
-            }
-          },
-          "required": [
-            "address"
-          ],
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "chord_arc_venues",
-        "description": "Per-venue daily volume on Arc for the last N days (1..180) with each venue's share of the window — Uniswap V3, V2, V4 and the launchpad forks as separate rows.",
-        "parameters": {
-          "type": "object",
-          "properties": {
             "days": {
               "type": "integer",
-              "default": 30
+              "enum": [
+                1,
+                3,
+                7,
+                30
+              ],
+              "description": "Window in days (default 7). Solana has 1, 3, 7; EVM boards have 1, 7, 30."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Rows to return (default 25)."
             }
           },
-          "additionalProperties": false
+          "required": [
+            "chain"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_holders",
+        "description": "Holder ledger of a token (balances by address) on the chains that keep one.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "type": "string",
+              "enum": [
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
+              ],
+              "description": "Chain key. chord_chains lists what each chain supports."
+            },
+            "address": {
+              "type": "string",
+              "description": "Token address: 0x… on EVM chains, the base58 mint on Solana (case-sensitive)."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Rows to return (default 25)."
+            }
+          },
+          "required": [
+            "chain",
+            "address"
+          ]
         }
       }
     },
@@ -397,55 +406,33 @@
       "type": "function",
       "function": {
         "name": "chord_lp_pools",
-        "description": "Pools ranked for a liquidity provider on Arc (or Robinhood Chain 4663 / Monad 143): TVL, volume by window, fees earned by LPs, fee/TVL and its annualised APR, 24h LP adds/removes, providers, whether a V4 hook can gate adds. Suspect pools (wash turnover, dust TVL) are flagged and hidden unless asked. Use for 'where to LP', 'best fee APR', 'is pool X worth providing to'.",
+        "description": "Pools ranked for a liquidity provider: volume, fees, TVL, fee/TVL.",
         "parameters": {
           "type": "object",
           "properties": {
             "chain": {
-              "default": 5042
-            },
-            "sort": {
               "type": "string",
               "enum": [
-                "fee_tvl",
-                "vol_24h",
-                "vol_1h",
-                "tvl",
-                "fees_24h",
-                "first_seen",
-                "lp_net_24h",
-                "trades_24h",
-                "score"
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
               ],
-              "default": "fee_tvl"
-            },
-            "interval": {
-              "type": "string",
-              "enum": [
-                "1h",
-                "6h",
-                "24h"
-              ],
-              "default": "24h"
-            },
-            "minTvl": {
-              "type": "number"
-            },
-            "quote": {
-              "type": "string",
-              "description": "restrict to pools quoted in this token (symbol or address)"
+              "description": "Chain key. chord_chains lists what each chain supports."
             },
             "limit": {
               "type": "integer",
-              "default": 20
-            },
-            "flagged": {
-              "type": "boolean",
-              "default": false,
-              "description": "include suspect pools"
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Rows to return (default 25)."
             }
           },
-          "additionalProperties": false
+          "required": [
+            "chain"
+          ]
         }
       }
     },
@@ -453,79 +440,136 @@
       "type": "function",
       "function": {
         "name": "chord_lp_positions",
-        "description": "A wallet's liquidity positions (Uniswap V3/V4 position NFTs) from Chord's LP ledger: pool, venue, fee tier, range, in range now and distance to the edge, dollars in/out, value now, fees earned and uncollected, PnL, age, JIT flag; plus a summary (open/closed, win rate, realized PnL, fees).",
+        "description": "A wallet's liquidity positions on one chain: range, value, fees, in or out of range.",
         "parameters": {
           "type": "object",
           "properties": {
-            "wallet": {
-              "type": "string"
-            },
             "chain": {
-              "default": 5042
-            },
-            "status": {
               "type": "string",
               "enum": [
-                "open",
-                "closed",
-                "all"
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
               ],
-              "default": "open"
+              "description": "Chain key. chord_chains lists what each chain supports."
             },
-            "limit": {
-              "type": "integer",
-              "default": 50
+            "wallet": {
+              "type": "string",
+              "description": "Wallet address: 0x… on EVM chains, base58 on Solana."
             }
           },
           "required": [
+            "chain",
             "wallet"
-          ],
-          "additionalProperties": false
+          ]
         }
       }
     },
     {
       "type": "function",
       "function": {
-        "name": "chord_lp_leaderboard",
-        "description": "Top liquidity providers from the position ledger (LP Agent style): profit 7d/30d/all, win rate, fees, positions, pools, average age and invested size, what they provide to. JIT and same-operator clusters are excluded; filters mirror LP Agent's panel.",
+        "name": "chord_quote",
+        "description": "Best swap quote on an EVM chain. Chord's own router answers first; another aggregator only when Chord cannot route. Amounts are integer strings in the token's smallest unit; the zero address is the native asset. Returns a quoteId valid for 2 minutes.",
         "parameters": {
           "type": "object",
           "properties": {
             "chain": {
-              "default": 5042
-            },
-            "sort": {
               "type": "string",
               "enum": [
-                "profit",
-                "win_rate",
-                "avg_age",
-                "positions",
-                "pools",
-                "ev",
-                "avg_invested",
-                "monthly_profit",
-                "fees",
-                "last_activity"
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
               ],
-              "default": "profit"
+              "description": "Chain key. chord_chains lists what each chain supports."
             },
-            "limit": {
+            "tokenIn": {
+              "type": "string",
+              "description": "Token address: 0x… on EVM chains, the base58 mint on Solana (case-sensitive)."
+            },
+            "tokenOut": {
+              "type": "string",
+              "description": "Token address: 0x… on EVM chains, the base58 mint on Solana (case-sensitive)."
+            },
+            "amount": {
+              "type": "string",
+              "description": "Input amount in the smallest unit, digits only."
+            },
+            "slippageBps": {
               "type": "integer",
-              "default": 25
+              "minimum": 1,
+              "maximum": 5000,
+              "description": "Default 50."
             },
-            "minPositions": {
-              "type": "integer"
-            },
-            "minAgeHours": {
-              "type": "number"
-            },
-            "minWinRate": {
-              "type": "number"
+            "taker": {
+              "type": "string",
+              "description": "Optional: the wallet that will sign. With it the answer includes the transaction and a simulation."
             }
           },
-          "additionalProperties": false
+          "required": [
+            "chain",
+            "tokenIn",
+            "tokenOut",
+            "amount"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "chord_swap_tx",
+        "description": "The UNSIGNED transaction for a swap, plus the approval it needs and a simulation run as the taker. Nothing is sent: the taker's own wallet signs and broadcasts. Pass a quoteId from chord_quote, or the full parameters.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "quoteId": {
+              "type": "string"
+            },
+            "chain": {
+              "type": "string",
+              "enum": [
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
+              ],
+              "description": "Chain key. chord_chains lists what each chain supports."
+            },
+            "tokenIn": {
+              "type": "string",
+              "description": "Token address: 0x… on EVM chains, the base58 mint on Solana (case-sensitive)."
+            },
+            "tokenOut": {
+              "type": "string",
+              "description": "Token address: 0x… on EVM chains, the base58 mint on Solana (case-sensitive)."
+            },
+            "amount": {
+              "type": "string"
+            },
+            "slippageBps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000
+            },
+            "taker": {
+              "type": "string",
+              "description": "The wallet that signs and receives."
+            }
+          },
+          "required": [
+            "taker"
+          ]
         }
       }
     },
@@ -533,22 +577,22 @@
       "type": "function",
       "function": {
         "name": "chord_ask",
-        "description": "Ask Chord's analyst about Arc (chain 5042) in plain language and get a researched answer: trending, a token's flow/holders/risk, support and resistance with an entry ladder, top traders on a token, a wallet's PnL and trades, largest prints, launches, depth, a bridge quote, position sizing, or an ad-hoc SQL question over the index. Returns the answer text, source links, an optional route card and any tables the analysis produced. Needs a Chord API key (CHORD_API_KEY). Slower than the data tools (5–40 s); use it for judgement, use the other tools for raw numbers.",
+        "description": "Ask Chord's analyst a question in plain language (markets, tokens, wallets, perps, macro). Uses many data sources and takes 10 to 60 seconds. Needs an API key.",
         "parameters": {
           "type": "object",
           "properties": {
             "question": {
-              "type": "string"
+              "type": "string",
+              "description": "Up to 1,000 characters."
             },
             "wallet": {
               "type": "string",
-              "description": "The agent's own wallet, so 'my PnL' resolves"
+              "description": "Optional: lets 'my PnL' resolve."
             }
           },
           "required": [
             "question"
-          ],
-          "additionalProperties": false
+          ]
         }
       }
     }

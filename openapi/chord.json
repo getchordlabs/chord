@@ -25,6 +25,10 @@
       "description": "Best-route quotes across every venue on the chain, and the unsigned transaction to execute them."
     },
     {
+      "name": "Agents and status",
+      "description": "What an agent starts from: the chain directory (which capability lives on which route, per chain), the hosted MCP server, per-chain health, the public status history, and how much agent traffic each chain sees."
+    },
+    {
       "name": "Meta aggregator",
       "description": "One quote and one unsigned transaction on any Chord chain, for agents. Chord's own router answers first; a third-party aggregator (KyberSwap, Monorail, LI.FI, Relay) only when Chord fails, never for a better price. Every answer names the provider, and a fallback transaction is returned only when its router is on Chord's allowlist and it passed a simulation run as the taker."
     },
@@ -22336,6 +22340,1762 @@
         ]
       }
     },
+    "/chains": {
+      "get": {
+        "tags": [
+          "Agents and status"
+        ],
+        "operationId": "chainsDirectory",
+        "summary": "Every chain and the route of each capability",
+        "description": "The directory an agent starts from. One entry per chain Chord serves, with its constants (native asset, wrapped native, dollar anchors with real decimals, explorer) and, for each capability, the route that serves it on that chain. A capability the chain does not have is `null`: the data routes grew chain by chain, so this is the one place that says where to read what. Solana is listed with `id: null` and base58, case-sensitive addresses. A chain that is not public yet appears only for a caller with an API key.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chains": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "description": "Chain key, the value every `chain` parameter accepts.",
+                            "enum": [
+                              "monad",
+                              "robinhood",
+                              "arc",
+                              "avalanche",
+                              "base",
+                              "bnb",
+                              "solana"
+                            ]
+                          },
+                          "id": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "EVM chain id; null for Solana."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "short": {
+                            "type": "string",
+                            "description": "Short label."
+                          },
+                          "addressFormat": {
+                            "type": "string",
+                            "description": "`evm` (0x, case-insensitive) or `base58` (case-sensitive).",
+                            "enum": [
+                              "evm",
+                              "base58"
+                            ]
+                          },
+                          "native": {
+                            "type": "object",
+                            "properties": {
+                              "symbol": {
+                                "type": "string",
+                                "description": ""
+                              },
+                              "decimals": {
+                                "type": "integer",
+                                "description": ""
+                              }
+                            }
+                          },
+                          "wrappedNative": {
+                            "type": "string",
+                            "description": "The token the native asset is stored under."
+                          },
+                          "anchors": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "symbol": {
+                                  "type": "string",
+                                  "description": ""
+                                },
+                                "address": {
+                                  "type": "string",
+                                  "description": ""
+                                },
+                                "decimals": {
+                                  "type": "integer",
+                                  "description": "Read on chain. BNB Chain's dollar stables have 18."
+                                },
+                                "stableUsd": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ],
+                                  "description": "1 for a dollar stable; null for a rate anchor."
+                                }
+                              }
+                            }
+                          },
+                          "explorer": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "blockTimeSec": {
+                            "type": "number",
+                            "description": "Measured average."
+                          },
+                          "capabilities": {
+                            "type": "object",
+                            "properties": {
+                              "overview": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "tokens": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "search": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "token": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "trades": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "candles": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "wallet": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "walletTrades": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "smartMoney": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "holders": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "lpPools": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "lpPositions": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "quote": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              },
+                              "swap": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "method": {
+                                    "type": "string",
+                                    "description": "`GET` or `POST`."
+                                  },
+                                  "path": {
+                                    "type": "string",
+                                    "description": "Path under the host, with `{address}` / `{wallet}` placeholders to fill."
+                                  },
+                                  "query": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too."
+                                  }
+                                },
+                                "description": "The route that serves this capability on this chain, or null when the chain does not have it."
+                              }
+                            }
+                          },
+                          "mcp": {
+                            "type": "string",
+                            "description": "The hosted MCP endpoint pinned to this chain."
+                          }
+                        }
+                      }
+                    },
+                    "capabilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": ""
+                      },
+                      "description": "Every capability name, in table order."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "ISO time."
+                    }
+                  }
+                },
+                "example": {
+                  "chains": [
+                    {
+                      "key": "arc",
+                      "id": 5042,
+                      "name": "Arc",
+                      "short": "Arc",
+                      "addressFormat": "evm",
+                      "native": {
+                        "symbol": "USDC",
+                        "decimals": 18
+                      },
+                      "wrappedNative": "0x3600000000000000000000000000000000000000",
+                      "anchors": [
+                        {
+                          "symbol": "USDC",
+                          "address": "0x3600000000000000000000000000000000000000",
+                          "decimals": 6,
+                          "stableUsd": 1
+                        }
+                      ],
+                      "explorer": "https://explorer.arc.io",
+                      "blockTimeSec": 0.5,
+                      "capabilities": {
+                        "search": {
+                          "method": "GET",
+                          "path": "/v1/tokens/search",
+                          "query": {
+                            "chain": "5042",
+                            "q": "{q}"
+                          }
+                        },
+                        "candles": {
+                          "method": "GET",
+                          "path": "/v1/candles",
+                          "query": {
+                            "chain": "5042",
+                            "token": "{address}"
+                          }
+                        },
+                        "wallet": {
+                          "method": "GET",
+                          "path": "/v1/portfolio/{wallet}/pnl",
+                          "query": {
+                            "chain": "5042"
+                          }
+                        },
+                        "walletTrades": {
+                          "method": "GET",
+                          "path": "/v1/portfolio/{wallet}/trades",
+                          "query": {
+                            "chain": "5042"
+                          }
+                        },
+                        "lpPools": {
+                          "method": "GET",
+                          "path": "/v1/lp/pools",
+                          "query": {
+                            "chain": "5042"
+                          }
+                        },
+                        "lpPositions": {
+                          "method": "GET",
+                          "path": "/v1/lp/positions",
+                          "query": {
+                            "chain": "5042",
+                            "owner": "{wallet}"
+                          }
+                        },
+                        "overview": {
+                          "method": "GET",
+                          "path": "/v1/arc/overview"
+                        },
+                        "tokens": {
+                          "method": "GET",
+                          "path": "/v1/arc/tokens"
+                        },
+                        "token": {
+                          "method": "GET",
+                          "path": "/v1/arc/token/{address}"
+                        },
+                        "trades": {
+                          "method": "GET",
+                          "path": "/v1/arc/token/{address}/trades"
+                        },
+                        "smartMoney": {
+                          "method": "GET",
+                          "path": "/v1/smart-money/top",
+                          "query": {
+                            "chain": "5042",
+                            "source": "onchain"
+                          }
+                        },
+                        "holders": {
+                          "method": "GET",
+                          "path": "/v1/arc/token/{address}/holders"
+                        },
+                        "quote": {
+                          "method": "GET",
+                          "path": "/v1/meta/quote",
+                          "query": {
+                            "chain": "5042"
+                          }
+                        },
+                        "swap": {
+                          "method": "POST",
+                          "path": "/v1/meta/swap"
+                        }
+                      },
+                      "mcp": "https://api.getchord.xyz/v1/mcp?chain=arc"
+                    },
+                    {
+                      "key": "base",
+                      "id": 8453,
+                      "name": "Base",
+                      "short": "Base",
+                      "addressFormat": "evm",
+                      "native": {
+                        "symbol": "ETH",
+                        "decimals": 18
+                      },
+                      "wrappedNative": "0x4200000000000000000000000000000000000006",
+                      "anchors": [
+                        {
+                          "symbol": "WETH",
+                          "address": "0x4200000000000000000000000000000000000006",
+                          "decimals": 18,
+                          "stableUsd": null
+                        },
+                        {
+                          "symbol": "USDC",
+                          "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+                          "decimals": 6,
+                          "stableUsd": 1
+                        }
+                      ],
+                      "explorer": "https://basescan.org",
+                      "blockTimeSec": 2,
+                      "capabilities": {
+                        "overview": {
+                          "method": "GET",
+                          "path": "/v1/chains/base/overview"
+                        },
+                        "tokens": {
+                          "method": "GET",
+                          "path": "/v1/chains/base/tokens"
+                        },
+                        "search": {
+                          "method": "GET",
+                          "path": "/v1/tokens/search",
+                          "query": {
+                            "chain": "8453",
+                            "q": "{q}"
+                          }
+                        },
+                        "token": {
+                          "method": "GET",
+                          "path": "/v1/chains/base/token/{address}"
+                        },
+                        "trades": {
+                          "method": "GET",
+                          "path": "/v1/chains/base/token/{address}/trades"
+                        },
+                        "candles": {
+                          "method": "GET",
+                          "path": "/v1/candles",
+                          "query": {
+                            "chain": "8453",
+                            "token": "{address}"
+                          }
+                        },
+                        "wallet": {
+                          "method": "GET",
+                          "path": "/v1/chains/base/wallet/{wallet}"
+                        },
+                        "walletTrades": null,
+                        "smartMoney": null,
+                        "holders": null,
+                        "lpPools": null,
+                        "lpPositions": null,
+                        "quote": {
+                          "method": "GET",
+                          "path": "/v1/meta/quote",
+                          "query": {
+                            "chain": "8453"
+                          }
+                        },
+                        "swap": {
+                          "method": "POST",
+                          "path": "/v1/meta/swap"
+                        }
+                      },
+                      "mcp": "https://api.getchord.xyz/v1/mcp?chain=base"
+                    }
+                  ],
+                  "capabilities": [
+                    "overview",
+                    "tokens",
+                    "search",
+                    "token",
+                    "trades",
+                    "candles",
+                    "wallet",
+                    "walletTrades",
+                    "smartMoney",
+                    "holders",
+                    "lpPools",
+                    "lpPositions",
+                    "quote",
+                    "swap"
+                  ],
+                  "updatedAt": "2026-10-11T17:33:08.447Z"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/chains": {
+      "get": {
+        "tags": [
+          "Agents and status"
+        ],
+        "operationId": "chainHealth",
+        "summary": "Health of every chain, one generic row each",
+        "description": "What the status page is built from, readable directly. `quotes.engine` is the routing engine's own state (`ok`, `starting` after a deploy, `stale` when its pool sync stopped, `down`); `quotes.canary` is the small quote the status probe sends. `data.ageSec` is how old the newest indexed trade is and `data.maxAgeSec` the age past which the chain's data counts as delayed. `quotes` is null where Chord does not route (Solana), `data` is null where no tape runs. Answers from a 15-second memo.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "at": {
+                      "type": "string",
+                      "description": "ISO time the rows were read."
+                    },
+                    "chains": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "description": "",
+                            "enum": [
+                              "monad",
+                              "robinhood",
+                              "arc",
+                              "avalanche",
+                              "base",
+                              "bnb",
+                              "solana"
+                            ]
+                          },
+                          "id": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "quotes": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "engine": {
+                                "type": "string",
+                                "description": ""
+                              },
+                              "latencyMs": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "Round trip from the API to the engine."
+                              },
+                              "lastSyncBlock": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": ""
+                              },
+                              "canary": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "inputMint": {
+                                    "type": "string",
+                                    "description": ""
+                                  },
+                                  "outputMint": {
+                                    "type": "string",
+                                    "description": ""
+                                  },
+                                  "amount": {
+                                    "type": "string",
+                                    "pattern": "^\\d+$",
+                                    "description": "Amount in the token's smallest unit, as a decimal string. Never a float."
+                                  }
+                                },
+                                "description": "10 units of the chain's first dollar stable into its wrapped native (Arc: into EURC)."
+                              }
+                            }
+                          },
+                          "data": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "ageSec": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "Null = the age could not be read."
+                              },
+                              "maxAgeSec": {
+                                "type": "integer",
+                                "description": ""
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "at": "2026-10-11T17:33:02.088Z",
+                  "chains": [
+                    {
+                      "key": "monad",
+                      "id": 143,
+                      "name": "Monad",
+                      "quotes": {
+                        "engine": "ok",
+                        "latencyMs": 4,
+                        "lastSyncBlock": 112529162,
+                        "canary": {
+                          "inputMint": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+                          "outputMint": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+                          "amount": "10000000"
+                        }
+                      },
+                      "data": {
+                        "ageSec": 10,
+                        "maxAgeSec": 600
+                      }
+                    },
+                    {
+                      "key": "robinhood",
+                      "id": 4663,
+                      "name": "Robinhood Chain",
+                      "quotes": {
+                        "engine": "ok",
+                        "latencyMs": 5,
+                        "lastSyncBlock": 86010669,
+                        "canary": {
+                          "inputMint": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+                          "outputMint": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+                          "amount": "10000000"
+                        }
+                      },
+                      "data": {
+                        "ageSec": 4,
+                        "maxAgeSec": 2700
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "tags": [
+          "Agents and status"
+        ],
+        "operationId": "statusSummary",
+        "summary": "Uptime history, measured from outside Chord's servers",
+        "description": "Served by Cloudflare, not by the API's own servers, so it answers while they do not. A probe runs every minute: it reads `GET /health/chains` and requests one small quote per chain down the public path. Components are `api`, `quotes:<chain>` and `data:<chain>`. Uptime is the share of SAMPLED minutes that were not down; `sampledMin` says how many minutes each window really holds, and a day with no samples has `level: null`: it is never counted as up. An incident opens on the second bad check in a row and closes on the second good one. The same data as a page: https://getchord.xyz/status",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "at": {
+                      "type": "string",
+                      "description": "ISO time."
+                    },
+                    "overall": {
+                      "type": "string",
+                      "description": "",
+                      "enum": [
+                        "operational",
+                        "degraded",
+                        "outage",
+                        "unknown"
+                      ]
+                    },
+                    "lastProbeAgeSec": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Seconds since the last probe. Above about 180 every status reads `unknown`."
+                    },
+                    "since": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "First UTC day with a sample."
+                    },
+                    "probe": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string",
+                          "description": ""
+                        },
+                        "everySec": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "openAfterMin": {
+                          "type": "integer",
+                          "description": ""
+                        }
+                      }
+                    },
+                    "components": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "`api`, `quotes:<chain>` or `data:<chain>`."
+                          },
+                          "group": {
+                            "type": "string",
+                            "description": "",
+                            "enum": [
+                              "api",
+                              "quotes",
+                              "data"
+                            ]
+                          },
+                          "chain": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "",
+                            "enum": [
+                              "operational",
+                              "degraded",
+                              "down",
+                              "unknown"
+                            ]
+                          },
+                          "note": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Why it is not operational."
+                          },
+                          "ms": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Last probe: the API call, or the canary quote, in milliseconds. Null for data components."
+                          },
+                          "ageSec": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Data components: seconds behind the chain."
+                          },
+                          "uptime": {
+                            "type": "object",
+                            "properties": {
+                              "h24": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": ""
+                              },
+                              "d7": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": ""
+                              },
+                              "d30": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": ""
+                              },
+                              "d90": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": ""
+                              }
+                            },
+                            "description": "Percent of sampled minutes not down. Null = nothing sampled."
+                          },
+                          "sampledMin": {
+                            "type": "object",
+                            "properties": {
+                              "h24": {
+                                "type": "integer",
+                                "description": ""
+                              },
+                              "d7": {
+                                "type": "integer",
+                                "description": ""
+                              },
+                              "d30": {
+                                "type": "integer",
+                                "description": ""
+                              },
+                              "d90": {
+                                "type": "integer",
+                                "description": ""
+                              }
+                            },
+                            "description": "Minutes actually sampled in each window."
+                          },
+                          "avgMs30d": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "days": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "day": {
+                                  "type": "string",
+                                  "description": "UTC day."
+                                },
+                                "level": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "description": "Worst level that day: 0 down, 1 degraded, 2 operational; null = no samples."
+                                },
+                                "downMin": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "degMin": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "sampled": {
+                                  "type": "integer",
+                                  "description": ""
+                                }
+                              }
+                            },
+                            "description": "Oldest first, 90 entries."
+                          }
+                        }
+                      }
+                    },
+                    "incidents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Component id."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "group": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "start": {
+                            "type": "string",
+                            "description": "ISO."
+                          },
+                          "end": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO; null while open."
+                          },
+                          "minutes": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "worst": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "note": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "Newest first, last 30 days."
+                    }
+                  }
+                },
+                "example": {
+                  "at": "2026-10-11T17:33:09.133Z",
+                  "overall": "operational",
+                  "lastProbeAgeSec": 9,
+                  "since": "2026-10-11",
+                  "probe": {
+                    "from": "Cloudflare edge",
+                    "everySec": 60,
+                    "openAfterMin": 2
+                  },
+                  "incidents": [],
+                  "components": [
+                    {
+                      "id": "api",
+                      "group": "api",
+                      "chain": null,
+                      "name": "API",
+                      "status": "operational",
+                      "note": null,
+                      "ms": 58,
+                      "ageSec": null,
+                      "uptime": {
+                        "h24": 100,
+                        "d7": 100,
+                        "d30": 100,
+                        "d90": 100
+                      },
+                      "sampledMin": {
+                        "h24": 9,
+                        "d7": 9,
+                        "d30": 9,
+                        "d90": 9
+                      },
+                      "avgMs30d": 119,
+                      "days": [
+                        {
+                          "day": "2026-07-14",
+                          "level": null,
+                          "downMin": 0,
+                          "degMin": 0,
+                          "sampled": 0
+                        },
+                        {
+                          "day": "2026-07-15",
+                          "level": null,
+                          "downMin": 0,
+                          "degMin": 0,
+                          "sampled": 0
+                        }
+                      ]
+                    },
+                    {
+                      "id": "quotes:arc",
+                      "group": "quotes",
+                      "chain": "arc",
+                      "name": "Arc",
+                      "status": "operational",
+                      "note": null,
+                      "ms": 697,
+                      "ageSec": null,
+                      "uptime": {
+                        "h24": 100,
+                        "d7": 100,
+                        "d30": 100,
+                        "d90": 100
+                      },
+                      "sampledMin": {
+                        "h24": 9,
+                        "d7": 9,
+                        "d30": 9,
+                        "d90": 9
+                      },
+                      "avgMs30d": 683,
+                      "days": [
+                        {
+                          "day": "2026-07-14",
+                          "level": null,
+                          "downMin": 0,
+                          "degMin": 0,
+                          "sampled": 0
+                        },
+                        {
+                          "day": "2026-07-15",
+                          "level": null,
+                          "downMin": 0,
+                          "degMin": 0,
+                          "sampled": 0
+                        }
+                      ]
+                    },
+                    {
+                      "id": "data:arc",
+                      "group": "data",
+                      "chain": "arc",
+                      "name": "Arc",
+                      "status": "operational",
+                      "note": null,
+                      "ms": null,
+                      "ageSec": 2,
+                      "uptime": {
+                        "h24": 100,
+                        "d7": 100,
+                        "d30": 100,
+                        "d90": 100
+                      },
+                      "sampledMin": {
+                        "h24": 9,
+                        "d7": 9,
+                        "d30": 9,
+                        "d90": 9
+                      },
+                      "avgMs30d": null,
+                      "days": [
+                        {
+                          "day": "2026-07-14",
+                          "level": null,
+                          "downMin": 0,
+                          "degMin": 0,
+                          "sampled": 0
+                        },
+                        {
+                          "day": "2026-07-15",
+                          "level": null,
+                          "downMin": 0,
+                          "degMin": 0,
+                          "sampled": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/stats": {
+      "get": {
+        "tags": [
+          "Agents and status"
+        ],
+        "operationId": "agentStats",
+        "summary": "Agent traffic per chain",
+        "description": "How much programmatic traffic a chain sees through Chord, by the surface it came through: `mcp` (the hosted MCP), `api` (an API key), `x402` and `wallet` (not live yet), `anon` (keyless scripts), and `web` (people in Chord's own app; their board reads are not counted). `agents` adds up everything that is not `web`. Counts are requests answered 2xx; `swapTx` is swap transactions BUILT, not swaps executed on chain. `callers` is distinct callers over the window. `since` is the first day with any count: the counters started on 2026-10-11, earlier days are unknown, not zero.",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "",
+              "enum": [
+                "all",
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
+              ]
+            },
+            "description": "A chain key or id, or `all` (every chain plus chain-free calls such as Ask). Default `all`."
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "default": 30
+            },
+            "description": "Window in UTC days, today included."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "days": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "from": {
+                      "type": "string",
+                      "description": "UTC day."
+                    },
+                    "to": {
+                      "type": "string",
+                      "description": "UTC day."
+                    },
+                    "agents": {
+                      "$ref": "#/components/schemas/AgentCounts"
+                    },
+                    "web": {
+                      "$ref": "#/components/schemas/AgentCounts"
+                    },
+                    "bySource": {
+                      "type": "object",
+                      "properties": {
+                        "mcp": {
+                          "$ref": "#/components/schemas/AgentCounts"
+                        },
+                        "x402": {
+                          "$ref": "#/components/schemas/AgentCounts"
+                        },
+                        "wallet": {
+                          "$ref": "#/components/schemas/AgentCounts"
+                        },
+                        "api": {
+                          "$ref": "#/components/schemas/AgentCounts"
+                        },
+                        "anon": {
+                          "$ref": "#/components/schemas/AgentCounts"
+                        },
+                        "web": {
+                          "$ref": "#/components/schemas/AgentCounts"
+                        }
+                      }
+                    },
+                    "daily": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "day": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "calls": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "reads": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "quotes": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "swapTx": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "asks": {
+                            "type": "integer",
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "Oldest first; programmatic callers only."
+                    },
+                    "since": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "ISO time."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": "arc",
+                  "days": 7,
+                  "from": "2026-10-05",
+                  "to": "2026-10-11",
+                  "agents": {
+                    "calls": 5,
+                    "reads": 5,
+                    "quotes": 0,
+                    "swapTx": 0,
+                    "asks": 0,
+                    "callers": 1
+                  },
+                  "web": {
+                    "calls": 0,
+                    "reads": 0,
+                    "quotes": 0,
+                    "swapTx": 0,
+                    "asks": 0,
+                    "callers": 0
+                  },
+                  "bySource": {
+                    "mcp": {
+                      "calls": 5,
+                      "reads": 5,
+                      "quotes": 0,
+                      "swapTx": 0,
+                      "asks": 0,
+                      "callers": 1
+                    },
+                    "x402": {
+                      "calls": 0,
+                      "reads": 0,
+                      "quotes": 0,
+                      "swapTx": 0,
+                      "asks": 0,
+                      "callers": 0
+                    },
+                    "wallet": {
+                      "calls": 0,
+                      "reads": 0,
+                      "quotes": 0,
+                      "swapTx": 0,
+                      "asks": 0,
+                      "callers": 0
+                    },
+                    "api": {
+                      "calls": 0,
+                      "reads": 0,
+                      "quotes": 0,
+                      "swapTx": 0,
+                      "asks": 0,
+                      "callers": 0
+                    },
+                    "anon": {
+                      "calls": 0,
+                      "reads": 0,
+                      "quotes": 0,
+                      "swapTx": 0,
+                      "asks": 0,
+                      "callers": 0
+                    },
+                    "web": {
+                      "calls": 0,
+                      "reads": 0,
+                      "quotes": 0,
+                      "swapTx": 0,
+                      "asks": 0,
+                      "callers": 0
+                    }
+                  },
+                  "daily": [
+                    {
+                      "day": "2026-10-05",
+                      "calls": 0,
+                      "reads": 0,
+                      "quotes": 0,
+                      "swapTx": 0,
+                      "asks": 0
+                    },
+                    {
+                      "day": "2026-10-06",
+                      "calls": 0,
+                      "reads": 0,
+                      "quotes": 0,
+                      "swapTx": 0,
+                      "asks": 0
+                    }
+                  ],
+                  "since": "2026-10-11",
+                  "updatedAt": "2026-10-11T17:33:08.931Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "tags": [
+          "Agents and status"
+        ],
+        "operationId": "mcp",
+        "summary": "Hosted MCP server",
+        "description": "Model Context Protocol over stateless Streamable HTTP: POST one JSON-RPC message (or a batch of up to 20), get JSON back. Methods: `initialize`, `ping`, `tools/list`, `tools/call`. 17 tools; every data tool takes a `chain`. `?chain=<key>` pins a default chain and names the server `chord-<key>`. The handshake and the tool list need no credentials and are not metered; a tool call is an ordinary request to this API made as the caller, so it is limited and metered exactly like the REST call it wraps. Send a key as `X-API-Key`, `Authorization: Bearer`, or `?apiKey=`. A tool-level failure is a normal result with `isError: true` and a sentence the model can act on. Guide: https://getchord.xyz/docs/agents/mcp/",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "",
+              "enum": [
+                "monad",
+                "robinhood",
+                "arc",
+                "avalanche",
+                "base",
+                "bnb",
+                "solana"
+              ]
+            },
+            "description": "Default chain for this endpoint."
+          },
+          {
+            "name": "apiKey",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": ""
+            },
+            "description": "Your key, for connectors that cannot set a header."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "A JSON-RPC 2.0 message, or an array of them."
+              },
+              "example": {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                  "name": "chord_search",
+                  "arguments": {
+                    "query": "EURC"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The JSON-RPC response. A tool result carries one text block: `{chain, route, data}` as JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "JSON-RPC 2.0 response."
+                },
+                "example": {
+                  "jsonrpc": "2.0",
+                  "id": 1,
+                  "result": {
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "{\"chain\":\"arc\",\"route\":\"GET /v1/tokens/search\",\"data\":{\"chain\":5042,\"q\":\"EURC\",\"tokens\":[{\"address\":\"0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1\",\"symbol\":\"EURC\",\"name\":\"Euro Coin\",\"decimals\":6,\"logoURI\":\"https://assets.coingecko.com/coins/images/26045/small/euro.png\",\"verified\":true}]}}"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "A notification: nothing to answer."
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp/tools.json": {
+      "get": {
+        "tags": [
+          "Agents and status"
+        ],
+        "operationId": "mcpTools",
+        "summary": "The MCP tools as a function-calling manifest",
+        "description": "The same tool list as OpenAI-style function definitions, for frameworks that take a manifest instead of speaking MCP. Always current: it is printed from the list the MCP server serves.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "version": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "base_url": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "mcp": {
+                      "type": "string",
+                      "description": "The hosted MCP endpoint."
+                    },
+                    "auth": {
+                      "type": "object",
+                      "properties": {
+                        "header": {
+                          "type": "string",
+                          "description": ""
+                        },
+                        "required": {
+                          "type": "boolean",
+                          "description": ""
+                        }
+                      }
+                    },
+                    "tools": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "function": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": ""
+                              },
+                              "description": {
+                                "type": "string",
+                                "description": ""
+                              },
+                              "parameters": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "JSON Schema of the arguments."
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "name": "chord",
+                  "version": "1.0.0",
+                  "base_url": "https://api.getchord.xyz",
+                  "mcp": "https://api.getchord.xyz/v1/mcp",
+                  "auth": {
+                    "header": "X-API-Key",
+                    "required": false
+                  },
+                  "tools": [
+                    {
+                      "type": "function",
+                      "function": {
+                        "name": "chord_chains",
+                        "description": "The chains Chord serves, with their native asset, anchors and which capabilities each one has (overview, tokens, trades, candles, wallet PnL, smart money, holders, LP, quote, swap). Call this first when unsure what a chain supports.",
+                        "parameters": {
+                          "type": "object",
+                          "properties": {}
+                        }
+                      }
+                    },
+                    {
+                      "type": "function",
+                      "function": {
+                        "name": "chord_status",
+                        "description": "Live health of every chain: routing engine state, how old the newest indexed trade is, and the public status page link.",
+                        "parameters": {
+                          "type": "object",
+                          "properties": {}
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -22442,6 +24202,36 @@
       }
     },
     "schemas": {
+      "AgentCounts": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "integer",
+            "description": "Requests answered 2xx."
+          },
+          "reads": {
+            "type": "integer",
+            "description": ""
+          },
+          "quotes": {
+            "type": "integer",
+            "description": ""
+          },
+          "swapTx": {
+            "type": "integer",
+            "description": "Swap transactions built, not executed."
+          },
+          "asks": {
+            "type": "integer",
+            "description": "Questions to the analyst."
+          },
+          "callers": {
+            "type": "integer",
+            "description": "Distinct callers in the window."
+          }
+        },
+        "description": "Counts for one surface or a sum of surfaces."
+      },
       "Error": {
         "type": "object",
         "properties": {

@@ -1,12 +1,18 @@
 {
   "name": "chord-agent",
-  "version": "0.1.0",
-  "description": "Chord agent harness: an MCP tool server and a function-calling manifest over the Chord API (stock tokens on chain 4663 and every token on Arc 5042: prices, stocks, routes, smart money, wallet PnL, LP pools and positions).",
+  "version": "0.2.0",
+  "description": "Chord agent harness: a stdio bridge to the hosted Chord MCP and a function-calling manifest. Market data and unsigned swap transactions on Monad, Robinhood Chain, Arc, Avalanche, Base, BNB Chain and Solana; the chain is a parameter of every tool.",
   "type": "module",
-  "bin": { "chord-agent": "./dist/mcp.js" },
+  "bin": {
+    "chord-agent": "./dist/mcp.js"
+  },
   "main": "./dist/tools.js",
   "types": "./dist/tools.d.ts",
-  "files": ["dist", "tools.json", "README.md"],
+  "files": [
+    "dist",
+    "tools.json",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node -e \"const fs=require('fs');fs.chmodSync('dist/mcp.js',0o755)\"",
     "manifest": "node dist/manifest.js > tools.json && mkdir -p ../web/public/agent && cp tools.json ../web/public/agent/tools.json",
@@ -22,7 +28,9 @@
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "license": "MIT",
   "homepage": "https://getchord.xyz/docs/agents/"
 }

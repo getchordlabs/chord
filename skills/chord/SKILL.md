@@ -37,9 +37,10 @@ read that data and prepare swaps carefully. **You never sign, never broadcast, n
   to addresses, converts amounts exactly, prints compact JSON, and builds an unsigned transaction only
   behind `--user-confirmed`. Prefer it; plain `curl` works too. Always pass `limit` on list calls and
   never cut JSON with `head -c` (a truncated answer is a wrong answer).
-- If `chord_*` MCP tools are in your tool list they wrap the same API (`chord_meta_quote` and
-  `chord_meta_swap_tx` on every chain: use them first for any swap; Robinhood Chain prices, stocks,
-  `chord_quote` and `chord_swap_tx`; Arc data; LP; `chord_ask`). Every rule below applies to them.
+- If `chord_*` MCP tools are in your tool list (the hosted server at `https://api.getchord.xyz/v1/mcp`)
+  they wrap the same API with the chain as a parameter: `chord_chains` says what each chain supports,
+  `chord_quote` and `chord_swap_tx` go through the meta aggregator on every EVM chain, the rest are
+  reads, plus `chord_ask`. Every rule below applies to them.
 
 ## Chains
 
@@ -94,8 +95,8 @@ Worked calls with real responses: `references/examples.md`.
 - **Read-only, run without asking:** every GET above, `/v1/meta/quote` **without** a wallet,
   `/v1/quote`, `/v1/swap/simulate`, `POST /v1/ask`.
 - **Fund-moving, needs the user's confirmation first:** `POST /v1/meta/swap`, `/v1/meta/quote` with
-  `taker` (it returns a transaction), `chord.py meta-swap`, `chord_meta_swap_tx`, `POST /v1/swap`,
-  `chord.py swap-tx`, `chord_swap_tx`, and every token approval.
+  `taker` (it returns a transaction), `chord.py meta-swap`, `chord_swap_tx`, `chord_quote` with a
+  `taker`, `POST /v1/swap`, `chord.py swap-tx`, and every token approval.
 - **Never:** sign or broadcast anything; ask for, accept or store a private key or seed phrase;
   build the swap in the same response that shows the quote; pass `--user-confirmed` unless the user
   said yes in a later message; write or imagine the user's yes yourself; propose an unlimited approval.

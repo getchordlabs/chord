@@ -4897,5 +4897,530 @@
     "minuteThrough": "2026-10-10"
    }
   }
+ },
+ "/v1/chains": {
+  "chains": [
+   {
+    "key": "arc",
+    "id": 5042,
+    "name": "Arc",
+    "short": "Arc",
+    "addressFormat": "evm",
+    "native": {
+     "symbol": "USDC",
+     "decimals": 18
+    },
+    "wrappedNative": "0x3600000000000000000000000000000000000000",
+    "anchors": [
+     {
+      "symbol": "USDC",
+      "address": "0x3600000000000000000000000000000000000000",
+      "decimals": 6,
+      "stableUsd": 1
+     }
+    ],
+    "explorer": "https://explorer.arc.io",
+    "blockTimeSec": 0.5,
+    "capabilities": {
+     "search": {
+      "method": "GET",
+      "path": "/v1/tokens/search",
+      "query": {
+       "chain": "5042",
+       "q": "{q}"
+      }
+     },
+     "candles": {
+      "method": "GET",
+      "path": "/v1/candles",
+      "query": {
+       "chain": "5042",
+       "token": "{address}"
+      }
+     },
+     "wallet": {
+      "method": "GET",
+      "path": "/v1/portfolio/{wallet}/pnl",
+      "query": {
+       "chain": "5042"
+      }
+     },
+     "walletTrades": {
+      "method": "GET",
+      "path": "/v1/portfolio/{wallet}/trades",
+      "query": {
+       "chain": "5042"
+      }
+     },
+     "lpPools": {
+      "method": "GET",
+      "path": "/v1/lp/pools",
+      "query": {
+       "chain": "5042"
+      }
+     },
+     "lpPositions": {
+      "method": "GET",
+      "path": "/v1/lp/positions",
+      "query": {
+       "chain": "5042",
+       "owner": "{wallet}"
+      }
+     },
+     "overview": {
+      "method": "GET",
+      "path": "/v1/arc/overview"
+     },
+     "tokens": {
+      "method": "GET",
+      "path": "/v1/arc/tokens"
+     },
+     "token": {
+      "method": "GET",
+      "path": "/v1/arc/token/{address}"
+     },
+     "trades": {
+      "method": "GET",
+      "path": "/v1/arc/token/{address}/trades"
+     },
+     "smartMoney": {
+      "method": "GET",
+      "path": "/v1/smart-money/top",
+      "query": {
+       "chain": "5042",
+       "source": "onchain"
+      }
+     },
+     "holders": {
+      "method": "GET",
+      "path": "/v1/arc/token/{address}/holders"
+     },
+     "quote": {
+      "method": "GET",
+      "path": "/v1/meta/quote",
+      "query": {
+       "chain": "5042"
+      }
+     },
+     "swap": {
+      "method": "POST",
+      "path": "/v1/meta/swap"
+     }
+    },
+    "mcp": "https://api.getchord.xyz/v1/mcp?chain=arc"
+   },
+   {
+    "key": "base",
+    "id": 8453,
+    "name": "Base",
+    "short": "Base",
+    "addressFormat": "evm",
+    "native": {
+     "symbol": "ETH",
+     "decimals": 18
+    },
+    "wrappedNative": "0x4200000000000000000000000000000000000006",
+    "anchors": [
+     {
+      "symbol": "WETH",
+      "address": "0x4200000000000000000000000000000000000006",
+      "decimals": 18,
+      "stableUsd": null
+     },
+     {
+      "symbol": "USDC",
+      "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "decimals": 6,
+      "stableUsd": 1
+     }
+    ],
+    "explorer": "https://basescan.org",
+    "blockTimeSec": 2,
+    "capabilities": {
+     "overview": {
+      "method": "GET",
+      "path": "/v1/chains/base/overview"
+     },
+     "tokens": {
+      "method": "GET",
+      "path": "/v1/chains/base/tokens"
+     },
+     "search": {
+      "method": "GET",
+      "path": "/v1/tokens/search",
+      "query": {
+       "chain": "8453",
+       "q": "{q}"
+      }
+     },
+     "token": {
+      "method": "GET",
+      "path": "/v1/chains/base/token/{address}"
+     },
+     "trades": {
+      "method": "GET",
+      "path": "/v1/chains/base/token/{address}/trades"
+     },
+     "candles": {
+      "method": "GET",
+      "path": "/v1/candles",
+      "query": {
+       "chain": "8453",
+       "token": "{address}"
+      }
+     },
+     "wallet": {
+      "method": "GET",
+      "path": "/v1/chains/base/wallet/{wallet}"
+     },
+     "walletTrades": null,
+     "smartMoney": null,
+     "holders": null,
+     "lpPools": null,
+     "lpPositions": null,
+     "quote": {
+      "method": "GET",
+      "path": "/v1/meta/quote",
+      "query": {
+       "chain": "8453"
+      }
+     },
+     "swap": {
+      "method": "POST",
+      "path": "/v1/meta/swap"
+     }
+    },
+    "mcp": "https://api.getchord.xyz/v1/mcp?chain=base"
+   }
+  ],
+  "capabilities": [
+   "overview",
+   "tokens",
+   "search",
+   "token",
+   "trades",
+   "candles",
+   "wallet",
+   "walletTrades",
+   "smartMoney",
+   "holders",
+   "lpPools",
+   "lpPositions",
+   "quote",
+   "swap"
+  ],
+  "updatedAt": "2026-10-11T17:33:08.447Z"
+ },
+ "/v1/health/chains": {
+  "at": "2026-10-11T17:33:02.088Z",
+  "chains": [
+   {
+    "key": "monad",
+    "id": 143,
+    "name": "Monad",
+    "quotes": {
+     "engine": "ok",
+     "latencyMs": 4,
+     "lastSyncBlock": 112529162,
+     "canary": {
+      "inputMint": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+      "outputMint": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+      "amount": "10000000"
+     }
+    },
+    "data": {
+     "ageSec": 10,
+     "maxAgeSec": 600
+    }
+   },
+   {
+    "key": "robinhood",
+    "id": 4663,
+    "name": "Robinhood Chain",
+    "quotes": {
+     "engine": "ok",
+     "latencyMs": 5,
+     "lastSyncBlock": 86010669,
+     "canary": {
+      "inputMint": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "outputMint": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "amount": "10000000"
+     }
+    },
+    "data": {
+     "ageSec": 4,
+     "maxAgeSec": 2700
+    }
+   }
+  ]
+ },
+ "/v1/agent/stats?chain=arc&days=7": {
+  "chain": "arc",
+  "days": 7,
+  "from": "2026-10-05",
+  "to": "2026-10-11",
+  "agents": {
+   "calls": 5,
+   "reads": 5,
+   "quotes": 0,
+   "swapTx": 0,
+   "asks": 0,
+   "callers": 1
+  },
+  "web": {
+   "calls": 0,
+   "reads": 0,
+   "quotes": 0,
+   "swapTx": 0,
+   "asks": 0,
+   "callers": 0
+  },
+  "bySource": {
+   "mcp": {
+    "calls": 5,
+    "reads": 5,
+    "quotes": 0,
+    "swapTx": 0,
+    "asks": 0,
+    "callers": 1
+   },
+   "x402": {
+    "calls": 0,
+    "reads": 0,
+    "quotes": 0,
+    "swapTx": 0,
+    "asks": 0,
+    "callers": 0
+   },
+   "wallet": {
+    "calls": 0,
+    "reads": 0,
+    "quotes": 0,
+    "swapTx": 0,
+    "asks": 0,
+    "callers": 0
+   },
+   "api": {
+    "calls": 0,
+    "reads": 0,
+    "quotes": 0,
+    "swapTx": 0,
+    "asks": 0,
+    "callers": 0
+   },
+   "anon": {
+    "calls": 0,
+    "reads": 0,
+    "quotes": 0,
+    "swapTx": 0,
+    "asks": 0,
+    "callers": 0
+   },
+   "web": {
+    "calls": 0,
+    "reads": 0,
+    "quotes": 0,
+    "swapTx": 0,
+    "asks": 0,
+    "callers": 0
+   }
+  },
+  "daily": [
+   {
+    "day": "2026-10-05",
+    "calls": 0,
+    "reads": 0,
+    "quotes": 0,
+    "swapTx": 0,
+    "asks": 0
+   },
+   {
+    "day": "2026-10-06",
+    "calls": 0,
+    "reads": 0,
+    "quotes": 0,
+    "swapTx": 0,
+    "asks": 0
+   }
+  ],
+  "since": "2026-10-11",
+  "updatedAt": "2026-10-11T17:33:08.931Z"
+ },
+ "/v1/status": {
+  "at": "2026-10-11T17:33:09.133Z",
+  "overall": "operational",
+  "lastProbeAgeSec": 9,
+  "since": "2026-10-11",
+  "probe": {
+   "from": "Cloudflare edge",
+   "everySec": 60,
+   "openAfterMin": 2
+  },
+  "incidents": [],
+  "components": [
+   {
+    "id": "api",
+    "group": "api",
+    "chain": null,
+    "name": "API",
+    "status": "operational",
+    "note": null,
+    "ms": 58,
+    "ageSec": null,
+    "uptime": {
+     "h24": 100,
+     "d7": 100,
+     "d30": 100,
+     "d90": 100
+    },
+    "sampledMin": {
+     "h24": 9,
+     "d7": 9,
+     "d30": 9,
+     "d90": 9
+    },
+    "avgMs30d": 119,
+    "days": [
+     {
+      "day": "2026-07-14",
+      "level": null,
+      "downMin": 0,
+      "degMin": 0,
+      "sampled": 0
+     },
+     {
+      "day": "2026-07-15",
+      "level": null,
+      "downMin": 0,
+      "degMin": 0,
+      "sampled": 0
+     }
+    ]
+   },
+   {
+    "id": "quotes:arc",
+    "group": "quotes",
+    "chain": "arc",
+    "name": "Arc",
+    "status": "operational",
+    "note": null,
+    "ms": 697,
+    "ageSec": null,
+    "uptime": {
+     "h24": 100,
+     "d7": 100,
+     "d30": 100,
+     "d90": 100
+    },
+    "sampledMin": {
+     "h24": 9,
+     "d7": 9,
+     "d30": 9,
+     "d90": 9
+    },
+    "avgMs30d": 683,
+    "days": [
+     {
+      "day": "2026-07-14",
+      "level": null,
+      "downMin": 0,
+      "degMin": 0,
+      "sampled": 0
+     },
+     {
+      "day": "2026-07-15",
+      "level": null,
+      "downMin": 0,
+      "degMin": 0,
+      "sampled": 0
+     }
+    ]
+   },
+   {
+    "id": "data:arc",
+    "group": "data",
+    "chain": "arc",
+    "name": "Arc",
+    "status": "operational",
+    "note": null,
+    "ms": null,
+    "ageSec": 2,
+    "uptime": {
+     "h24": 100,
+     "d7": 100,
+     "d30": 100,
+     "d90": 100
+    },
+    "sampledMin": {
+     "h24": 9,
+     "d7": 9,
+     "d30": 9,
+     "d90": 9
+    },
+    "avgMs30d": null,
+    "days": [
+     {
+      "day": "2026-07-14",
+      "level": null,
+      "downMin": 0,
+      "degMin": 0,
+      "sampled": 0
+     },
+     {
+      "day": "2026-07-15",
+      "level": null,
+      "downMin": 0,
+      "degMin": 0,
+      "sampled": 0
+     }
+    ]
+   }
+  ]
+ },
+ "/v1/mcp/tools.json": {
+  "name": "chord",
+  "version": "1.0.0",
+  "base_url": "https://api.getchord.xyz",
+  "mcp": "https://api.getchord.xyz/v1/mcp",
+  "auth": {
+   "header": "X-API-Key",
+   "required": false
+  },
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "chord_chains",
+     "description": "The chains Chord serves, with their native asset, anchors and which capabilities each one has (overview, tokens, trades, candles, wallet PnL, smart money, holders, LP, quote, swap). Call this first when unsure what a chain supports.",
+     "parameters": {
+      "type": "object",
+      "properties": {}
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "chord_status",
+     "description": "Live health of every chain: routing engine state, how old the newest indexed trade is, and the public status page link.",
+     "parameters": {
+      "type": "object",
+      "properties": {}
+     }
+    }
+   }
+  ]
+ },
+ "POST /v1/mcp?chain=arc tools/call chord_search": {
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"chain\":\"arc\",\"route\":\"GET /v1/tokens/search\",\"data\":{\"chain\":5042,\"q\":\"EURC\",\"tokens\":[{\"address\":\"0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1\",\"symbol\":\"EURC\",\"name\":\"Euro Coin\",\"decimals\":6,\"logoURI\":\"https://assets.coingecko.com/coins/images/26045/small/euro.png\",\"verified\":true}]}}"
+    }
+   ]
+  }
  }
 }
