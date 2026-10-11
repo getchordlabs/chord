@@ -19783,7 +19783,7 @@
         ],
         "operationId": "solLpPools",
         "summary": "Liquidity pools by LP activity",
-        "description": "Every pool where liquidity moved in the window, ranked: `fees` (claimed fees, default), `deposits`, `withdrawals`, `net` (net inflow), `lps` (distinct LPs) or `tvl`. Each row has the pool's TVL estimate and swap volume from the swap tape (TVL is null for most DLMM and CLMM pools: their swap events carry no reserve), deposits, withdrawals, claimed fees, counts and open positions. Cached 60 seconds.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
+        "description": "Every pool where liquidity moved in the window, ranked: `fees` (claimed fees, default), `deposits`, `withdrawals`, `net` (net inflow), `lps` (distinct LPs), `tvl` or `fee_tvl` (fees claimed in the window per dollar of liquidity now). Each row has the pool's TVL estimate and swap volume from the swap tape (TVL is null until the pool has had a verified swap), deposits, withdrawals, claimed fees, counts and open positions. Cached 60 seconds.\n\n`feeTvlPct` is fees **claimed**, not fees accrued: the tape cannot see fees that sit unclaimed in a position, so it is not an APR. `sort=fee_tvl` starts from a $10,000 TVL floor (one claim on a thin pool would top the list); pass `minTvl=0` for no floor. `q` takes a ticker (any case, part of it is enough) or one pool or mint address (exact, case-sensitive).\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
         "parameters": [
           {
             "name": "sort",
@@ -19797,7 +19797,8 @@
                 "withdrawals",
                 "net",
                 "lps",
-                "tvl"
+                "tvl",
+                "fee_tvl"
               ],
               "default": "fees"
             },
@@ -19826,6 +19827,42 @@
               "default": 24
             },
             "description": "Window in hours, never before `since`."
+          },
+          {
+            "name": "minTvl",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            "description": "Leave out pools under this TVL in US dollars, and pools whose TVL is unknown. Default 0, or 10000 with `sort=fee_tvl`."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "description": "A ticker, or one pool or mint address."
+          },
+          {
+            "name": "dex",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "meteora_dlmm",
+                "meteora_damm_v2",
+                "raydium_clmm",
+                "pumpswap"
+              ]
+            },
+            "description": "One venue."
           }
         ],
         "responses": {
@@ -19855,6 +19892,14 @@
                     "pools": {
                       "type": "integer",
                       "description": "Pools with activity in the window."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Pools left after `minTvl`, `q` and `dex`."
+                    },
+                    "minTvl": {
+                      "type": "number",
+                      "description": "The floor applied."
                     },
                     "rows": {
                       "type": "array",
@@ -19975,6 +20020,34 @@
                               "null"
                             ],
                             "description": ""
+                          },
+                          "feeTvlPct": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Fees claimed in the window as a percent of `tvlUsd`. null when the TVL is unknown."
+                          },
+                          "firstLpEvent": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "imageA": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Token image as its creator set it. Untrusted."
+                          },
+                          "imageB": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
                           }
                         }
                       }
@@ -20045,7 +20118,7 @@
             }
           },
           "400": {
-            "description": "`BAD_LIMIT` / `BAD_HOURS` / `BAD_SORT`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "description": "`BAD_LIMIT` / `BAD_HOURS` / `BAD_SORT` / `BAD_MIN_TVL` / `BAD_QUERY` / `BAD_DEX`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
             "content": {
               "application/json": {
                 "schema": {
