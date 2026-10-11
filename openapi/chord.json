@@ -20157,7 +20157,7 @@
         ],
         "operationId": "solLpTop",
         "summary": "LP wallets",
-        "description": "Wallets ranked over the LP positions active in the window: `fees` (claimed, default), `deposits` or `pnl` (realized). Many leaders are vaults and rebalancing bots; a short window is not a track record. Cached 60 seconds.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
+        "description": "Wallets ranked over the LP positions active in the window: `fees` (claimed, default), `deposits` or `pnl` (realized). Many leaders are vaults and rebalancing bots; a short window is not a track record. Cached 60 seconds.\n\nThe board is **fee-checked**: a wallet whose realized profit is positive while the fees it claimed are under a tenth of that profit earned on the token's price (in practice one-sided liquidity on a token it launched) and is left out; `hidden` counts them. `all=1` keeps them in.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
         "parameters": [
           {
             "name": "sort",
@@ -20197,6 +20197,19 @@
               "default": 24
             },
             "description": "Window in hours, never before `since`."
+          },
+          {
+            "name": "all",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1"
+              ]
+            },
+            "description": "1 = keep the wallets the fee check leaves out."
           }
         ],
         "responses": {
@@ -20222,6 +20235,14 @@
                     "since": {
                       "type": "integer",
                       "description": "Unix time, seconds, UTC."
+                    },
+                    "feeChecked": {
+                      "type": "boolean",
+                      "description": "The fee check was applied."
+                    },
+                    "hidden": {
+                      "type": "integer",
+                      "description": "Wallets of the window the fee check left out."
                     },
                     "rows": {
                       "type": "array",
@@ -20324,7 +20345,7 @@
             }
           },
           "400": {
-            "description": "`BAD_LIMIT` / `BAD_HOURS` / `BAD_SORT`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
+            "description": "`BAD_LIMIT` / `BAD_HOURS` / `BAD_SORT` / `BAD_ALL`, or `UNSUPPORTED_CHAIN` (Solana is not public on this deployment and the request has no `X-API-Key`).",
             "content": {
               "application/json": {
                 "schema": {

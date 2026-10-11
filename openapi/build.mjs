@@ -983,11 +983,13 @@ add("/chains/solana/lp/pools", "get", op(T.sol, "solLpPools", "Liquidity pools b
         imageA: nullable(str("Token image as its creator set it. Untrusted.")), imageB: nullable(str("")) })),
       updatedAt: SOL_UPDATED }), ex("/v1/chains/solana/lp/pools?sort=fees&limit=2")), ...SOL_ERR("`BAD_LIMIT` / `BAD_HOURS` / `BAD_SORT` / `BAD_MIN_TVL` / `BAD_QUERY` / `BAD_DEX`") } }));
 
-add("/chains/solana/lp/top", "get", op(T.sol, "solLpTop", "LP wallets", `Wallets ranked over the LP positions active in the window: \`fees\` (claimed, default), \`deposits\` or \`pnl\` (realized). Many leaders are vaults and rebalancing bots; a short window is not a track record. Cached 60 seconds.\n\n${SOL_LP_INTRO}`,
-  { params: [q("sort", { type: "string", enum: ["fees", "deposits", "pnl"], default: "fees" }, ""), q("limit", { type: "integer", minimum: 1, maximum: 100, default: 50 }, ""), SOL_LP_HOURS],
+add("/chains/solana/lp/top", "get", op(T.sol, "solLpTop", "LP wallets", `Wallets ranked over the LP positions active in the window: \`fees\` (claimed, default), \`deposits\` or \`pnl\` (realized). Many leaders are vaults and rebalancing bots; a short window is not a track record. Cached 60 seconds.\n\nThe board is **fee-checked**: a wallet whose realized profit is positive while the fees it claimed are under a tenth of that profit earned on the token's price (in practice one-sided liquidity on a token it launched) and is left out; \`hidden\` counts them. \`all=1\` keeps them in.\n\n${SOL_LP_INTRO}`,
+  { params: [q("sort", { type: "string", enum: ["fees", "deposits", "pnl"], default: "fees" }, ""), q("limit", { type: "integer", minimum: 1, maximum: 100, default: 50 }, ""), SOL_LP_HOURS,
+      q("all", { type: "string", enum: ["0", "1"] }, "1 = keep the wallets the fee check leaves out.")],
     responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, sort: str(""), windowHours: int(""), since: SOL_TS,
+      feeChecked: bool("The fee check was applied."), hidden: int("Wallets of the window the fee check left out."),
       rows: arr(obj({ wallet: nullable(SOL_ADDR), positions: int(""), open: int(""), pools: int(""), depositedUsd: num(""), withdrawnUsd: num(""), feesClaimedUsd: num(""), realizedPnlUsd: nullable(num("")), realizedPositions: int(""), winRate: nullable(num("0–1.")) })),
-      updatedAt: SOL_UPDATED }), ex("/v1/chains/solana/lp/top?sort=fees&limit=2")), ...SOL_ERR("`BAD_LIMIT` / `BAD_HOURS` / `BAD_SORT`") } }));
+      updatedAt: SOL_UPDATED }), ex("/v1/chains/solana/lp/top?sort=fees&limit=2")), ...SOL_ERR("`BAD_LIMIT` / `BAD_HOURS` / `BAD_SORT` / `BAD_ALL`") } }));
 
 add("/chains/solana/lp/pool/{address}", "get", op(T.sol, "solLpPool", "One pool's liquidity", `Deposits, withdrawals, net flow and claimed fees over the window, and by hour; open positions and their owners; the pair with decimals, TVL estimate and swap volume. Cached 20 seconds.\n\n${SOL_LP_INTRO}`,
   { params: [SOL_LP_POOL_P, SOL_LP_HOURS],
