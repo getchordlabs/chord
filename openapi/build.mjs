@@ -682,6 +682,10 @@ add("/rh/stocks", "get", op(T.rh, "rhStocks", "Tokenized stocks", `Every tokeniz
 // routes/chains.ts + services/chainRollup.ts + services/chainWallet.ts. Examples captured live on BNB Chain (the chain with an ingest floor).
 const CH_TOK = "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c"; // BTCB on BNB Chain
 const CH_WAL = "0x34135a8b5cc02d1b579789fb09dd9cec4f8d7c13";
+// A wallet with swaps inside the raw window on the day the example was captured (2026-10-12); the window is a few days, so
+// re-capture picks a current one (any wallet from GET /v1/chains/base/token/<address>/trades).
+const CH_TRADES_CHAIN = "bnb";
+const CH_TRADES_WAL = "0x2cf971cb78b7a3cdc0b2044a11abd7392b796c2d";
 const CHAINS_INTRO = `Chain-keyed data for Avalanche C-Chain, Base and BNB Chain, served from Chord's rollup tables for the chain (every swap summed by hour, token and venue). Only the trade tape, the prints ticker and the wallet read raw rows, scoped to one token or one wallet and bounded.
 
 - **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers \`400 UNSUPPORTED_CHAIN\` ("chain N is not served yet") unless the request carries an \`X-API-Key\`; those answers are sent \`Cache-Control: private\`.
@@ -740,6 +744,25 @@ add("/chains/{chain}/token/{address}/trades", "get", op(T.chains, "chainTokenTra
 add("/chains/{chain}/venues", "get", op(T.chains, "chainVenues", "Venue share over a window", `Per-venue volume, trades and share for 1–30 UTC days, with a daily series per venue. The first day of a young tape is partial.\n\n${CHAINS_INTRO}`,
   { params: [CHAIN_P, q("days", { type: "integer", minimum: 1, maximum: 30, default: 30 }, "Window length, in UTC days including today.")],
     responses: chErr({ 200: ok("", obj({ chain: int(""), days: int(""), since: UNIX_S, venues: arr(obj({ dex: str(""), volUsd: num(""), trades: int(""), sharePct: num(""), series: arr(obj({ day: int(""), volUsd: num(""), trades: int(""), tokens: int("") })) }), "Biggest first."), totals: obj({ volUsd: num(""), trades: int("") }), updatedAt: UNIX_MS }), ex("/v1/chains/bnb/venues?days=2")) }, "`BAD_DAYS`") }));
+
+add("/chains/{chain}/wallet/{address}/trades", "get", op(T.chains, "chainWalletTrades", "A wallet's swaps", `The wallet's swaps on the chain, newest first, each with the token and its symbol. Keyset-paged: pass \`nextBefore\` back as \`before\` for the next page; \`nextBefore\` is null on the last one.
+
+**The list covers the raw tape only**: the last few days the database keeps on these chains (about 3 on BNB Chain and Base, 7 on Avalanche today). \`window.fromTs\` is where it starts. Older days are counted in the wallet route named by \`olderHistory\`, as totals per token, not as a list. Say how far back the list goes when you show it.
+
+- \`wallet\` on a trade is the address the tape attributed it to; a swap sent through a router that the tape could not attribute is not in the list.
+- Trades under the chain's ingest floor are not in the tape (BNB Chain: $100).
+
+${CHAINS_INTRO}`,
+  { params: [CHAIN_P, p("address", ADDRESS, "Wallet address."), q("limit", { type: "integer", minimum: 1, maximum: 200, default: 50 }, "Newest rows."), q("before", { type: "string", pattern: "^\\d{1,12}(:\\d{1,15}:\\d{1,9})?$" }, "Exclusive cursor: the previous page's `nextBefore` (`ts:block:logIndex`), or a Unix second.")],
+    responses: chErr({ 200: ok("", obj({
+      chain: int(""), wallet: ADDRESS,
+      window: obj({ fromTs: nullable(UNIX_S), toTs: UNIX_S }, "The span the list can cover. `fromTs` null = the chain has no raw day yet."),
+      history: str("Always `raw`: this list never reads the data lake."),
+      trades: arr(obj({ ts: UNIX_S, tx: TX_HASH, logIndex: int(""), block: int(""), token: ADDRESS, symbol: nullable(str("")), side: { type: "string", enum: ["buy", "sell"] }, tokenAmt: num("Whole tokens."), usd: num(""), priceUsd: num(""), dex: str("") }), "Newest first."),
+      nextBefore: nullable(str("Cursor for the next page; null when this page is not full.")),
+      olderHistory: nullable(str("Path of the wallet route that counts the days before `window.fromTs`.")),
+      ingestFloor: ref("IngestFloor"),
+    }), ex(`/v1/chains/${CH_TRADES_CHAIN}/wallet/${CH_TRADES_WAL}/trades?limit=2`)) }, "`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_BEFORE`") }));
 
 add("/chains/{chain}/wallet/{address}", "get", op(T.chains, "chainWallet", "One wallet's swaps and PnL", `A wallet's swaps on the chain and an average-cost PnL over them. **The window is short**: the database keeps the raw tape for a few days on these chains (about 3 on BNB Chain and Base, 7 on Avalanche today), and older days come from Chord's data lake only where its days run without a gap up to that window. \`window\` says how far back the numbers go and \`history\` where they came from (\`raw\`, \`raw+lake\`, or \`raw (lake unavailable)\`). Say so when you show the number.
 

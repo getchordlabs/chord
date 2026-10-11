@@ -5448,5 +5448,53 @@
     }
    ]
   }
+ },
+ "/v1/chains/bnb/wallet/0x2cf971cb78b7a3cdc0b2044a11abd7392b796c2d/trades?limit=2": {
+  "chain": 56,
+  "wallet": "0x2cf971cb78b7a3cdc0b2044a11abd7392b796c2d",
+  "window": {
+   "fromTs": 1791417600,
+   "toTs": 1791746566
+  },
+  "history": "raw",
+  "trades": [
+   {
+    "ts": 1791746543,
+    "tx": "0x330db50d0c397734e4d61fc2659b053527a9076f516b00050d4cceed47cf9c7e",
+    "logIndex": 50,
+    "block": 127074619,
+    "token": "0x4fa7c69a7b69f8bc48233024d546bc299d6b03bf",
+    "side": "sell",
+    "tokenAmt": 950204.2671867504,
+    "usd": 1519.2258102727808,
+    "priceUsd": 0.0015988412836439056,
+    "dex": "pancake_v3",
+    "symbol": "quq"
+   },
+   {
+    "ts": 1791746523,
+    "tx": "0x4e1457e8bdc7d83db90ce6fed43a8092f71814c57834ecad38ec4746b47c11c1",
+    "logIndex": 45,
+    "block": 127074574,
+    "token": "0x4fa7c69a7b69f8bc48233024d546bc299d6b03bf",
+    "side": "buy",
+    "tokenAmt": 855183.3425646495,
+    "usd": 1367.5757736974172,
+    "priceUsd": 0.0015991609116194076,
+    "dex": "pancake_v3",
+    "symbol": "quq"
+   }
+  ],
+  "nextBefore": "1791746523:127074574:45",
+  "olderHistory": "/v1/chains/bnb/wallet/0x2cf971cb78b7a3cdc0b2044a11abd7392b796c2d",
+  "ingestFloor": {
+   "minTradeUsd": 100,
+   "history": [
+    {
+     "usd": 100,
+     "fromTs": 1790789196
+    }
+   ]
+  }
  }
 }

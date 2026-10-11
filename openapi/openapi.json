@@ -16340,6 +16340,268 @@
         }
       }
     },
+    "/chains/{chain}/wallet/{address}/trades": {
+      "get": {
+        "tags": [
+          "Avalanche, Base, BNB Chain"
+        ],
+        "operationId": "chainWalletTrades",
+        "summary": "A wallet's swaps",
+        "description": "The wallet's swaps on the chain, newest first, each with the token and its symbol. Keyset-paged: pass `nextBefore` back as `before` for the next page; `nextBefore` is null on the last one.\n\n**The list covers the raw tape only**: the last few days the database keeps on these chains (about 3 on BNB Chain and Base, 7 on Avalanche today). `window.fromTs` is where it starts. Older days are counted in the wallet route named by `olderHistory`, as totals per token, not as a list. Say how far back the list goes when you show it.\n\n- `wallet` on a trade is the address the tape attributed it to; a swap sent through a router that the tape could not attribute is not in the list.\n- Trades under the chain's ingest floor are not in the tape (BNB Chain: $100).\n\nChain-keyed data for Avalanche C-Chain, Base and BNB Chain, served from Chord's rollup tables for the chain (every swap summed by hour, token and venue). Only the trade tape, the prints ticker and the wallet read raw rows, scoped to one token or one wallet and bounded.\n\n- **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers `400 UNSUPPORTED_CHAIN` (\"chain N is not served yet\") unless the request carries an `X-API-Key`; those answers are sent `Cache-Control: private`.\n- **Ingest floor.** Every count, volume and print covers trades at or above the chain's floor, returned as `ingestFloor`. BNB Chain runs at $100 today; Avalanche and Base at 0.\n- **Readiness.** `503 NOT_READY` until the chain's rollup has run on this deployment; `503 CHAIN_DATA_UNAVAILABLE` when the store cannot be read. Never treat either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "avalanche",
+                "base",
+                "bnb",
+                "43114",
+                "8453",
+                "56"
+              ]
+            },
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+          },
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": "Wallet address."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": "Newest rows."
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,12}(:\\d{1,15}:\\d{1,9})?$"
+            },
+            "description": "Exclusive cursor: the previous page's `nextBefore` (`ts:block:logIndex`), or a Unix second."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "wallet": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "window": {
+                      "type": "object",
+                      "properties": {
+                        "fromTs": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Unix time, seconds, UTC."
+                        },
+                        "toTs": {
+                          "type": "integer",
+                          "description": "Unix time, seconds, UTC."
+                        }
+                      },
+                      "description": "The span the list can cover. `fromTs` null = the chain has no raw day yet."
+                    },
+                    "history": {
+                      "type": "string",
+                      "description": "Always `raw`: this list never reads the data lake."
+                    },
+                    "trades": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ts": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "tx": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{64}$",
+                            "description": "Transaction hash."
+                          },
+                          "logIndex": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "block": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "token": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "symbol": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "buy",
+                              "sell"
+                            ]
+                          },
+                          "tokenAmt": {
+                            "type": "number",
+                            "description": "Whole tokens."
+                          },
+                          "usd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "priceUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "Newest first."
+                    },
+                    "nextBefore": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Cursor for the next page; null when this page is not full."
+                    },
+                    "olderHistory": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Path of the wallet route that counts the days before `window.fromTs`."
+                    },
+                    "ingestFloor": {
+                      "$ref": "#/components/schemas/IngestFloor"
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 56,
+                  "wallet": "0x2cf971cb78b7a3cdc0b2044a11abd7392b796c2d",
+                  "window": {
+                    "fromTs": 1791417600,
+                    "toTs": 1791746566
+                  },
+                  "history": "raw",
+                  "trades": [
+                    {
+                      "ts": 1791746543,
+                      "tx": "0x330db50d0c397734e4d61fc2659b053527a9076f516b00050d4cceed47cf9c7e",
+                      "logIndex": 50,
+                      "block": 127074619,
+                      "token": "0x4fa7c69a7b69f8bc48233024d546bc299d6b03bf",
+                      "side": "sell",
+                      "tokenAmt": 950204.2671867504,
+                      "usd": 1519.2258102727808,
+                      "priceUsd": 0.0015988412836439056,
+                      "dex": "pancake_v3",
+                      "symbol": "quq"
+                    },
+                    {
+                      "ts": 1791746523,
+                      "tx": "0x4e1457e8bdc7d83db90ce6fed43a8092f71814c57834ecad38ec4746b47c11c1",
+                      "logIndex": 45,
+                      "block": 127074574,
+                      "token": "0x4fa7c69a7b69f8bc48233024d546bc299d6b03bf",
+                      "side": "buy",
+                      "tokenAmt": 855183.3425646495,
+                      "usd": 1367.5757736974172,
+                      "priceUsd": 0.0015991609116194076,
+                      "dex": "pancake_v3",
+                      "symbol": "quq"
+                    }
+                  ],
+                  "nextBefore": "1791746523:127074574:45",
+                  "olderHistory": "/v1/chains/bnb/wallet/0x2cf971cb78b7a3cdc0b2044a11abd7392b796c2d",
+                  "ingestFloor": {
+                    "minTradeUsd": 100,
+                    "history": [
+                      {
+                        "usd": 100,
+                        "fromTs": 1790789196
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (unknown chain, a chain with its own routes, or a chain not served to this caller yet), or `BAD_ADDRESS` / `BAD_LIMIT` / `BAD_BEFORE`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`NOT_READY` (the chain's rollup has not run on this deployment yet) or `CHAIN_DATA_UNAVAILABLE` (the store could not be read). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chains/{chain}/wallet/{address}": {
       "get": {
         "tags": [
