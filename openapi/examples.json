@@ -5476,5 +5476,123 @@
     }
    ]
   }
+ },
+ "/v1/lp/pools/0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09/lps?chain=5042&limit=2": {
+  "chain": 5042,
+  "pool": "0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09",
+  "minIn": 20,
+  "total": 60,
+  "rows": [
+   {
+    "wallet": "0x5db28691cbfc2ceeca1d919f0749b64013c25432",
+    "positions": 2,
+    "open": 0,
+    "closed": 2,
+    "wins": 1,
+    "winRatePct": 50,
+    "profitUsd": 898.4072651256388,
+    "feesUsd": 1473.5195824012221,
+    "inUsd": 4971.427097120565,
+    "avgAgeHours": 85.54625,
+    "lastTs": 1790521219
+   },
+   {
+    "wallet": "0x2e41ff7889197ceab7ca505fe08fb54a9da07ab8",
+    "positions": 2,
+    "open": 0,
+    "closed": 2,
+    "wins": 2,
+    "winRatePct": 100,
+    "profitUsd": 602.4129568209053,
+    "feesUsd": 431.0974968623506,
+    "inUsd": 1101.9782460581446,
+    "avgAgeHours": 66.98930555555556,
+    "lastTs": 1790168420
+   }
+  ],
+  "updatedAt": 1791831160142
+ },
+ "/v1/lp/wallet/0x5db28691cbfc2ceeca1d919f0749b64013c25432?chain=5042": {
+  "chain": 5042,
+  "wallet": "0x5db28691cbfc2ceeca1d919f0749b64013c25432",
+  "summary": {
+   "positions": 2,
+   "open": 0,
+   "closed": 2,
+   "wins": 1,
+   "winRatePct": 50,
+   "pools": 1,
+   "feesUsd": 1473.5195824012221,
+   "profitUsd": 898.4072651256388,
+   "evUsd": 449.2036325628194,
+   "avgAgeHours": 85.54625,
+   "avgInvestedUsd": 2485.7135485602826,
+   "avgMonthlyProfitUsd": 1220.1586855458952,
+   "windows": {
+    "d7": {
+     "positions": 0,
+     "profitUsd": 0,
+     "feesUsd": 0
+    },
+    "d30": {
+     "positions": 2,
+     "profitUsd": 898.4072651256388,
+     "feesUsd": 1473.5195824012221
+    },
+    "all": {
+     "positions": 2,
+     "profitUsd": 898.4072651256388,
+     "feesUsd": 1473.5195824012221
+    }
+   },
+   "firstTs": 1789922677,
+   "lastTs": 1790521219
+  },
+  "history": [
+   {
+    "day": "2026-09-22",
+    "profitUsd": 1767.3683024312918,
+    "feesUsd": 556.5679612124811,
+    "positions": 1
+   },
+   {
+    "day": "2026-09-27",
+    "profitUsd": -868.961037305653,
+    "feesUsd": 916.9516211887411,
+    "positions": 1
+   }
+  ],
+  "pools": [
+   {
+    "pool": "0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09",
+    "token": "0x8faae5592b9acc27a79fca745c6b872adf514a5d",
+    "anchor": "0x3600000000000000000000000000000000000000",
+    "positions": 2,
+    "open": 0,
+    "inUsd": 4971.427097120565,
+    "profitUsd": 898.4072651256388,
+    "feesUsd": 1473.5195824012221,
+    "symbol": "MURMUR",
+    "anchorSymbol": "USDC",
+    "logo": "https://cdn.dexscreener.com/cms/images/QUq-IqT1GLQNkxMx?width=800&height=800&quality=95&format=auto"
+   }
+  ],
+  "ledger": {
+   "positions": 2,
+   "open": 0,
+   "closed": 2
+  },
+  "unscored": {
+   "small": 0,
+   "jit": 0,
+   "unreconciled": 0,
+   "partial": 0,
+   "unlistedPool": 0,
+   "cluster": 0
+  },
+  "minIn": 20,
+  "truncated": false,
+  "operator": false,
+  "updatedAt": 1791831176348
  }
 }

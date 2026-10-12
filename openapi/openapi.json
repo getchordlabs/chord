@@ -6275,6 +6275,98 @@
             "description": "Robinhood Chain (4663): pools with a tokenized stock or ETF on one side."
           },
           {
+            "name": "maxTvl",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Range filters: every bound is inclusive, unset = off, and a row whose figure the index does not have fails a set bound."
+          },
+          {
+            "name": "minVol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Volume of the `interval`, dollars."
+          },
+          {
+            "name": "maxVol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": ""
+          },
+          {
+            "name": "minFees",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Fees of the `interval`, dollars."
+          },
+          {
+            "name": "maxFees",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": ""
+          },
+          {
+            "name": "minAgeH",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": "Hours since the pool was created (since its first trade when the creation is unknown)."
+          },
+          {
+            "name": "maxAgeH",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0
+            },
+            "description": ""
+          },
+          {
+            "name": "minFeePct",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "description": "Fee tier in percent (0.3 = 30 bps)."
+          },
+          {
+            "name": "maxFeePct",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "description": ""
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -7145,6 +7237,639 @@
         }
       }
     },
+    "/lp/pools/{pool}/lps": {
+      "get": {
+        "tags": [
+          "Liquidity"
+        ],
+        "operationId": "lpPoolLps",
+        "summary": "A pool's providers by profit",
+        "description": "The wallets that provided to one pool, most profitable first. Profit is the wallet board's: value out + fees − value in on closed positions, plus the fees of open ones. Scored like the board: positions of `minIn` dollars or more, none that opened and closed inside a minute, none the tape could not reconcile. `total` counts the wallets with a scored position in the pool.\n\n**Use it for**: \"who earns in this pool\", a provider table on a pool page.",
+        "parameters": [
+          {
+            "name": "pool",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x([a-fA-F0-9]{40}|[a-fA-F0-9]{64})$",
+              "description": "A pool: a 20-byte contract address (V2 / V3) or a 32-byte Uniswap V4 pool id."
+            },
+            "description": ""
+          },
+          {
+            "name": "chain",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "enum": [
+                5042,
+                4663,
+                143
+              ]
+            },
+            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "Out of range is `400 BAD_LIMIT`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "pool": {
+                      "type": "string",
+                      "pattern": "^0x([a-fA-F0-9]{40}|[a-fA-F0-9]{64})$",
+                      "description": "A pool: a 20-byte contract address (V2 / V3) or a 32-byte Uniswap V4 pool id."
+                    },
+                    "minIn": {
+                      "type": "number",
+                      "description": "Dollars in under this are not scored."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Wallets with a scored position in the pool."
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "wallet": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "positions": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "open": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "closed": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "wins": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "winRatePct": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Null with no closed position."
+                          },
+                          "profitUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "feesUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "inUsd": {
+                            "type": "number",
+                            "description": "Dollars the wallet put into the pool, summed over its positions."
+                          },
+                          "avgAgeHours": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "lastTs": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          }
+                        }
+                      }
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 5042,
+                  "pool": "0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09",
+                  "minIn": 20,
+                  "total": 60,
+                  "rows": [
+                    {
+                      "wallet": "0x5db28691cbfc2ceeca1d919f0749b64013c25432",
+                      "positions": 2,
+                      "open": 0,
+                      "closed": 2,
+                      "wins": 1,
+                      "winRatePct": 50,
+                      "profitUsd": 898.4072651256388,
+                      "feesUsd": 1473.5195824012221,
+                      "inUsd": 4971.427097120565,
+                      "avgAgeHours": 85.54625,
+                      "lastTs": 1790521219
+                    },
+                    {
+                      "wallet": "0x2e41ff7889197ceab7ca505fe08fb54a9da07ab8",
+                      "positions": 2,
+                      "open": 0,
+                      "closed": 2,
+                      "wins": 2,
+                      "winRatePct": 100,
+                      "profitUsd": 602.4129568209053,
+                      "feesUsd": 431.0974968623506,
+                      "inUsd": 1101.9782460581446,
+                      "avgAgeHours": 66.98930555555556,
+                      "lastTs": 1790168420
+                    }
+                  ],
+                  "updatedAt": 1791831160142
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lp/wallet/{address}": {
+      "get": {
+        "tags": [
+          "Liquidity"
+        ],
+        "operationId": "lpWallet",
+        "summary": "One wallet's LP record",
+        "description": "Everything the wallet board knows about one wallet, whether it is ranked or not: win rate, fees, profit, expected value per position, average invested / age / monthly profit and the 7-day / 30-day / all-time windows (`summary`); one row per UTC day on which a position ended, with the profit and the fees that landed on it (`history`; an open position counts its fees on the day it was last touched); the pools it provided to (`pools`, up to 60, by number of positions).\n\nThe figures use the board's row rules, so a wallet opened from `/lp/leaderboard` shows the same numbers: `unscored` says how many ledger positions were left out and why (each under the first reason that fits), and `ledger` counts every position, scored or not. `operator: true` = 500 or more scored positions, an account the board does not rank. `truncated: true` = the wallet holds more than 20,000 positions and the figures cover the newest 20,000.\n\n**Use it for**: a wallet page, \"is this LP worth following\", a PnL calendar.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": "Not a 0x address is `400 BAD_WALLET`."
+          },
+          {
+            "name": "chain",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "enum": [
+                5042,
+                4663,
+                143
+              ]
+            },
+            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "wallet": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "positions": {
+                          "type": "integer",
+                          "description": "Scored positions."
+                        },
+                        "open": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "closed": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "wins": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "winRatePct": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": ""
+                        },
+                        "pools": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "feesUsd": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "profitUsd": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "evUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Expected value per position."
+                        },
+                        "avgAgeHours": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": ""
+                        },
+                        "avgInvestedUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": ""
+                        },
+                        "avgMonthlyProfitUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Profit to date over the months since the first position, never less than one week."
+                        },
+                        "windows": {
+                          "type": "object",
+                          "properties": {
+                            "d7": {
+                              "type": "object",
+                              "properties": {
+                                "positions": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "profitUsd": {
+                                  "type": "number",
+                                  "description": ""
+                                },
+                                "feesUsd": {
+                                  "type": "number",
+                                  "description": ""
+                                }
+                              }
+                            },
+                            "d30": {
+                              "type": "object",
+                              "properties": {
+                                "positions": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "profitUsd": {
+                                  "type": "number",
+                                  "description": ""
+                                },
+                                "feesUsd": {
+                                  "type": "number",
+                                  "description": ""
+                                }
+                              }
+                            },
+                            "all": {
+                              "type": "object",
+                              "properties": {
+                                "positions": {
+                                  "type": "integer",
+                                  "description": ""
+                                },
+                                "profitUsd": {
+                                  "type": "number",
+                                  "description": ""
+                                },
+                                "feesUsd": {
+                                  "type": "number",
+                                  "description": ""
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "firstTs": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Unix time, seconds, UTC."
+                        },
+                        "lastTs": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Unix time, seconds, UTC."
+                        }
+                      }
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "day": {
+                            "type": "string",
+                            "description": "YYYY-MM-DD, UTC"
+                          },
+                          "profitUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "feesUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "positions": {
+                            "type": "integer",
+                            "description": "Positions that ended (or, open, were last touched) on the day."
+                          }
+                        }
+                      },
+                      "description": "Oldest first; days with nothing are absent."
+                    },
+                    "pools": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "pool": {
+                            "type": "string",
+                            "pattern": "^0x([a-fA-F0-9]{40}|[a-fA-F0-9]{64})$",
+                            "description": "A pool: a 20-byte contract address (V2 / V3) or a 32-byte Uniswap V4 pool id."
+                          },
+                          "token": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "anchor": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "positions": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "open": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "inUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "profitUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "feesUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "symbol": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "anchorSymbol": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "logo": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          }
+                        }
+                      }
+                    },
+                    "ledger": {
+                      "type": "object",
+                      "properties": {
+                        "positions": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "open": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "closed": {
+                          "type": "integer",
+                          "description": ""
+                        }
+                      },
+                      "description": "Every position the ledger holds for the wallet."
+                    },
+                    "unscored": {
+                      "type": "object",
+                      "properties": {
+                        "small": {
+                          "type": "integer",
+                          "description": "Under `minIn` dollars."
+                        },
+                        "jit": {
+                          "type": "integer",
+                          "description": "Opened and closed inside a minute."
+                        },
+                        "unreconciled": {
+                          "type": "integer",
+                          "description": "Far more dollars out than the index saw go in."
+                        },
+                        "partial": {
+                          "type": "integer",
+                          "description": "Opened before the index started."
+                        },
+                        "unlistedPool": {
+                          "type": "integer",
+                          "description": "On a pool the pool list hides as thin or suspect."
+                        }
+                      }
+                    },
+                    "minIn": {
+                      "type": "number",
+                      "description": ""
+                    },
+                    "truncated": {
+                      "type": "boolean",
+                      "description": ""
+                    },
+                    "operator": {
+                      "type": "boolean",
+                      "description": ""
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 5042,
+                  "wallet": "0x5db28691cbfc2ceeca1d919f0749b64013c25432",
+                  "summary": {
+                    "positions": 2,
+                    "open": 0,
+                    "closed": 2,
+                    "wins": 1,
+                    "winRatePct": 50,
+                    "pools": 1,
+                    "feesUsd": 1473.5195824012221,
+                    "profitUsd": 898.4072651256388,
+                    "evUsd": 449.2036325628194,
+                    "avgAgeHours": 85.54625,
+                    "avgInvestedUsd": 2485.7135485602826,
+                    "avgMonthlyProfitUsd": 1220.1586855458952,
+                    "windows": {
+                      "d7": {
+                        "positions": 0,
+                        "profitUsd": 0,
+                        "feesUsd": 0
+                      },
+                      "d30": {
+                        "positions": 2,
+                        "profitUsd": 898.4072651256388,
+                        "feesUsd": 1473.5195824012221
+                      },
+                      "all": {
+                        "positions": 2,
+                        "profitUsd": 898.4072651256388,
+                        "feesUsd": 1473.5195824012221
+                      }
+                    },
+                    "firstTs": 1789922677,
+                    "lastTs": 1790521219
+                  },
+                  "history": [
+                    {
+                      "day": "2026-09-22",
+                      "profitUsd": 1767.3683024312918,
+                      "feesUsd": 556.5679612124811,
+                      "positions": 1
+                    },
+                    {
+                      "day": "2026-09-27",
+                      "profitUsd": -868.961037305653,
+                      "feesUsd": 916.9516211887411,
+                      "positions": 1
+                    }
+                  ],
+                  "pools": [
+                    {
+                      "pool": "0xf53f02d9041d00bbd92235b4c902b9f350c554a8ed2dc64fa0a4585aac413f09",
+                      "token": "0x8faae5592b9acc27a79fca745c6b872adf514a5d",
+                      "anchor": "0x3600000000000000000000000000000000000000",
+                      "positions": 2,
+                      "open": 0,
+                      "inUsd": 4971.427097120565,
+                      "profitUsd": 898.4072651256388,
+                      "feesUsd": 1473.5195824012221,
+                      "symbol": "MURMUR",
+                      "anchorSymbol": "USDC",
+                      "logo": "https://cdn.dexscreener.com/cms/images/QUq-IqT1GLQNkxMx?width=800&height=800&quality=95&format=auto"
+                    }
+                  ],
+                  "ledger": {
+                    "positions": 2,
+                    "open": 0,
+                    "closed": 2
+                  },
+                  "unscored": {
+                    "small": 0,
+                    "jit": 0,
+                    "unreconciled": 0,
+                    "partial": 0,
+                    "unlistedPool": 0,
+                    "cluster": 0
+                  },
+                  "minIn": 20,
+                  "truncated": false,
+                  "operator": false,
+                  "updatedAt": 1791831176348
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/lp/positions": {
       "get": {
         "tags": [
@@ -7206,6 +7931,17 @@
             "description": "Only positions holding this token."
           },
           {
+            "name": "pool",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x([a-fA-F0-9]{40}|[a-fA-F0-9]{64})$",
+              "description": "A pool: a 20-byte contract address (V2 / V3) or a 32-byte Uniswap V4 pool id."
+            },
+            "description": "Only positions in this pool."
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -7216,6 +7952,18 @@
               "default": 100
             },
             "description": ""
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20000,
+              "default": 0
+            },
+            "description": "Rows to skip, newest first: page through a wallet's closed positions. Out of range is `400 BAD_OFFSET`."
           }
         ],
         "responses": {
