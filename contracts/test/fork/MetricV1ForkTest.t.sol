@@ -126,10 +126,11 @@ contract MetricV1ForkTest is Test {
         );
     }
 
-    /// A contract the factory never created is refused before any approval is given.
+    /// A contract the factory never created is refused before any approval is given — and before any token is
+    ///      touched, so this runs on every chain's fork: the two token addresses are Monad's and hold no code elsewhere
+    ///      (funding the adapter with `deal` made this test revert on the Avalanche fork, 2026-10-12).
     function test_impostorPool_refused() public {
         address fake = address(new FakeMetricPool());
-        deal(0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A, address(adapter), 1 ether);
         vm.prank(ROUTER);
         vm.expectRevert(abi.encodeWithSelector(MetricV1Adapter.NotMetricPool.selector, fake));
         adapter.swap(
