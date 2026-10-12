@@ -443,7 +443,7 @@ def cmd_ask(args):
     if isinstance(d, dict) and "__http_error__" in d:
         print(json.dumps({"error": d.get("error"), "message": d.get("message"), "status": d["__http_error__"]}, indent=1), file=sys.stderr)
         sys.exit(1)
-    keep = ("text", "citations", "quote", "artifact", "viz", "clarify", "disclaimer", "toolsUsed", "credits", "elapsedMs")
+    keep = ("text", "details", "citations", "quote", "artifact", "viz", "clarify", "disclaimer", "followUps", "toolsUsed", "credits", "elapsedMs")
     print(json.dumps({k: d.get(k) for k in keep if k in d}, indent=1))
 
 

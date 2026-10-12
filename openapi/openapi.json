@@ -10101,7 +10101,7 @@
         ],
         "operationId": "ask",
         "summary": "Ask the analyst",
-        "description": "Chord's analyst over the Arc index and the router — 40+ tools (trending, a token's flow, holders and risk, support and resistance with an entry ladder, top traders on a token, a wallet's PnL and trades, largest prints, launches, depth, a bridge quote, position sizing, read-only SQL over the index). Returns the answer, source links, an optional route card, tables and charts the analysis produced, and a report when one was built.\n\n**Auth**: a developer API key (`X-API-Key`) or a Google session bearer. Metered per key per day against the deployment's token budget; 8 questions a minute per caller.\n\n**Agents**: send `\"stream\": false` for one JSON answer (5–40 s). Without it the response is `text/event-stream` with `status` events (which tool is running), one `answer` event, then `done`.",
+        "description": "Chord's analyst over the Arc index and the router — 40+ tools (trending, a token's flow, holders and risk, support and resistance, top traders on a token, a wallet's PnL and trades, largest prints, launches, depth, a bridge quote, read-only SQL over the index). Returns the answer, source links, an optional route card, tables and charts the analysis produced, and a report when one was built. It analyses: a plan (zones, tranches, an exit, the level where the idea is wrong) is written only when the question asks for one, and is illustrative, with its assumptions stated.\n\n**Layout**: `text` is the whole answer on its own. The optional fields `shape`, `parts`, `details`, `followUpKinds` and `focus` say how the chat lays it out: `parts` is the same answer in order, with the tables and charts of `viz` placed inside the text (in `text` a placed table is written out as a Markdown table), and `details` is further depth the chat folds, which `text` does not repeat. A client that ignores them loses nothing of the answer.\n\n**Auth**: a developer API key (`X-API-Key`) or a Google session bearer. Metered per key per day against the deployment's token budget; 8 questions a minute per caller.\n\n**Agents**: send `\"stream\": false` for one JSON answer (5–40 s). Without it the response is `text/event-stream` with `status` events (which tool is running), one `answer` event, then `done`.",
         "requestBody": {
           "required": true,
           "content": {
@@ -10180,15 +10180,25 @@
                   "properties": {
                     "text": {
                       "type": "string",
-                      "description": "The answer, Markdown."
+                      "description": "The answer, Markdown, complete on its own: a table the answer placed is written out in it (its first 8 rows and 6 columns). `details` is not repeated here."
                     },
                     "citations": {
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "additionalProperties": true,
-                        "description": "Source links (endpoint + parameters the answer read)."
-                      }
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "description": "What the link is."
+                          },
+                          "href": {
+                            "type": "string",
+                            "description": "A Chord page as a path under `https://getchord.xyz` (`/arc/token/0x…`), or the source's own URL."
+                          }
+                        },
+                        "description": "A source link."
+                      },
+                      "description": "Where to check the numbers: the Chord pages and outside sources behind the answer."
                     },
                     "quote": {
                       "type": [
@@ -10196,7 +10206,7 @@
                         "null"
                       ],
                       "additionalProperties": true,
-                      "description": "A route card when the question implied a trade."
+                      "description": "A route card when the question implied a trade: the two tokens, the amounts in whole tokens, the venues, price impact, fee and a link to the trade on Chord. A preview, not a `/v1/quote` response: `/v1/swap` needs a fresh `/v1/quote`."
                     },
                     "artifact": {
                       "type": [
@@ -10204,7 +10214,7 @@
                         "null"
                       ],
                       "additionalProperties": true,
-                      "description": "Chart levels, ladder, zones, report link."
+                      "description": "The token the answer is about: its stats, where volume traded (support, resistance, VWAP), a report link when one was built."
                     },
                     "walletArtifact": {
                       "type": [
@@ -10219,7 +10229,7 @@
                       "items": {
                         "type": "object",
                         "additionalProperties": true,
-                        "description": "Tables and charts (`kind`: table · bar · line · donut)."
+                        "description": "Tables and charts (`kind`: table · bar · line · donut), at most 6: the ones `parts` and `details` place come first, in that order."
                       }
                     },
                     "toolsUsed": {
@@ -10231,6 +10241,158 @@
                     "tokens": {
                       "type": "integer",
                       "description": "Model tokens spent."
+                    },
+                    "followUps": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Up to three next questions: one that goes deeper, one that widens, one action (an alert, a chart, a plan)."
+                    },
+                    "assets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "Price chips for the assets the answer names (symbol, label, price, 24h change), at most 8."
+                      }
+                    },
+                    "shape": {
+                      "type": "string",
+                      "enum": [
+                        "fact",
+                        "explain",
+                        "brief",
+                        "board",
+                        "why",
+                        "overview",
+                        "compare",
+                        "post",
+                        "do",
+                        "report",
+                        "auto"
+                      ],
+                      "description": "The kind of answer the question got: a single fact, an explanation, a call with its evidence (`brief`), a ranked list (`board`), why something moves, a market overview, a comparison, something to post, something to do on Chord, a full report, or `auto` when nothing matched."
+                    },
+                    "parts": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "t": {
+                                "type": "string",
+                                "const": "md"
+                              },
+                              "text": {
+                                "type": "string",
+                                "description": "Markdown."
+                              }
+                            },
+                            "description": "Text.",
+                            "required": [
+                              "t",
+                              "text"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "t": {
+                                "type": "string",
+                                "const": "viz"
+                              },
+                              "i": {
+                                "type": "integer",
+                                "description": "Index into `viz`."
+                              }
+                            },
+                            "description": "The table or chart placed at this point.",
+                            "required": [
+                              "t",
+                              "i"
+                            ]
+                          }
+                        ]
+                      },
+                      "description": "The answer body in order: text, and the blocks of `viz` placed inside it. Absent on a question back (`clarify`)."
+                    },
+                    "details": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "text": {
+                          "type": "string",
+                          "description": "The folded part as Markdown, placed tables written out."
+                        },
+                        "parts": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "t": {
+                                    "type": "string",
+                                    "const": "md"
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "description": "Markdown."
+                                  }
+                                },
+                                "description": "Text.",
+                                "required": [
+                                  "t",
+                                  "text"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "t": {
+                                    "type": "string",
+                                    "const": "viz"
+                                  },
+                                  "i": {
+                                    "type": "integer",
+                                    "description": "Index into `viz`."
+                                  }
+                                },
+                                "description": "The table or chart placed at this point.",
+                                "required": [
+                                  "t",
+                                  "i"
+                                ]
+                              }
+                            ]
+                          },
+                          "description": "`i` indexes the same `viz`."
+                        }
+                      },
+                      "description": "Further depth (a per-venue breakdown, a longer history) that the chat folds under \"Show full analysis\". Not part of `text`. Null when the answer has none."
+                    },
+                    "followUpKinds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "ask",
+                          "alert",
+                          "deeper"
+                        ]
+                      },
+                      "description": "Parallel to `followUps`: `alert` = it asks for an alert, `deeper` = it goes deeper into this answer, `ask` = any other question."
+                    },
+                    "focus": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Index into `assets` of the one asset the answer is about, when there is one."
                     }
                   }
                 }
@@ -10295,7 +10457,7 @@
         ],
         "operationId": "askPicks",
         "summary": "Ask Picks board",
-        "description": "The analyst's current picks (rebuilt every four hours over tokens with real activity): side, score, confidence, target and invalidation with how each was set, the reasons for and against, and the facts behind them — plus the seven-day track record.",
+        "description": "The analyst's current picks (rebuilt every four hours over tokens with real activity): side, score, confidence, the reasons for and against, and the facts behind them, plus the seven-day track record: picks graded, the share that moved their way and the average move. It carries no targets or stops.",
         "responses": {
           "200": {
             "description": "",
@@ -10359,35 +10521,6 @@
                             "type": "number",
                             "description": ""
                           },
-                          "target": {
-                            "type": "number",
-                            "description": ""
-                          },
-                          "invalidation": {
-                            "type": "number",
-                            "description": ""
-                          },
-                          "levels": {
-                            "type": "object",
-                            "properties": {
-                              "target": {
-                                "type": "number",
-                                "description": ""
-                              },
-                              "targetFrom": {
-                                "type": "string",
-                                "description": ""
-                              },
-                              "invalidation": {
-                                "type": "number",
-                                "description": ""
-                              },
-                              "invalidationFrom": {
-                                "type": "string",
-                                "description": ""
-                              }
-                            }
-                          },
                           "why": {
                             "type": "array",
                             "items": {
@@ -10418,29 +10551,23 @@
                           "type": "integer",
                           "description": ""
                         },
-                        "targetHits": {
-                          "type": "integer",
-                          "description": ""
-                        },
-                        "stopHits": {
-                          "type": "integer",
-                          "description": ""
-                        },
-                        "expired": {
-                          "type": "integer",
-                          "description": ""
-                        },
                         "open": {
                           "type": "integer",
                           "description": ""
                         },
-                        "avgMovePct": {
-                          "type": "number",
-                          "description": ""
+                        "rightWayPct": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Of the graded picks that have a price move so far, the share that moved the pick's way, percent. Null while none has one."
                         },
-                        "hitRatePct": {
-                          "type": "number",
-                          "description": ""
+                        "avgMovePct": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Their average move in the pick's direction, percent. Null while none has one."
                         }
                       }
                     }
@@ -10458,14 +10585,6 @@
                       "score": 3.93,
                       "confidence": "medium",
                       "priceUsd": 0.0044422,
-                      "target": 0.0051085,
-                      "invalidation": 0.0040578,
-                      "levels": {
-                        "target": 0.0051085,
-                        "targetFrom": "mechanical +15%",
-                        "invalidation": 0.0040578,
-                        "invalidationFrom": "5% under the nearest support"
-                      },
                       "why": [
                         "buyers 64% of the last hour (156 trades)",
                         "59.8% of buying from wallets that are not bots or routers"
@@ -10493,14 +10612,6 @@
                       "score": 3.71,
                       "confidence": "medium",
                       "priceUsd": 0.00014232,
-                      "target": 0.00015394,
-                      "invalidation": 0.00012419,
-                      "levels": {
-                        "target": 0.00015394,
-                        "targetFrom": "resistance",
-                        "invalidation": 0.00012419,
-                        "invalidationFrom": "5% under the nearest support"
-                      },
                       "why": [
                         "volume 284% above the prior six hours",
                         "70.3% of buying from wallets that are not bots or routers"
@@ -10523,12 +10634,8 @@
                   ],
                   "trackRecord7d": {
                     "graded": 120,
-                    "targetHits": 36,
-                    "stopHits": 46,
-                    "expired": 0,
                     "open": 38,
-                    "avgMovePct": 2.4,
-                    "hitRatePct": 44
+                    "avgMovePct": 2.4
                   }
                 }
               }

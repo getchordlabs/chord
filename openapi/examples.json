@@ -2436,14 +2436,6 @@
     "score": 3.93,
     "confidence": "medium",
     "priceUsd": 0.0044422,
-    "target": 0.0051085,
-    "invalidation": 0.0040578,
-    "levels": {
-     "target": 0.0051085,
-     "targetFrom": "mechanical +15%",
-     "invalidation": 0.0040578,
-     "invalidationFrom": "5% under the nearest support"
-    },
     "why": [
      "buyers 64% of the last hour (156 trades)",
      "59.8% of buying from wallets that are not bots or routers"
@@ -2471,14 +2463,6 @@
     "score": 3.71,
     "confidence": "medium",
     "priceUsd": 0.00014232,
-    "target": 0.00015394,
-    "invalidation": 0.00012419,
-    "levels": {
-     "target": 0.00015394,
-     "targetFrom": "resistance",
-     "invalidation": 0.00012419,
-     "invalidationFrom": "5% under the nearest support"
-    },
     "why": [
      "volume 284% above the prior six hours",
      "70.3% of buying from wallets that are not bots or routers"
@@ -2501,12 +2485,8 @@
   ],
   "trackRecord7d": {
    "graded": 120,
-   "targetHits": 36,
-   "stopHits": 46,
-   "expired": 0,
    "open": 38,
-   "avgMovePct": 2.4,
-   "hitRatePct": 44
+   "avgMovePct": 2.4
   }
  },
  "/v1/bridge2/config": {
