@@ -6144,7 +6144,7 @@
         ],
         "operationId": "lpPools",
         "summary": "Pools ranked for a liquidity provider",
-        "description": "Every indexed pool with volume by window, fees (volume × the pool's fee tier), TVL, fee/TVL and an annualised yardstick, LP adds / removes / providers in 24 hours, trader counts, and a 0–100 health score. Pools under $10k TVL are hidden unless `small=1`; wash and launch-farm pools are hidden unless `flagged=1` (they come back with `suspect: true`).\n\n**Use it for**: an LP screener, \"where are the fees on Arc\", a pool picker for a token.",
+        "description": "Every indexed pool with volume by window, fees (volume × the pool's fee tier), TVL, fee/TVL and an annualised yardstick, LP adds / removes / providers in 24 hours, trader counts, and a 0–100 health score. Pools under $10k TVL are hidden unless `small=1`; wash and launch-farm pools are hidden unless `flagged=1` (they come back with `suspect: true`). `category=stocks` keeps the pools with a tokenized stock or ETF on one side (Robinhood Chain only: `400 BAD_CATEGORY` elsewhere, `503 CATEGORY_UNAVAILABLE` while the token list cannot be read).\n\n**Use it for**: an LP screener, \"where are the fees on Arc\", a pool picker for a token.",
         "parameters": [
           {
             "name": "chain",
@@ -6263,6 +6263,18 @@
             "description": "1 = include suspect pools."
           },
           {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "stocks"
+              ]
+            },
+            "description": "Robinhood Chain (4663): pools with a tokenized stock or ETF on one side."
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -6314,6 +6326,10 @@
                     "flagged": {
                       "type": "boolean",
                       "description": ""
+                    },
+                    "category": {
+                      "type": "string",
+                      "description": "Present when the list was narrowed to a category."
                     },
                     "hidden": {
                       "type": "integer",
@@ -6474,6 +6490,16 @@
           },
           "400": {
             "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7478,7 +7504,7 @@
         ],
         "operationId": "lpLeaderboard",
         "summary": "Best liquidity providers",
-        "description": "LP wallets from the ledger: win rate, fees, pools, expected value per position, average age / invested / monthly profit, profit over 7 / 30 days / all time, the last seven days of profit and what they provide to. Every filter bound is inclusive; unset = off.",
+        "description": "LP wallets from the ledger: win rate, fees, pools, expected value per position, average age / invested / monthly profit, profit over 7 / 30 days / all time, the last seven days of profit and what they provide to. Every filter bound is inclusive; unset = off.\n\nThe board is **fee-checked**: a wallet whose profit is positive while the fees it collected are under a tenth of that profit made it on the token's price (liquidity on a launch pulled into the buyers), not by providing, and is left out; `hidden` counts them and `all=1` keeps them in. The check reads the window the board ranks by (`profit_7d` → 7 days, `profit_30d` → 30 days, every other sort → all time). Every sort ranks inside the 400 most profitable wallets of its window that pass the filters; `total` is that count. A window sort lists only wallets with a position that ended or was touched in the window.",
         "parameters": [
           {
             "name": "chain",
@@ -7502,6 +7528,8 @@
               "type": "string",
               "enum": [
                 "profit",
+                "profit_7d",
+                "profit_30d",
                 "win_rate",
                 "avg_age",
                 "positions",
@@ -7514,7 +7542,7 @@
               ],
               "default": "profit"
             },
-            "description": ""
+            "description": "`profit` = all time. An unknown value is `400 BAD_SORT`."
           },
           {
             "name": "limit",
@@ -7527,6 +7555,19 @@
               "default": 48
             },
             "description": ""
+          },
+          {
+            "name": "all",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1"
+              ]
+            },
+            "description": "1 = keep the wallets the fee check leaves out."
           },
           {
             "name": "minIn",
@@ -7610,6 +7651,15 @@
               "type": "number"
             },
             "description": ""
+          },
+          {
+            "name": "minFees",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            },
+            "description": "Fees collected, all time."
           }
         ],
         "responses": {
@@ -7636,6 +7686,18 @@
                       "type": "object",
                       "additionalProperties": true,
                       "description": ""
+                    },
+                    "feeCheck": {
+                      "type": "boolean",
+                      "description": "The fee check was applied."
+                    },
+                    "hidden": {
+                      "type": "integer",
+                      "description": "Wallets passing the filters that the fee check left out."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Wallets the board ranks."
                     },
                     "rows": {
                       "type": "array",
@@ -20157,7 +20219,7 @@
         ],
         "operationId": "solLpTop",
         "summary": "LP wallets",
-        "description": "Wallets ranked over the LP positions active in the window: `fees` (claimed, default), `deposits` or `pnl` (realized). Many leaders are vaults and rebalancing bots; a short window is not a track record. Cached 60 seconds.\n\nThe board is **fee-checked**: a wallet whose realized profit is positive while the fees it claimed are under a tenth of that profit earned on the token's price (in practice one-sided liquidity on a token it launched) and is left out; `hidden` counts them. `all=1` keeps them in.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
+        "description": "Wallets ranked over the LP positions active in the window: `fees` (claimed, default), `deposits` or `pnl` (realized). Many leaders are vaults and rebalancing bots; a short window is not a track record. Cached 60 seconds.\n\nThe board is **fee-checked**: a wallet whose realized profit is positive while the fees it claimed are under a tenth of that profit earned on the token's price (in practice one-sided liquidity on a token it launched) and is left out; `hidden` counts them. A launchpad account (500 or more positions with a pool of its own for at least every second one: the liquidity of what a launchpad launched) is left out with them; `operators` counts those. `all=1` keeps both in.\n\nLiquidity on Solana from Chord's own tape: adds, removes, fee claims, position opens and closes, decoded from the same blocks as the swaps. No key needed.\n\n- **Venues.** Meteora DLMM, Meteora DAMM v2, Raydium CLMM and PumpSwap. Orca Whirlpools, Raydium CPMM / v4 and Meteora dynamic pools are not read yet.\n- **Since.** `since` is when LP decoding started (2026-10-06 15:53 UTC); windows never start before it. A position opened earlier is `partial: true` and carries no PnL.\n- **Fees are claimed fees.** An LP's fees appear when it claims them, so a window's fees understate what the pool earned, and one claim can hold days of fees.\n- **Positions.** One row per position account (DLMM / DAMM v2 position, Raydium CLMM position NFT, PumpSwap LP token account), rebuilt from all its events. `lower` / `upper` are DLMM bin ids or Raydium CLMM ticks; null = full range. Realized PnL = withdrawn + fees claimed − deposited, only for a position seen from its open to its close with every amount priced. An open position's current value is not in the events: none is given.\n- **Amounts** are whole tokens in the pool's own order (`mintA` / `mintB`); USD is valued when the event happened. Each add / remove / claim is checked against the pool vaults' balance changes in the same transaction (`verified`).\n- **Addresses** are base58 and case-sensitive, as on the other Solana routes.",
         "parameters": [
           {
             "name": "sort",
@@ -20209,7 +20271,7 @@
                 "1"
               ]
             },
-            "description": "1 = keep the wallets the fee check leaves out."
+            "description": "1 = keep the wallets the fee check and the launchpad rule leave out."
           }
         ],
         "responses": {
@@ -20243,6 +20305,10 @@
                     "hidden": {
                       "type": "integer",
                       "description": "Wallets of the window the fee check left out."
+                    },
+                    "operators": {
+                      "type": "integer",
+                      "description": "Launchpad accounts of the window left out."
                     },
                     "rows": {
                       "type": "array",
@@ -26495,6 +26561,10 @@
                   "profitUsd": {
                     "type": "number",
                     "description": ""
+                  },
+                  "feesUsd": {
+                    "type": "number",
+                    "description": ""
                   }
                 }
               },
@@ -26506,6 +26576,10 @@
                     "description": ""
                   },
                   "profitUsd": {
+                    "type": "number",
+                    "description": ""
+                  },
+                  "feesUsd": {
                     "type": "number",
                     "description": ""
                   }
@@ -26521,10 +26595,15 @@
                   "profitUsd": {
                     "type": "number",
                     "description": ""
+                  },
+                  "feesUsd": {
+                    "type": "number",
+                    "description": ""
                   }
                 }
               }
-            }
+            },
+            "description": "Per window: the positions that ended or were last touched in it, the profit they made and the fees they collected over their life."
           },
           "open": {
             "type": "integer",
