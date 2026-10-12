@@ -9828,8 +9828,22 @@
                           "ts": {
                             "type": "integer",
                             "description": "Unix time, seconds, UTC."
+                          },
+                          "href": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Where the wallet's owner acts on the alert: the position's page for a mark, the pool with the same range for a followed wallet's new position."
                           }
-                        }
+                        },
+                        "required": [
+                          "kind",
+                          "chain",
+                          "wallet",
+                          "text",
+                          "ts"
+                        ]
                       }
                     },
                     "pools": {
@@ -9838,6 +9852,41 @@
                         "type": "string",
                         "pattern": "^0x([a-fA-F0-9]{40}|[a-fA-F0-9]{64})$",
                         "description": "A pool: a 20-byte contract address (V2 / V3) or a 32-byte Uniswap V4 pool id."
+                      }
+                    },
+                    "marks": {
+                      "type": "object",
+                      "description": "Take-profit / stop-loss marks by `<manager>:<tokenId>`.",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "tpPct": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Take-profit: PnL in percent of the dollars that went in, above 0."
+                          },
+                          "slPct": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Stop-loss: the same, between -100 and 0."
+                          },
+                          "at": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          }
+                        }
+                      }
+                    },
+                    "following": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^0x[a-fA-F0-9]{40}$",
+                        "description": "EVM address, hex, case-insensitive."
                       }
                     },
                     "updatedAt": {
@@ -10165,6 +10214,233 @@
                         "type": "string",
                         "pattern": "^0x([a-fA-F0-9]{40}|[a-fA-F0-9]{64})$",
                         "description": "A pool: a 20-byte contract address (V2 / V3) or a 32-byte Uniswap V4 pool id."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lp/watch/mark": {
+      "post": {
+        "tags": [
+          "Liquidity"
+        ],
+        "operationId": "lpWatchMark",
+        "summary": "Set a take-profit / stop-loss alert on a position",
+        "description": "A mark on one open position: when its PnL (percent of the dollars that went in, live value and fees included) crosses the take-profit or the stop-loss, one alert goes to the wallet's inbox and linked Telegram chats with a link to the position, and the mark is removed. It is an alert, not an order: nothing is signed or closed for the wallet. Both values null removes the mark. The wallet is watched from then on; positions are checked every two minutes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "chain": {
+                    "type": "integer",
+                    "enum": [
+                      5042,
+                      4663,
+                      143
+                    ]
+                  },
+                  "wallet": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "manager": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "tokenId": {
+                    "type": "string",
+                    "description": "The position's id on its manager, decimal."
+                  },
+                  "tpPct": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "description": "Above 0, at most 10000."
+                  },
+                  "slPct": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "description": "Between -100 and 0."
+                  }
+                },
+                "required": [
+                  "chain",
+                  "wallet",
+                  "manager",
+                  "tokenId"
+                ]
+              },
+              "example": {
+                "chain": 4663,
+                "wallet": "0xb145400da27a2497d9fc2cd5621f2bfd37617af4",
+                "manager": "0x58daec3116aae6d93017baaea7749052e8a04fa7",
+                "tokenId": "2990642",
+                "tpPct": 20,
+                "slPct": -15
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "wallet": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "marks": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "tpPct": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Take-profit: PnL in percent of the dollars that went in, above 0."
+                          },
+                          "slPct": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Stop-loss: the same, between -100 and 0."
+                          },
+                          "at": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters — `error` names the check that failed (`INVALID_PARAMS`, `BAD_ADDRESS`, `BAD_LIMIT`, `BAD_HOURS`, …).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lp/watch/follow": {
+      "post": {
+        "tags": [
+          "Liquidity"
+        ],
+        "operationId": "lpWatchFollow",
+        "summary": "Follow a liquidity provider",
+        "description": "Alerts for `wallet` when `target` opens or closes a position, from now on (a follow does not replay the wallet's past). An \"opened\" alert links to the same pool with the same range; nothing is copied for the wallet. At most 10 followed wallets.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "chain": {
+                    "type": "integer",
+                    "enum": [
+                      5042,
+                      4663,
+                      143
+                    ]
+                  },
+                  "wallet": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "target": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "EVM address, hex, case-insensitive."
+                  },
+                  "on": {
+                    "type": "boolean",
+                    "description": "false = stop following. Default true."
+                  }
+                },
+                "required": [
+                  "chain",
+                  "wallet",
+                  "target"
+                ]
+              },
+              "example": {
+                "chain": 4663,
+                "wallet": "0xb145400da27a2497d9fc2cd5621f2bfd37617af4",
+                "target": "0x5b0dbd62f7639bef7a1ae1c4ff9408105946a9b9",
+                "on": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "wallet": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "following": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^0x[a-fA-F0-9]{40}$",
+                        "description": "EVM address, hex, case-insensitive."
                       }
                     }
                   }
