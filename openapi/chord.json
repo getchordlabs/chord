@@ -21227,6 +21227,41 @@
                               "null"
                             ],
                             "description": "0–1."
+                          },
+                          "evUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Mean result of a realized position; null with none."
+                          },
+                          "avgAgeHours": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Hours a position stays open, open ones counted to now."
+                          },
+                          "avgDepositUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "firstTs": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Unix time, seconds, UTC."
+                          },
+                          "lastTs": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Unix time, seconds, UTC."
                           }
                         }
                       }
@@ -21241,34 +21276,47 @@
                   "chain": "solana",
                   "sort": "fees",
                   "windowHours": 24,
-                  "since": 1791301995,
+                  "since": 1791750117,
+                  "feeChecked": true,
+                  "hidden": 235,
+                  "operators": 2,
                   "rows": [
                     {
-                      "wallet": "4FP4tZxbFqAbdnpTxNLjq2U9H2mmxQ2WhCxrqQ2jadFu",
+                      "wallet": "6sWm5C5E25mZD98z7RAZZCqetT3rjWuLXRZsmimg6KEK",
                       "positions": 1,
                       "open": 1,
                       "pools": 1,
                       "depositedUsd": 0,
                       "withdrawnUsd": 0,
-                      "feesClaimedUsd": 4161.145469719044,
+                      "feesClaimedUsd": 225969.36547100003,
                       "realizedPnlUsd": null,
                       "realizedPositions": 0,
-                      "winRate": null
+                      "winRate": null,
+                      "evUsd": null,
+                      "avgAgeHours": 74.6913888888889,
+                      "avgDepositUsd": null,
+                      "firstTs": 1791567628,
+                      "lastTs": 1791818882
                     },
                     {
-                      "wallet": "7bAvDPmybUxnHE16aSUooFG5LxExc6DfAcjcRGfLXdJT",
-                      "positions": 1,
-                      "open": 1,
+                      "wallet": "9SgR9w7ii7ZofZ5kgyb7hUwRVAkqRApdTZWcx4gsssCb",
+                      "positions": 2,
+                      "open": 2,
                       "pools": 1,
-                      "depositedUsd": 7713.205912149275,
+                      "depositedUsd": 0,
                       "withdrawnUsd": 0,
-                      "feesClaimedUsd": 3070.9286966812124,
+                      "feesClaimedUsd": 94307.16837727133,
                       "realizedPnlUsd": null,
                       "realizedPositions": 0,
-                      "winRate": null
+                      "winRate": null,
+                      "evUsd": null,
+                      "avgAgeHours": null,
+                      "avgDepositUsd": null,
+                      "firstTs": 1791429320,
+                      "lastTs": 1791791319
                     }
                   ],
-                  "updatedAt": 1791303661
+                  "updatedAt": 1791836517
                 }
               }
             }
@@ -21929,6 +21977,66 @@
                       ],
                       "description": "0–1."
                     },
+                    "evUsd": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "Mean result of a realized position."
+                    },
+                    "avgAgeHours": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "avgDepositUsd": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": ""
+                    },
+                    "firstTs": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "lastTs": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "day": {
+                            "type": "string",
+                            "description": "YYYY-MM-DD, UTC"
+                          },
+                          "profitUsd": {
+                            "type": "number",
+                            "description": "Result of the realized positions that ended on the day."
+                          },
+                          "feesUsd": {
+                            "type": "number",
+                            "description": "Fees claimed by the positions that ended, or were last touched, on the day."
+                          },
+                          "positions": {
+                            "type": "integer",
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "One row per day a position ended on, oldest first, whatever `status` was asked. Its sums are `realizedPnlUsd` and `feesClaimedUsd` of status=all."
+                    },
                     "rows": {
                       "type": "array",
                       "items": {
@@ -21946,79 +22054,104 @@
                   "wallet": "GwBsj9GJdFrATQs1k9EYUyfaatKZDiViy8tkU9JP3TUL",
                   "status": "all",
                   "since": 1791301995,
-                  "positions": 6,
-                  "open": 1,
-                  "closed": 5,
-                  "pools": 1,
-                  "depositedUsd": 75816.33043309217,
-                  "withdrawnUsd": 75753.276828783,
-                  "feesClaimedUsd": 52.68063852704718,
-                  "realizedPnlUsd": -83.25162531591923,
-                  "realizedPositions": 4,
-                  "winRate": 0.5,
+                  "positions": 750,
+                  "open": 10,
+                  "closed": 740,
+                  "pools": 26,
+                  "depositedUsd": 2649179.5405913335,
+                  "withdrawnUsd": 2647817.6755300546,
+                  "feesClaimedUsd": 18015.87641073856,
+                  "realizedPnlUsd": 3345.1307860846005,
+                  "realizedPositions": 722,
+                  "winRate": 0.5512465373961218,
+                  "evUsd": 4.633145133081164,
+                  "avgAgeHours": 2.460573222071869,
+                  "avgDepositUsd": 3575.1410804201532,
+                  "firstTs": 1790774387,
+                  "lastTs": 1791825711,
+                  "history": [
+                    {
+                      "day": "2026-09-30",
+                      "profitUsd": 0,
+                      "feesUsd": 71.65268316036983,
+                      "positions": 2
+                    },
+                    {
+                      "day": "2026-10-01",
+                      "profitUsd": 0,
+                      "feesUsd": 7.083795820757369,
+                      "positions": 2
+                    },
+                    {
+                      "day": "2026-10-04",
+                      "profitUsd": 0,
+                      "feesUsd": 38.751457795784674,
+                      "positions": 2
+                    }
+                  ],
                   "rows": [
                     {
-                      "position": "9FSWX8ctaKQKYsTpxuuXEMWVXYm3NGm9cDCLYvs6zhE7",
+                      "position": "69v9s6gQje3Rk8u3vwn8kSEAxX1BNciUJEhG5Vb2fcPA",
                       "dex": "meteora_dlmm",
-                      "pool": "5whNk71ua6aRtNKazDqEeAimmfzuX9epJcjh4isQKprn",
+                      "pool": "GgoFghiA6Ca7YNmG6dRxwKQWkZhRK8ND47EREz46arot",
                       "owner": "GwBsj9GJdFrATQs1k9EYUyfaatKZDiViy8tkU9JP3TUL",
-                      "mintA": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
-                      "symbolA": "SPCXx",
+                      "mintA": "WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp",
+                      "symbolA": "XMR",
                       "mintB": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
                       "symbolB": "USDC",
-                      "lower": 688,
-                      "upper": 693,
-                      "status": "open",
-                      "openedAt": 1791303527,
-                      "closedAt": null,
-                      "firstEvent": 1791303527,
-                      "lastEvent": 1791303527,
-                      "events": 2,
-                      "depositedA": 87.25797003,
-                      "depositedB": 0,
-                      "withdrawnA": 0,
-                      "withdrawnB": 0,
-                      "feesA": 0,
-                      "feesB": 0,
-                      "depositedUsd": 15125.346891374138,
-                      "withdrawnUsd": 0,
-                      "feesClaimedUsd": 0,
-                      "realizedPnlUsd": null,
+                      "lower": -7544,
+                      "upper": -7544,
+                      "status": "closed",
+                      "openedAt": 1791825038,
+                      "closedAt": 1791825711,
+                      "firstEvent": 1791825038,
+                      "lastEvent": 1791825711,
+                      "events": 5,
+                      "depositedA": 0,
+                      "depositedB": 9871.870653,
+                      "withdrawnA": 15.009532666305,
+                      "withdrawnB": 1897.560215,
+                      "feesA": 0.017992659416,
+                      "feesB": 2.482098,
+                      "depositedUsd": 9871.870653,
+                      "withdrawnUsd": 9879.734769314513,
+                      "feesClaimedUsd": 12.050720244798956,
+                      "realizedPnlUsd": 19.91483655931188,
                       "partial": false,
                       "unpricedEvents": 0
                     },
                     {
-                      "position": "BJMyRCurUG45Lst2tZf2RMVbxwCopyWzxzHjgQz5ET6m",
+                      "position": "BpHs9ZbEoCTrM2P5JKY3cgxWhUTeMMUMa41jWiUjwQ9w",
                       "dex": "meteora_dlmm",
-                      "pool": "5whNk71ua6aRtNKazDqEeAimmfzuX9epJcjh4isQKprn",
+                      "pool": "GgoFghiA6Ca7YNmG6dRxwKQWkZhRK8ND47EREz46arot",
                       "owner": "GwBsj9GJdFrATQs1k9EYUyfaatKZDiViy8tkU9JP3TUL",
-                      "mintA": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
-                      "symbolA": "SPCXx",
+                      "mintA": "WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp",
+                      "symbolA": "XMR",
                       "mintB": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
                       "symbolB": "USDC",
-                      "lower": 691,
-                      "upper": 693,
+                      "lower": -7545,
+                      "upper": -7545,
                       "status": "closed",
-                      "openedAt": 1791303350,
-                      "closedAt": 1791303523,
-                      "firstEvent": 1791303350,
-                      "lastEvent": 1791303523,
+                      "openedAt": 1791824988,
+                      "closedAt": 1791825034,
+                      "firstEvent": 1791824988,
+                      "lastEvent": 1791825034,
                       "events": 5,
                       "depositedA": 0,
-                      "depositedB": 15169.346751,
-                      "withdrawnA": 87.22116669,
-                      "withdrawnB": 0,
-                      "feesA": 0.03680336,
-                      "feesB": 0,
-                      "depositedUsd": 15169.346751,
-                      "withdrawnUsd": 15118.967379175197,
-                      "feesClaimedUsd": 6.379515665752227,
-                      "realizedPnlUsd": -43.99985615904916,
+                      "depositedB": 9871.839615,
+                      "withdrawnA": 0,
+                      "withdrawnB": 9871.405961,
+                      "feesA": 0.000141564492,
+                      "feesB": 0.464692,
+                      "depositedUsd": 9871.839615,
+                      "withdrawnUsd": 9871.405961,
+                      "feesClaimedUsd": 0.5398261385532628,
+                      "realizedPnlUsd": 0.10617213855221053,
                       "partial": false,
                       "unpricedEvents": 0
                     }
                   ],
-                  "updatedAt": 1791303635
+                  "updatedAt": 1791836517
                 }
               }
             }

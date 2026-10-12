@@ -1026,7 +1026,8 @@ add("/chains/solana/lp/top", "get", op(T.sol, "solLpTop", "LP wallets", `Wallets
       q("all", { type: "string", enum: ["0", "1"] }, "1 = keep the wallets the fee check and the launchpad rule leave out.")],
     responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, sort: str(""), windowHours: int(""), since: SOL_TS,
       feeChecked: bool("The fee check was applied."), hidden: int("Wallets of the window the fee check left out."), operators: int("Launchpad accounts of the window left out."),
-      rows: arr(obj({ wallet: nullable(SOL_ADDR), positions: int(""), open: int(""), pools: int(""), depositedUsd: num(""), withdrawnUsd: num(""), feesClaimedUsd: num(""), realizedPnlUsd: nullable(num("")), realizedPositions: int(""), winRate: nullable(num("0–1.")) })),
+      rows: arr(obj({ wallet: nullable(SOL_ADDR), positions: int(""), open: int(""), pools: int(""), depositedUsd: num(""), withdrawnUsd: num(""), feesClaimedUsd: num(""), realizedPnlUsd: nullable(num("")), realizedPositions: int(""), winRate: nullable(num("0–1.")),
+        evUsd: nullable(num("Mean result of a realized position; null with none.")), avgAgeHours: nullable(num("Hours a position stays open, open ones counted to now.")), avgDepositUsd: nullable(num("")), firstTs: nullable(SOL_TS), lastTs: nullable(SOL_TS) })),
       updatedAt: SOL_UPDATED }), ex("/v1/chains/solana/lp/top?sort=fees&limit=2")), ...SOL_ERR("`BAD_LIMIT` / `BAD_HOURS` / `BAD_SORT` / `BAD_ALL`") } }));
 
 add("/chains/solana/lp/pool/{address}", "get", op(T.sol, "solLpPool", "One pool's liquidity", `Deposits, withdrawals, net flow and claimed fees over the window, and by hour; open positions and their owners; the pair with decimals, TVL estimate and swap volume. Cached 20 seconds.\n\n${SOL_LP_INTRO}`,
@@ -1044,7 +1045,10 @@ add("/chains/solana/lp/pool/{address}/positions", "get", op(T.sol, "solLpPoolPos
 add("/chains/solana/lp/wallet/{address}", "get", op(T.sol, "solLpWallet", "A wallet's LP positions", `The wallet's positions as owner (DLMM: the position's owner, not an operator acting for it), most recently active first, with totals over every position of the \`status\` asked: deposited, withdrawn, claimed fees, realized PnL and win rate over positions seen open to close. Cached 15 seconds.\n\n${SOL_LP_INTRO}`,
   { params: [SOL_WAL_P, SOL_LP_STATUS, q("limit", { type: "integer", minimum: 1, maximum: 200, default: 100 }, "Rows; totals cover every position.")],
     responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, wallet: SOL_ADDR, status: str(""), since: nullable(SOL_TS), positions: int(""), open: int(""), closed: int(""), pools: int(""),
-      depositedUsd: num(""), withdrawnUsd: num(""), feesClaimedUsd: num(""), realizedPnlUsd: nullable(num("")), realizedPositions: int(""), winRate: nullable(num("0–1.")), rows: arr(ref("SolLpPosition")), updatedAt: SOL_UPDATED }),
+      depositedUsd: num(""), withdrawnUsd: num(""), feesClaimedUsd: num(""), realizedPnlUsd: nullable(num("")), realizedPositions: int(""), winRate: nullable(num("0–1.")),
+      evUsd: nullable(num("Mean result of a realized position.")), avgAgeHours: nullable(num("")), avgDepositUsd: nullable(num("")), firstTs: nullable(SOL_TS), lastTs: nullable(SOL_TS),
+      history: arr(obj({ day: str("YYYY-MM-DD, UTC"), profitUsd: num("Result of the realized positions that ended on the day."), feesUsd: num("Fees claimed by the positions that ended, or were last touched, on the day."), positions: int("") }), "One row per day a position ended on, oldest first, whatever `status` was asked. Its sums are `realizedPnlUsd` and `feesClaimedUsd` of status=all."),
+      rows: arr(ref("SolLpPosition")), updatedAt: SOL_UPDATED }),
       ex(`/v1/chains/solana/lp/wallet/${SOL_LP_WAL}?limit=2`)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_STATUS` / `BAD_LIMIT`") } }));
 
 for (const [by, opId, title, key] of [
