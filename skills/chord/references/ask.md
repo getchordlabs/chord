@@ -42,6 +42,7 @@ Body:
 | `stream` | no | `false` = one JSON answer (what agents want); omitted = server-sent events |
 | `history` | no | earlier turns `[{ "role": "user" or "assistant", "content": "..." }]`, last 12 kept |
 | `wallet` | no | a 0x address so "my PnL", "my balances" resolve to it |
+| `mode` | no | `"quick"` = the shortest answer (verdict, claim, three rows, 120 words at most), faster; `"deep"` = a judgement or an explanation as a full research note (`shape: "report"`). Omitted = the length the question calls for; other values are ignored |
 
 ## Auth
 

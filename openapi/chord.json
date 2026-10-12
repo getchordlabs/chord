@@ -10150,6 +10150,14 @@
                     "pattern": "^0x[a-fA-F0-9]{40}$",
                     "description": "The caller's wallet, so \"my PnL\" resolves."
                   },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "quick",
+                      "deep"
+                    ],
+                    "description": "How long an answer to write. `quick`: the shortest form (the verdict, its claim, at most three rows of evidence, 120 words at most), faster. `deep`: a judgement or an explanation comes back as a full research note (`shape: \"report\"`), any other answer with a longer folded `details`. Omitted: the length the question calls for. Any other value is ignored."
+                  },
                   "images": {
                     "type": "array",
                     "items": {
