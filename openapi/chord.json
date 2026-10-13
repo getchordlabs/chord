@@ -21423,11 +21423,30 @@
               "enum": [
                 "fees",
                 "deposits",
-                "pnl"
+                "pnl",
+                "win_rate",
+                "ev",
+                "positions",
+                "avg_age",
+                "last_activity"
               ],
               "default": "fees"
             },
             "description": ""
+          },
+          {
+            "name": "unit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "usd",
+                "native"
+              ],
+              "default": "usd"
+            },
+            "description": "`native` = the money fields of the answer in SOL: every deposit, withdrawal and claimed fee converted at the SOL price of its own minute, so a wallet that put SOL in and took the same SOL out reads flat whatever SOL did in dollars (win rate and expected value follow the unit). The fields keep their `…Usd` names; `unit` and `unitSymbol` in the answer say what they carry. `503 UNIT_NOT_READY` while positions are being folded again; another value is `400 BAD_UNIT`."
           },
           {
             "name": "limit",
@@ -22219,6 +22238,20 @@
               "default": "all"
             },
             "description": "Which positions."
+          },
+          {
+            "name": "unit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "usd",
+                "native"
+              ],
+              "default": "usd"
+            },
+            "description": "`native` = the money fields of the answer in SOL: every deposit, withdrawal and claimed fee converted at the SOL price of its own minute, so a wallet that put SOL in and took the same SOL out reads flat whatever SOL did in dollars (win rate and expected value follow the unit). The fields keep their `…Usd` names; `unit` and `unitSymbol` in the answer say what they carry. `503 UNIT_NOT_READY` while positions are being folded again; another value is `400 BAD_UNIT`."
           },
           {
             "name": "limit",
