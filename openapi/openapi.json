@@ -8114,7 +8114,7 @@
         ],
         "operationId": "lpPosition",
         "summary": "One position",
-        "description": "A position by its NFT: the valued row, its events, and a hold-instead comparison (what the same tokens would be worth unpooled).",
+        "description": "A position by its NFT: the valued row, its events, and a hold-instead comparison (what the same tokens would be worth unpooled). `native` carries the same position in the chain's own coin (`nativeSymbol`): what went in, came out and was paid as fees, each event converted at the coin's price of its own hour, and the value and waiting fees at the coin's price now. It is null while the chain's ledger has no figures in its coin.",
         "parameters": [
           {
             "name": "chain",
@@ -8252,6 +8252,61 @@
                           "description": ""
                         }
                       }
+                    },
+                    "native": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "in": {
+                          "type": "number",
+                          "description": "In, in the coin."
+                        },
+                        "out": {
+                          "type": "number",
+                          "description": "Out, in the coin."
+                        },
+                        "fees": {
+                          "type": "number",
+                          "description": "Fees paid out, in the coin."
+                        },
+                        "value": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Value now at the coin's price now; null for a closed position."
+                        },
+                        "uncollected": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Fees waiting, at the coin's price now."
+                        },
+                        "pnl": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Closed: out + fees − in. Open: value + waiting + out + fees − in."
+                        },
+                        "pnlPct": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "`pnl` in percent of `in`."
+                        }
+                      }
+                    },
+                    "nativeSymbol": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The chain's coin (`ETH`, `MON`, `USDC`); null with `native`."
                     },
                     "updatedAt": {
                       "type": "integer",
@@ -9931,6 +9986,13 @@
                           "at": {
                             "type": "integer",
                             "description": "Unix time, seconds, UTC."
+                          },
+                          "unit": {
+                            "type": "string",
+                            "description": "Present, and `native`, when the percent is counted in the chain's own coin; absent = in dollars.",
+                            "enum": [
+                              "native"
+                            ]
                           }
                         }
                       }
@@ -10295,7 +10357,7 @@
         ],
         "operationId": "lpWatchMark",
         "summary": "Set a take-profit / stop-loss alert on a position",
-        "description": "A mark on one open position: when its PnL (percent of the dollars that went in, live value and fees included) crosses the take-profit or the stop-loss, one alert goes to the wallet's inbox and linked Telegram chats with a link to the position, and the mark is removed. It is an alert, not an order: nothing is signed or closed for the wallet. Both values null removes the mark. The wallet is watched from then on; positions are checked every two minutes.",
+        "description": "A mark on one open position: when its PnL (percent of the dollars that went in, live value and fees included) crosses the take-profit or the stop-loss, one alert goes to the wallet's inbox and linked Telegram chats with a link to the position, and the mark is removed. It is an alert, not an order: nothing is signed or closed for the wallet. Both values null removes the mark. The wallet is watched from then on; positions are checked every two minutes. A mark with `unit: \"native\"` waits (it never falls back to dollars) while the chain has no figures in its coin.",
         "requestBody": {
           "required": true,
           "content": {
@@ -10338,6 +10400,14 @@
                       "null"
                     ],
                     "description": "Between -100 and 0."
+                  },
+                  "unit": {
+                    "type": "string",
+                    "description": "`native` = count the percent in the chain's own coin: what went in and what the position is worth now, both in ETH / MON (`native` of `GET /lp/position`). The coin moving against the dollar then crosses nothing. Default `usd`.",
+                    "enum": [
+                      "usd",
+                      "native"
+                    ]
                   }
                 },
                 "required": [
@@ -10397,6 +10467,13 @@
                           "at": {
                             "type": "integer",
                             "description": "Unix time, seconds, UTC."
+                          },
+                          "unit": {
+                            "type": "string",
+                            "description": "Present, and `native`, when the percent is counted in the chain's own coin; absent = in dollars.",
+                            "enum": [
+                              "native"
+                            ]
                           }
                         }
                       }
