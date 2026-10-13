@@ -7458,6 +7458,20 @@
               ]
             },
             "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad."
+          },
+          {
+            "name": "unit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "usd",
+                "native"
+              ],
+              "default": "usd"
+            },
+            "description": "`native` = every money field of the answer in the chain's own coin (ETH on Robinhood Chain, MON on Monad; Arc's coin is USDC), each deposit, withdrawal and fee converted at the coin's price of its own hour, and live values at the price now. The fields keep their `…Usd` names; `unit` and `unitSymbol` in the answer say what they carry. The row rules (the $20 floor, the 20x bound) stay in dollars, so both units score the same positions. `503 UNIT_NOT_READY` while a chain's ledger is being rebuilt with these figures; another value is `400 BAD_UNIT`."
           }
         ],
         "responses": {
@@ -7476,6 +7490,18 @@
                       "type": "string",
                       "pattern": "^0x[a-fA-F0-9]{40}$",
                       "description": "EVM address, hex, case-insensitive."
+                    },
+                    "unit": {
+                      "type": "string",
+                      "description": "`usd` or `native`: the unit of every money field in this answer.",
+                      "enum": [
+                        "usd",
+                        "native"
+                      ]
+                    },
+                    "unitSymbol": {
+                      "type": "string",
+                      "description": "`USD`, or the chain's coin (`ETH`, `MON`, `USDC`)."
                     },
                     "summary": {
                       "type": "object",
@@ -7894,6 +7920,20 @@
             "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad."
           },
           {
+            "name": "unit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "usd",
+                "native"
+              ],
+              "default": "usd"
+            },
+            "description": "`native` = every money field of the answer in the chain's own coin (ETH on Robinhood Chain, MON on Monad; Arc's coin is USDC), each deposit, withdrawal and fee converted at the coin's price of its own hour, and live values at the price now. The fields keep their `…Usd` names; `unit` and `unitSymbol` in the answer say what they carry. The row rules (the $20 floor, the 20x bound) stay in dollars, so both units score the same positions. `503 UNIT_NOT_READY` while a chain's ledger is being rebuilt with these figures; another value is `400 BAD_UNIT`."
+          },
+          {
             "name": "owner",
             "in": "query",
             "required": true,
@@ -8267,6 +8307,20 @@
               ]
             },
             "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad."
+          },
+          {
+            "name": "unit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "usd",
+                "native"
+              ],
+              "default": "usd"
+            },
+            "description": "`native` = every money field of the answer in the chain's own coin (ETH on Robinhood Chain, MON on Monad; Arc's coin is USDC), each deposit, withdrawal and fee converted at the coin's price of its own hour, and live values at the price now. The fields keep their `…Usd` names; `unit` and `unitSymbol` in the answer say what they carry. The row rules (the $20 floor, the 20x bound) stay in dollars, so both units score the same positions. `503 UNIT_NOT_READY` while a chain's ledger is being rebuilt with these figures; another value is `400 BAD_UNIT`."
           },
           {
             "name": "sort",
