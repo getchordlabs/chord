@@ -182,6 +182,7 @@ const PoolListRow = obj({
   trades24h: int(""), wallets24h: int(""), priceUsd: nullable(num("")), lpAdd24h: num(""), lpRemove24h: num(""), providers24h: int(""), firstSeenTs: UNIX_S, createdTs: nullable(UNIX_S), lastTradeHour: int(""),
   turnover24h: nullable(num("24h volume ÷ TVL.")), suspect: bool("Wash or launch-farm printing (volume without traders, dust TVL under real volume, turnover no honest pool reaches). Hidden by default; `flagged=1` shows them."),
   score: int("0–100 health score (traders, TVL, yield sanity, LP flow, age, penalties)."),
+  marketCapUsd: nullable(num("The tracked token's price × its total supply on this chain (for a bridged token: what was bridged here). On the list only; `null` when the pool tracks neither side, the tracked side is the native coin, or the supply is not on record yet.")),
 });
 
 const LpPosition = obj({
