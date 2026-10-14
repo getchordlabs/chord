@@ -16,7 +16,7 @@ interface IPinnedAdapter {
 }
 
 /// @title AlignedStackDeploy
-/// @notice Shared body of `DeployBase` / `DeployAvalanche` / `DeployBnb` (docs/multichain-plan.md §3 M3):
+/// @notice Shared body of `DeployBase` / `DeployAvalanche` / `DeployBnb` / `DeployArbitrum` (docs/multichain-plan.md §3 M3):
 ///         the NullTerminal core stack — AdapterRegistry + NullRouter + FeeCollector (UUPS proxies) — at
 ///         the SAME proxy addresses as Monad / Robinhood Chain / Arc, plus the chain's adapter set.
 /// @dev THE TEMPLATE IS `script/DeployArc.s.sol` (deployed 2026-09-16). What is added here is only what
@@ -37,7 +37,7 @@ interface IPinnedAdapter {
 ///      Anything that changes this order before nonce 6 — a failed tx, a stray `new`, a "dry" run that
 ///      still broadcasts — moves every later address. There is no way back on the same key, which is
 ///      why `_preflight` refuses to start unless the deployer's nonce is exactly EXPECTED_START_NONCE.
-///      (The deployer EOA 0x0f11…4f79 read nonce 0 on 8453 / 43114 / 56 on 2026-09-30.)
+///      (The deployer EOA 0x0f11…4f79 read nonce 0 on 8453 / 43114 / 56 on 2026-09-30, and on 42161 on 2026-10-14.)
 ///
 ///      Adapters are H1-hardened (`BaseAdapter`): each pins the NullRouter PROXY as an immutable and
 ///      reverts `NotRouter` (0x91655201) for every other caller.
@@ -62,6 +62,14 @@ abstract contract AlignedStackDeploy is Script {
     // change it later without a redeploy. Cap is 100 bps in BOTH the collector and the router.
     uint16 internal constant DEFAULT_FEE_BPS = 25; // OWNER GATE
     uint16 internal constant REFERRAL_SHARE_BPS = 5000; // OWNER GATE
+
+    /// @notice Global default the collector is INITIALISED with. Base / BNB / Avalanche broadcast 25 (2026-10-01) and
+    ///         were moved to 5 by `setFeeBps(5)` on 2026-10-02 (owner: one 5 bps default on every chain,
+    ///         docs/fee-tiers.md); those scripts keep 25 so they still describe what was broadcast. A chain deployed
+    ///         after that call overrides this to start at 5 (DeployArbitrum) — one transaction fewer, no 25 window.
+    function defaultFeeBps() public pure virtual returns (uint16) {
+        return DEFAULT_FEE_BPS;
+    }
 
     struct Stack {
         AdapterRegistry registry;
@@ -154,7 +162,7 @@ abstract contract AlignedStackDeploy is Script {
         ERC1967Proxy feeCollectorProxy = new ERC1967Proxy(
             address(feeCollectorImpl),
             abi.encodeCall(
-                FeeCollector.initialize, (deployer, treasury, address(s.router), DEFAULT_FEE_BPS, REFERRAL_SHARE_BPS)
+                FeeCollector.initialize, (deployer, treasury, address(s.router), defaultFeeBps(), REFERRAL_SHARE_BPS)
             )
         );
         s.feeCollector = FeeCollector(address(feeCollectorProxy));
@@ -223,7 +231,8 @@ abstract contract AlignedStackDeploy is Script {
         require(s.feeCollector.owner() == deployer, "collector.owner");
         require(s.feeCollector.router() == address(s.router), "collector.router");
         require(s.feeCollector.treasury() == treasury, "collector.treasury");
-        require(s.feeCollector.feeBps() == DEFAULT_FEE_BPS, "collector.feeBps");
+        require(s.feeCollector.feeBps() == defaultFeeBps(), "collector.feeBps");
+        require(s.feeCollector.referralShareBps() == REFERRAL_SHARE_BPS, "collector.referralShareBps");
 
         for (uint256 i = 0; i < s.adapters.length; i++) {
             require(s.registry.isApproved(s.adapters[i]), "adapter not approved");
