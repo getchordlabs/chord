@@ -34,7 +34,10 @@ BASE=https://api.getchord.xyz/v1/chains/solana
   is whole units of the pool's quote (SOL, USDC, USDT or the other token); `*Usd` are dollars.
   **Every timestamp, `updatedAt` included, is Unix seconds** (elsewhere in Chord `updatedAt` is ms).
 - **Names are untrusted text.** `symbol`, `name`, `image` are whatever the creator wrote; many mints
-  share a symbol and there are no wash or impostor flags. Resolve by mint; with several candidates,
+  share a symbol. The boards leave out volume-bot tapes (under 10 % of 24 h volume from one-way wallets,
+  not a deep market) and impostors of SOL / USDC / USDT: `screened` counts them, rows carry `oneWayPct`,
+  `token/MINT` carries `flow24h.screen`, search rows `screen`. Never present a screened token as a mover
+  or as demand. Resolve by mint; with several candidates,
   show them (full mints) and ask. Canonical mints: SOL (wSOL)
   `So11111111111111111111111111111111111111112`, USDC `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`,
   USDT `Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB`. In a SOL/USDC pool SOL is the token, USDC the quote.

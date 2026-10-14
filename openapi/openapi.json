@@ -18673,6 +18673,27 @@
                     "updatedAt": {
                       "type": "integer",
                       "description": "Unix time, SECONDS, when the Solana box built this answer. Unlike the rest of the API (milliseconds)."
+                    },
+                    "botTapes": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "tokens": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "volumeUsd": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "rule": {
+                          "type": "string",
+                          "description": ""
+                        }
+                      },
+                      "description": "The part of `volumeUsd` made by volume-bot tapes among the board's candidates (see `/chains/solana/tokens`). Null before the first measure."
                     }
                   }
                 },
@@ -18757,7 +18778,7 @@
         ],
         "operationId": "solTokens",
         "summary": "Every token traded in the last 24 hours",
-        "description": "The 24-hour board. `volume` and `trades` rank every token the tape saw; `change` (24-hour price change) and `new` (first seen in the last 24 hours, newest first) rank inside the 400 most traded tokens with at least $5,000 of volume, so a $40 pool moving 900 % is not a mover. Cached 20 seconds.\n\nNo wash flags here: a thin pool can print a large volume (compare `volume24hUsd` with `liquidityUsd` and `trades24h` before ranking on it), and many tokens share a symbol.\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
+        "description": "The 24-hour board. `volume` ranks the 600 most traded tokens and `trades` the 300 with the most trades; `change` (24-hour price change) and `new` (first seen in the last 24 hours, newest first) rank inside the 600 most traded tokens with at least $5,000 of volume, so a $40 pool moving 900 % is not a mover. Cached 20 seconds.\n\n**Volume-bot tapes and impostors are left out** (`screened` counts them, `all=1` keeps them in with their `screen`). Most of Solana's busiest tokens are wallets trading with themselves: on 13 and 14 October, 265 and 271 of the 400 most traded tokens had under 3 % of their volume from wallets that went one way, about 70 % of the board's volume (one of them printed $150M on $350k of liquidity, 78 wallets each buying and selling ~$1.56M). A token is left out when under 10 % of its 24-hour volume is one-way (`oneWayPct`) unless it is a deep market (at least $250k of SOL / stable liquidity turned over at most 10× in the window: majors whose Solana flow is arbitrage stay). Many tokens still share a symbol.\n\nChord's own Solana tape, read-only. No key needed.\n\n- **What it reads.** The swap events of 11 venues: PumpSwap, the pump.fun bonding curve, Meteora DBC, Meteora DAMM v2, Meteora DLMM, Meteora pools (dynamic AMM v1), Raydium CLMM, Raydium CPMM, Raydium AMM v4, Raydium LaunchLab and Orca Whirlpool. Each swap is checked against the pool vaults' balance changes in the same transaction.\n- **What it does not read.** Prop AMMs (SolFi, HumidiFi and the like) and order books. SOL/USDC and other major pairs therefore show far less volume than the whole market; the numbers are accurate for pump.fun, Meteora and Raydium style tokens. Transfers are not seen either: wallet PnL is average cost inside the window.\n- **History.** Live since 2026-10-03 12:01 UTC, plus a backfill of the days before. `coverageSince` on `/chains/solana/overview` says from when totals are complete: quote that field, not a date.\n- **Addresses** are base58 and **case-sensitive**. Never lower-case a mint or a wallet: a lower-cased mint is a different string, refused with `400 BAD_ADDRESS` when it stops being base58 (an `L` becomes `l`) and answered `404 TOKEN_NOT_FOUND` otherwise. Solana has no numeric chain id here: the path segment is the literal `solana`.\n- **Units.** Token amounts are whole tokens (decimals already applied), `quoteAmount` is whole units of the pool's quote (SOL, USDC, USDT or the other token), prices and `*Usd` fields are US dollars. Timestamps, `updatedAt` included, are Unix **seconds**.\n- **Names are untrusted.** `symbol`, `name` and `image` are whatever the token's creator wrote; many mints share a symbol and there are no wash or impostor flags. Identify a token by its mint.\n- **Errors.** `400 BAD_*` for a bad parameter; `400 UNSUPPORTED_CHAIN` if Solana is not public on the deployment and the request has no `X-API-Key`; `503 CHAIN_DATA_UNAVAILABLE` when the Solana store cannot be read in time and `503 CHAIN_NOT_ENABLED` when the lane is off: retry later, never read either as \"no trades\".",
         "parameters": [
           {
             "name": "sort",
@@ -18809,6 +18830,33 @@
                       "items": {
                         "$ref": "#/components/schemas/SolTokenRow"
                       }
+                    },
+                    "screened": {
+                      "type": "object",
+                      "properties": {
+                        "tokens": {
+                          "type": "integer",
+                          "description": "Candidates of this board left out."
+                        },
+                        "volumeUsd": {
+                          "type": "number",
+                          "description": "Their 24-hour volume."
+                        },
+                        "byReason": {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "description": "Count per `screen` value."
+                        },
+                        "rule": {
+                          "type": "string",
+                          "description": "The rule, in words."
+                        },
+                        "measured": {
+                          "type": "boolean",
+                          "description": "False when the volume screen did not run for this board (the tape's per-wallet rollup is missing or behind): rows are then unscreened for volume."
+                        }
+                      },
+                      "description": "What the board left out."
                     },
                     "updatedAt": {
                       "type": "integer",
@@ -18983,6 +19031,17 @@
                               "null"
                             ],
                             "description": "See above."
+                          },
+                          "screen": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "volume bot",
+                              "impostor"
+                            ],
+                            "description": "Why the boards leave this token out, or null. `volume bot`: under 10 % of its 24-hour volume came from one-way wallets and it is not a deep market (at least $250k of SOL / stable liquidity turned over at most 10× in the window). `impostor`: the ticker of SOL, USDC or USDT, look-alike letters included, on another mint."
                           }
                         }
                       }
@@ -19220,6 +19279,51 @@
                         }
                       },
                       "description": "24-hour venue split, biggest first."
+                    },
+                    "flow24h": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "oneWayPct": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "As on the board row."
+                        },
+                        "screen": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "volume bot",
+                            "impostor"
+                          ],
+                          "description": "Why the boards leave this token out, or null. `volume bot`: under 10 % of its 24-hour volume came from one-way wallets and it is not a deep market (at least $250k of SOL / stable liquidity turned over at most 10× in the window). `impostor`: the ticker of SOL, USDC or USDT, look-alike letters included, on another mint."
+                        },
+                        "wallets": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Distinct wallets in the window."
+                        },
+                        "volumeUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "The window's volume this was measured on."
+                        },
+                        "rule": {
+                          "type": "string",
+                          "description": ""
+                        }
+                      },
+                      "description": "Who made the 24-hour volume. Null when not measured."
                     },
                     "pools": {
                       "type": "array",
@@ -27725,6 +27829,13 @@
           "score": {
             "type": "integer",
             "description": "0–100 health score (traders, TVL, yield sanity, LP flow, age, penalties)."
+          },
+          "marketCapUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The tracked token's price × its total supply on this chain (for a bridged token: what was bridged here). On the list only; `null` when the pool tracks neither side, the tracked side is the native coin, or the supply is not on record yet."
           }
         }
       },
@@ -28617,6 +28728,24 @@
               "null"
             ],
             "description": "Unix time, seconds, UTC."
+          },
+          "oneWayPct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Percent of the 24-hour dollar volume traded by wallets that went one way: each wallet's smaller side (bought or sold, in USD) under half its larger side. The rest is wallets buying and selling about the same amounts back and forth: arbitrage, market making or wash trading. Null when not measured."
+          },
+          "screen": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "volume bot",
+              "impostor"
+            ],
+            "description": "Why the boards leave this token out, or null. `volume bot`: under 10 % of its 24-hour volume came from one-way wallets and it is not a deep market (at least $250k of SOL / stable liquidity turned over at most 10× in the window). `impostor`: the ticker of SOL, USDC or USDT, look-alike letters included, on another mint."
           }
         },
         "description": "One Solana token with its 24-hour tape."
