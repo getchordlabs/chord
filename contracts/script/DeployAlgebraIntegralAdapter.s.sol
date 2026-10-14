@@ -23,6 +23,8 @@ contract DeployAlgebraIntegralAdapterScript is Script {
     address constant QUICKSWAP_V4_FACTORY = 0xC5396866754799B9720125B104AE01d935Ab9C7b;
     // BNB — THENA V3 (Algebra Integral: default pools + one custom deployer)
     address constant THENA_V3_FACTORY = 0x30055F87716d3DFD0E5198C27024481099fB4A98;
+    /// Camelot V3 (Algebra 1.9) on Arbitrum — default pools only (`poolByPair`), deployed at block 101,163,738.
+    address constant CAMELOT_V3_FACTORY = 0x1a3c9B1d2F0529D97f2afC5136Cc23e58f1FD35B;
 
     function venues() public view returns (address[] memory fs, address[] memory ds) {
         if (block.chainid == 43114) {
@@ -51,8 +53,12 @@ contract DeployAlgebraIntegralAdapterScript is Script {
             fs[0] = THENA_V3_FACTORY;
             fs[1] = THENA_V3_FACTORY;
             ds[1] = 0xF807462b5ce54A89e2F5B847D8281030eAfE241B;
+        } else if (block.chainid == 42161) {
+            fs = new address[](1);
+            ds = new address[](1);
+            fs[0] = CAMELOT_V3_FACTORY; // deployer 0 = poolByPair
         } else {
-            revert("wrong chain: Avalanche, Base or BNB only");
+            revert("wrong chain: Avalanche, Base, BNB or Arbitrum only");
         }
     }
 

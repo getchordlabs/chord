@@ -93,4 +93,14 @@ contract AlgebraIntegralForkTest is Test {
         _roundTrip(a, 0x58F04AAda1051885a3C4e296aaB0A454Ea1233A3, 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c,
             0x2170Ed0880ac9A755fd29B2688956BD959F933F8, 0.02 ether, 9_800);
     }
+
+    /// Camelot V3 on Arbitrum (Algebra 1.9, 2026-10-14): same pool.swap + algebraSwapCallback and the same
+    /// `Pool(token0, token1, pool)` event as Integral, a fee per direction inside the pool. Default pools only.
+    function test_camelotV3_arbitrum() public {
+        vm.createSelectFork(vm.envString("ARB_FORK_RPC"));
+        ChordAlgebraIntegralAdapter a = _adapter(0x1a3c9B1d2F0529D97f2afC5136Cc23e58f1FD35B, address(0), address(0), address(0));
+        // Camelot V3: WETH / USDC (87.2 WETH + 35,087 USDC on 2026-10-14)
+        _roundTrip(a, 0xB1026b8e7276e7AC75410F1fcbbe21796e8f7526, 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1,
+            0xaf88d065e77c8cC2239327C5EDb3A432268e5831, 0.2 ether, 9_900);
+    }
 }
