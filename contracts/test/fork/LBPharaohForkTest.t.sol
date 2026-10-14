@@ -58,4 +58,35 @@ contract LBPharaohForkTest is Test {
             assertEq(got, q, "USDC->WAVAX != getSwapOut");
         }
     }
+
+    /// LFJ Liquidity Book v2.1 (2026-10-14): the same pair-direct adapter with the v2.1 factory pinned beside Pharaoh's, on the
+    /// JOE/WAVAX bin-step-15 pair (the owner-created one KyberSwap routes as `traderjoe-v21`).
+    function test_lbV21_joeWavax_bothWays_matchGetSwapOut() public {
+        address[] memory f = new address[](2);
+        f[0] = FACTORY;
+        f[1] = 0x8e42f2F4101563bF679975178e880FD87d3eFd4e;
+        ChordLBPairAdapter a2 = new ChordLBPairAdapter(ROUTER, f);
+        address joe = 0x6e84a6216eA6dACC71eE8E6b0a5B7322EEbC0fDd;
+        address pair = 0x9f8973FB86b35C307324eC31fd81Cf565E2F4a63;
+        address user = address(0xB0B);
+        bool joeIsX = joe < WAVAX; // LB v2.1 pairs are created with tokenX / tokenY as given; read the side from getSwapOut
+        uint256 amt = 0.3e18; // the pair holds ~3.4 WAVAX on the Y side (2026-10-14): a test-sized order, not a stress
+        deal(WAVAX, address(a2), amt);
+        (, uint128 qa,) = ILBPairQ(pair).getSwapOut(uint128(amt), joeIsX ? false : true);
+        uint256 b0 = IERC20LB(joe).balanceOf(user);
+        vm.prank(ROUTER);
+        uint256 got = a2.swap(WAVAX, joe, amt, user, abi.encode(pair));
+        assertEq(IERC20LB(joe).balanceOf(user) - b0, got);
+        console2.log("WAVAX in", amt, "JOE out", got);
+        assertEq(got, qa, "WAVAX->JOE != getSwapOut");
+        vm.prank(user);
+        IERC20LB(joe).transfer(address(a2), got);
+        (, uint128 qb,) = ILBPairQ(pair).getSwapOut(uint128(got), joeIsX ? true : false);
+        vm.prank(ROUTER);
+        uint256 back = a2.swap(joe, WAVAX, got, user, abi.encode(pair));
+        console2.log("JOE in", got, "WAVAX back", back);
+        assertEq(back, qb, "JOE->WAVAX != getSwapOut");
+        // The pair's own fee (bin step 15: ~0.67 % a side on 2026-10-14) — both legs already equal getSwapOut above.
+        assertGe(back * 10_000 / amt, 9_800, "round trip");
+    }
 }
