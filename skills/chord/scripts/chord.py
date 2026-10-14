@@ -652,8 +652,8 @@ def cmd_simulate(args):
 # A pinned copy of packages/api/src/services/meta/config.ts (a test there keeps the two equal): the API checks its own
 # list, this is the second, independent check before anything reaches a wallet.
 META_ROUTERS = {
-    "chord": {c: [ROUTER] for c in (143, 4663, 5042, 43114, 8453, 56)},
-    "kyberswap": {c: ["0x6131b5fae19ea4f9d964eac0408e4408b66337b5"] for c in (143, 4663, 5042, 43114, 8453, 56)},
+    "chord": {c: [ROUTER] for c in (143, 4663, 5042, 43114, 8453, 56, 42161)},
+    "kyberswap": {c: ["0x6131b5fae19ea4f9d964eac0408e4408b66337b5"] for c in (143, 4663, 5042, 43114, 8453, 56, 42161)},
     "monorail": {143: ["0xa68a7f0601effdc65c64d9c47ca1b18d96b4352c"]},
     "lifi": {
         143: ["0x026f252016a7c47cdef1f05a3fc9e20c92a49c37"],
@@ -662,8 +662,9 @@ META_ROUTERS = {
         43114: ["0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae"],
         8453: ["0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae"],
         56: ["0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae"],
+        42161: ["0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae"],
     },
-    "relay": {c: ["0xccc88a9d1b4ed6b0eaba998850414b24f1c315be", "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f"] for c in (143, 4663, 5042, 43114, 8453, 56)},
+    "relay": {c: ["0xccc88a9d1b4ed6b0eaba998850414b24f1c315be", "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f"] for c in (143, 4663, 5042, 43114, 8453, 56, 42161)},
 }
 PROVIDER_NAMES = {"chord": "Chord router", "kyberswap": "KyberSwap", "monorail": "Monorail", "lifi": "LI.FI", "relay": "Relay"}
 
