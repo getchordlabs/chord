@@ -2,8 +2,9 @@
 
 Non-custodial trading API and AI agent. One quote call finds the best route across the DEXs of eight EVM chains
 (Ethereum, Monad, Robinhood Chain, Arc, Avalanche, Base, BNB Chain and Arbitrum One), and one router contract executes
-it in a single transaction. Next to trading, Chord keeps a live index of swaps, holders, LP positions and wallet PnL on those
-chains and on Solana, which apps and AI agents can query.
+it in a single transaction. On Solana, Chord quotes swaps through its own Solana router and Jupiter and returns an
+unsigned transaction for the user's wallet. Next to trading, Chord keeps a live index of swaps, holders, LP positions and
+wallet PnL on all nine chains, which apps and AI agents can query.
 
 - App (Ask, AI trading agent + wallet): https://getchord.xyz/ask
 - Docs and API reference: https://getchord.xyz/docs
@@ -45,9 +46,10 @@ function-calling manifest at https://api.getchord.xyz/v1/mcp/tools.json.
 | Base | 8453 | yes | tokens, trades, candles, wallet PnL |
 | BNB Chain | 56 | yes | tokens, trades, candles, wallet PnL |
 | Arbitrum One | 42161 | yes | tokens, trades, candles, wallet PnL |
-| Solana | none | no | tokens, trades, candles, wallet PnL, smart traders, LP |
+| Solana | none | yes, through `/v1/sol/trade/*` (not in the MCP tools yet) | tokens, trades, candles, wallet PnL, smart traders, LP |
 
-`GET /v1/chains` answers the same table with the route behind each capability.
+`GET /v1/chains` answers the same table with the route behind each capability (Solana swaps live under
+`/v1/sol/trade/*`, outside that table).
 
 ## What is in this repository
 
@@ -140,6 +142,8 @@ forge test --no-match-contract 'ForkTest$'
 - **Agents**: the stdio agent became a bridge to the hosted MCP server (`02f7201`), wallet trades on every chain
   (`5256c20`), Solana data, smart traders and LP routes in the OpenAPI spec and the skill (`710b14d`, `74957c2`,
   `d13d3ef`), a docs page per network (`0306a08`).
+- **Solana swaps**: Chord's own Solana router and Jupiter in the public docs and the skill (`ee2d912`), open to
+  everyone on Oct 15 (`41b3fdc`).
 
 ## Work done during the Arbitrum Open House Singapore Buildathon (Sep 13 to Oct 4, 2026)
 
