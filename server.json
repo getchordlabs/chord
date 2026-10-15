@@ -2,9 +2,17 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.getchordlabs/chord",
   "title": "Chord",
-  "description": "Swap quotes + unsigned txs on 7 EVM chains, token boards, candles, wallet PnL, smart money. No key.",
-  "version": "1.0.0",
+  "description": "Swap quotes + unsigned txs on 7 EVM chains, plus Solana data: boards, candles, wallet PnL. No key.",
+  "version": "1.1.0",
   "websiteUrl": "https://getchord.xyz/docs/agents/mcp/",
-  "repository": { "url": "https://github.com/getchordlabs/chord", "source": "github" },
-  "remotes": [{ "type": "streamable-http", "url": "https://api.getchord.xyz/v1/mcp" }]
+  "repository": {
+    "url": "https://github.com/getchordlabs/chord",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.getchord.xyz/v1/mcp"
+    }
+  ]
 }
