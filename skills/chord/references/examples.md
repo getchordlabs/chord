@@ -208,13 +208,13 @@ curl -s "https://api.getchord.xyz/v1/chains/bnb/token/0x55d398326f99059ff7754852
 
 The first address is not Tether's USDT on BNB Chain; the canonical one is `0x55d3...7955` (18 decimals).
 
-### B3. Unsupported chain, Solana swap, too many decimals
+### B3. Unsupported chain, Solana swap on the EVM route, too many decimals
 
 ```bash
 python3 scripts/chord.py quote optimism USDC WETH 1
-{"error": "unsupported chain 'optimism'. Chord covers: Monad (143), Robinhood Chain (4663), Arc (5042), Avalanche (43114), Base (8453), BNB Chain (56), Arbitrum One (42161), Ethereum (1), plus Solana data (read-only). It does not cover Optimism, Polygon or other chains."}
+{"error": "unsupported chain 'optimism'. Chord covers: Monad (143), Robinhood Chain (4663), Arc (5042), Avalanche (43114), Base (8453), BNB Chain (56), Arbitrum One (42161), Ethereum (1), plus Solana (data, and swaps under /v1/sol/trade/*). It does not cover Optimism, Polygon or other chains."}
 python3 scripts/chord.py quote solana USDC SOL 1
-{"error": "Solana is read-only in Chord: use 'token solana QUERY', 'price solana MINT', 'board solana' or 'get /v1/chains/solana/...'. Chord does not quote, route or build Solana swaps."}
+{"error": "Solana swaps are not on /v1/quote or /v1/meta: quote one with 'get \"/v1/sol/trade/quote?mint=MINT&side=buy|sell&amount=BASE_UNITS&wallet=WALLET&slippageBps=100\"' (amount = lamports for a buy, the token's smallest unit for a sell; references/solana.md); the user's wallet signs quote.tx unchanged. Solana data: 'token solana QUERY', 'price solana MINT', 'board solana'."}
 python3 scripts/chord.py quote bnb USDT CAKE 10.1234567890123456789
 {"error": "amount '10.1234567890123456789' has 19 decimal places; this token has 18. Ask the user, do not round silently."}
 ```

@@ -7,9 +7,9 @@ description: >-
   Ethereum. Use when the user asks for a token price or chart, the most traded or trending tokens,
   chain or DEX volume, a swap quote or route, an unsigned swap for their own wallet to sign, a
   Robinhood Chain stock token and its gap to the real share, holders, smart-money wallets, a
-  wallet's PnL, liquidity pools, or Chord Ask analysis on these chains. Also Solana data: pump.fun /
-  PumpSwap / Meteora / Raydium / Orca token boards, prices, candles, traders and wallet PnL (Solana
-  swaps are in beta and not open to API keys yet). Do NOT use for other chains (Optimism, Polygon,
+  wallet's PnL, liquidity pools, or Chord Ask analysis on these chains. Also Solana: pump.fun /
+  PumpSwap / Meteora / Raydium / Orca token boards, prices, candles, traders, wallet PnL, and SOL
+  swaps quoted for the user's own wallet. Do NOT use for other chains (Optimism, Polygon,
   TRON...), exchange accounts, perps or limit orders, transfers, withdrawals or bridging, or general
   blockchain education. Chord never signs or moves funds.
 license: MIT
@@ -54,16 +54,16 @@ read that data and prepare swaps carefully. **You never sign, never broadcast, n
 | BNB Chain | 56 | `bnb` | BNB | USDT and USDC (both **18 decimals** here), WBNB | `/v1/chains/bnb/*` |
 | Arbitrum One | 42161 | `arbitrum` | ETH | USDC, USDT0, USDC.e (bridged), WETH | `/v1/chains/arbitrum/*` |
 | Ethereum | 1 | `ethereum` | ETH | USDC, USDT (approve 0 first when an old allowance is left), DAI (18 decimals), WETH | `/v1/chains/ethereum/*` |
-| Solana | none | `solana` | SOL | USDC, USDT, wSOL (base58 mints, case-sensitive) | `/v1/chains/solana/*` (data) · `/v1/sol/trade/*` (swaps, beta) |
+| Solana | none | `solana` | SOL | USDC, USDT, wSOL (base58 mints, case-sensitive) | `/v1/chains/solana/*` (data) · `/v1/sol/trade/*` (swaps) |
 
 `/v1/meta/quote`, `POST /v1/meta/swap`, `/v1/quote`, `POST /v1/swap` and `/v1/candles` work on all
 eight with `chain=<id>`. Always pass it: `/v1/quote` silently defaults to Monad. The zero address means the chain's native gas token (on
 Arc it is an alias for the 6-decimal USDC predeploy). Solana data comes from Chord's tape of 11
 venues (no prop AMMs, no order books, so SOL/USDC is understated) under `/v1/chains/solana/*`; no
 `/v1/quote`, `/v1/meta/*` or `/v1/candles` (`references/solana.md`). Solana swaps are their own
-family, `/v1/sol/trade/*`: Chord's own router and Jupiter, whichever leaves the wallet with more. It is
-in beta: until `GET /v1/sol/trade/config` answers `"allowed": true` for your caller, every other route
-there answers `503 TRADE_NOT_ENABLED`.
+family, `/v1/sol/trade/*`: Chord's own router and Jupiter, whichever leaves the wallet with more. Open to
+everyone since 2026-10-15: quote, confirmation summary, the user's wallet signs `quote.tx` unchanged, then
+`POST /v1/sol/trade/send` (`references/solana.md`).
 
 ## Intent routing
 
@@ -85,7 +85,8 @@ there answers `503 TRADE_NOT_ENABLED`.
 | Buy, sell, swap, convert | meta-quote, confirmation summary (it names the provider and its router), wait for an explicit yes, then `chord.py meta-swap ... --user-confirmed` (wraps `POST /v1/meta/swap`) | `references/quote-and-swap.md` |
 | Will the transaction revert | `chord.py simulate QUOTE_FILE WALLET` (wraps `POST /v1/swap/simulate`) | `references/quote-and-swap.md` |
 | Smart money, best traders | `/v1/smart-money/top?chain=ID&source=onchain&window=7d` (5042, 4663, 143) | `references/data.md` |
-| Anything on Solana: a pump.fun / Meteora / Raydium token, board, chart, who traded it, a wallet's PnL | `chord.py token\|price\|board solana ...`, then `/v1/chains/solana/*` (read-only; never lower-case a mint) | `references/solana.md` |
+| Anything on Solana: a pump.fun / Meteora / Raydium token, board, chart, who traded it, a wallet's PnL | `chord.py token\|price\|board solana ...`, then `/v1/chains/solana/*` (never lower-case a mint) | `references/solana.md` |
+| Buy or sell a Solana token (SOL on one side) | `chord.py get "/v1/sol/trade/quote?mint=MINT&side=buy\|sell&amount=BASE_UNITS&wallet=W&slippageBps=100"`, confirmation summary, explicit yes; the user's wallet signs `quote.tx` unchanged, then `POST /v1/sol/trade/send`, poll `/v1/sol/trade/tx/{sig}` | `references/solana.md` |
 | A wallet's PnL | `/v1/portfolio/{w}/pnl?chain=ID` (5042, 4663, 143) · `/v1/chains/{key}/wallet/{w}` (43114, 8453, 56, 42161, 1) | `references/data.md` |
 | LP pools, fee APR, LP positions | `/v1/lp/pools?chain=ID`, `/v1/lp/positions?chain=ID&owner=W` (5042, 4663, 143) | `references/data.md` |
 | Backtest a strategy (supertrend, EMA cross, RSI, Donchian) on a perp, FX pair or gold | `GET /v1/backtest?symbol=BTC&interval=4h&strategy=supertrend&days=365` (simulated; quote `assumptions` with the result) | `references/data.md` |
@@ -210,9 +211,8 @@ large `staleSec`, say the numbers may be behind.
 
 - **Other chains** (Optimism, Polygon, TRON...): Chord does not
   index or route them. Offer the same pair on a Chord chain if it exists there.
-- **Solana swaps:** in beta, not open to API keys yet. Read `GET /v1/sol/trade/config`; when
-  `allowed` is false, give the data (`references/solana.md`) and say the trade has to happen in the
-  user's own wallet for now. Never describe a quote you could not get.
+- **Solana token ↔ token:** `/v1/sol/trade/*` always has SOL on one side. Offer two swaps through
+  SOL, each with its own confirmation. Never describe a quote you could not get.
 - **Sending, withdrawing, depositing, bridging, buying with a card, exchange accounts:** Chord
   cannot. Point to the user's wallet; still apply the address rules if they share an address.
 - **Perps, leverage, limit or stop orders, copy trading, automation:** Chord does not place them.

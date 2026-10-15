@@ -3,12 +3,22 @@
 Chord reads Solana from its own tape and serves it under `https://api.getchord.xyz/v1/chains/solana/*`.
 Every call is a plain GET, no key needed (60 requests a minute per IP; `X-API-Key` raises it).
 
-**Swaps are in beta and not open to API keys yet.** `/v1/sol/trade/*` quotes SOL ↔ one token by
-building Chord's own route (Raydium, Orca, Meteora, pump.fun, PumpSwap) and Jupiter's for the
-wallet, simulating each, and keeping the one that leaves the wallet with more. Ask
-`GET https://api.getchord.xyz/v1/sol/trade/config` first: unless it says `"allowed": true`, every other
-route there answers `503 TRADE_NOT_ENABLED`. Then, for "buy X on Solana", give the data and say the
-trade happens in the user's own wallet for now.
+**Swaps are open to everyone (since 2026-10-15), no key needed.** `/v1/sol/trade/*` quotes SOL ↔ one
+token by building Chord's own route (Raydium, Orca, Meteora, pump.fun, PumpSwap) and Jupiter's for the
+wallet, simulating each, and keeping the one that leaves the wallet with more. Amounts are base units
+(lamports for a buy, the token's smallest unit for a sell). One swap:
+
+1. `chord.py get "/v1/sol/trade/quote?mint=MINT&side=buy|sell&amount=BASE_UNITS&wallet=W&slippageBps=100"`:
+   `quote.route`, `quote.outAmount` (what the simulation delivered), `quote.minOut`, `quote.tx` (unsigned,
+   base64). Show the confirmation summary and wait for an explicit yes.
+2. The user's wallet signs `quote.tx` UNCHANGED (on `jupiter_meta` the wallet may be the second signer).
+   Chord and this skill never sign.
+3. `POST https://api.getchord.xyz/v1/sol/trade/send` with `{"tx": "<signed base64>"}` (only a
+   transaction Chord quoted in the last three minutes, signed by that wallet), then poll
+   `GET /v1/sol/trade/tx/{signature}` until `confirmed` / `finalized` (`receivedOut`), `failed` or `expired`.
+
+An RFQ quote carries `expireAt` and lives a few seconds: quote again when fewer than ten are left.
+`503 TRADE_NOT_ENABLED` means the lane is switched off on this deployment: give the data instead.
 
 ```bash
 BASE=https://api.getchord.xyz/v1/chains/solana

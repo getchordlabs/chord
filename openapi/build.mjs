@@ -291,7 +291,7 @@ const T = {
   rh: "Robinhood Chain data",
   chains: "Avalanche, Base, BNB Chain",
   sol: "Solana data",
-  solTrade: "Solana swaps (beta)",
+  solTrade: "Solana swaps",
   backtest: "Backtests",
   stream: "Streaming",
   account: "Account and health",
@@ -1092,7 +1092,7 @@ const SOL_TRADE_MINT = "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g";
 const SOL_TRADE_QUOTE_KEY = `/v1/sol/trade/quote?mint=${SOL_TRADE_MINT}&side=buy&amount=1000000000&wallet=${SOL_TRADE_WALLET}&slippageBps=100`;
 const SOL_TRADE_BAL_KEY = `/v1/sol/trade/balances?wallet=${SOL_TRADE_WALLET}&mint=${SOL_TRADE_MINT}`;
 const SOL_TRADE_HOLD_KEY = `/v1/sol/trade/holdings?wallet=${SOL_TRADE_WALLET}`;
-const SOL_TRADE_INTRO = `**Beta, not open yet.** Every route of this family except \`/sol/trade/config\` answers \`503 TRADE_NOT_ENABLED\` unless the caller is on the beta list; \`/sol/trade/config\` says whether yours is.
+const SOL_TRADE_INTRO = `**Open to everyone** since 2026-10-15, no key needed (an \`X-API-Key\` raises the rate limit). \`/sol/trade/config\` says whether the lane is on for the caller; when it is off the other routes answer \`503 TRADE_NOT_ENABLED\`.
 
 A quote is SOL against one token, bought or sold. For every quote Chord builds, for **your wallet**, the transaction of each route — \`direct\` (Chord's own router: Raydium AMM v4 / CPMM / CLMM, Orca Whirlpool, Meteora DLMM / DAMM v2, Meteora DBC, Raydium LaunchLab, pump.fun, PumpSwap; up to two pools), \`jupiter\` (Jupiter's swap API, no Jupiter fee) and \`jupiter_meta\` (Jupiter's order: Metis, its RFQ market makers, DFlow, OKX; Jupiter's fee inside the amount) — simulates each on the chain and returns the one that leaves the wallet with the most: tokens for a buy, SOL for a sell, after every fee. Ties go to \`direct\`, then \`jupiter\`. A route handing back under half of the input's market value is refused.
 
@@ -1336,11 +1336,11 @@ const doc = {
   info: {
     title: "Chord API",
     version: "2026-10-05",
-    summary: "Trade, data and agent endpoints for Arc (5042) and Robinhood Chain (4663), plus chain data for Avalanche (43114), Base (8453), BNB Chain (56), Arbitrum One (42161), Ethereum (1) and Solana (read-only).",
+    summary: "Trade, data and agent endpoints for eight EVM chains (Ethereum 1, Arbitrum One 42161, Base 8453, BNB Chain 56, Avalanche 43114, Monad 143, Arc 5042, Robinhood Chain 4663) and Solana (data and swaps).",
     description: `Chord is a non-custodial trading app and on-chain data index. The API has three kinds of endpoint:
 
 - **Trade**: \`/quote\` finds the best route across every venue on the chain; \`/swap\` turns it into a transaction you sign yourself. Chord never holds funds or keys.
-- **Read**: every swap on the chain, rolled up by token, venue and hour, from Chord's own index — tokens, launches, holders, top wallets, portfolio PnL, liquidity positions and pools. No key needed. Avalanche, Base and BNB Chain have the same rollups under \`/chains/{chain}/*\`; Solana has its own read-only family under \`/chains/solana/*\` (base58 addresses, case-sensitive).
+- **Read**: every swap on the chain, rolled up by token, venue and hour, from Chord's own index — tokens, launches, holders, top wallets, portfolio PnL, liquidity positions and pools. No key needed. Avalanche, Base, BNB Chain, Arbitrum One and Ethereum have the same rollups under \`/chains/{chain}/*\`; Solana has its own data family under \`/chains/solana/*\` (base58 addresses, case-sensitive) and its swaps under \`/sol/trade/*\`.
 - **Agent**: the analyst (\`/ask\`) and the streams.
 
 Amounts are decimal strings in the token's smallest unit. Timestamps are Unix seconds unless the field is \`updatedAt\` (milliseconds). Reads answer anonymous callers at 60 requests a minute per IP; an \`X-API-Key\` header raises that to your plan. Every non-2xx body is \`{ error, message }\`.`,
@@ -1363,7 +1363,7 @@ Amounts are decimal strings in the token's smallest unit. Timestamps are Unix se
     { name: T.rh, description: "Robinhood Chain (chain 4663): chain totals, tokens and tokenized stocks from the rollup tables." },
     { name: T.chains, description: "Avalanche C-Chain (43114), Base (8453), BNB Chain (56), Arbitrum One (42161) and Ethereum (1): chain totals, the 24-hour token board, prints, one token's tape, venue share and a wallet's PnL, from Chord's own index of every swap on those chains. One set of routes, the chain in the path." },
     { name: T.sol, description: "Solana, read-only: chain totals, the 24-hour token board, search, one token's stats, prints, candles and traders, the day's trader board, a wallet's PnL, and liquidity (LP pools, positions, events, LP wallets on Meteora DLMM / DAMM v2, Raydium CLMM and PumpSwap), from Chord's own tape of the swap events of 11 Solana venues (PumpSwap, pump.fun, Meteora, Raydium, Orca). Prop AMMs and order books are not read. Addresses are base58 and case-sensitive; the path segment is the literal `solana`. Read the notes on each operation before comparing these numbers with an all-market source." },
-    { name: T.solTrade, description: "Solana swaps, beta: every quote builds Chord's own route (Raydium, Orca, Meteora, pump.fun, PumpSwap) and Jupiter's for the wallet, simulates them, and returns the one that leaves the wallet with the most; you sign and send it back." },
+    { name: T.solTrade, description: "Solana swaps, open to everyone: every quote builds Chord's own route (Raydium, Orca, Meteora, pump.fun, PumpSwap) and Jupiter's for the wallet, simulates them, and returns the one that leaves the wallet with the most; you sign and send it back." },
     { name: T.backtest, description: "Bar-close strategy backtests over Chord's stored candles: any Hyperliquid perp, 13 FX pairs and metals. Simulated, nothing is traded." },
     { name: T.stream, description: "Server-sent events and the public WebSocket." },
     { name: T.account, description: "Your key, and the service's own health." },

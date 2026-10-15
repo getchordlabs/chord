@@ -6,13 +6,13 @@ to a wallet, and never broadcasts: the most it does is ask the API for an UNSIGN
 only when the caller passes --user-confirmed.
 
 Commands
-  chains                                   the eight chains (+ Solana, data only), their ids, gas tokens and data families
+  chains                                   the eight EVM chains + Solana, their ids, gas tokens and data families
   get PATH                                 GET any public /v1 path, print the JSON
   token CHAIN QUERY                        resolve a symbol, name or 0x address to token candidates
   price CHAIN TOKEN                        price and 24h stats from Chord's index (+ CoinGecko on 43114/8453/56/42161/1)
   board CHAIN [--sort volume] [--limit 10] most traded / moving tokens in the last 24h, compact rows
-                                           token / price / board also take CHAIN = solana (read-only: base58 mints,
-                                           case-sensitive; Chord does not quote or build Solana swaps)
+                                           token / price / board also take CHAIN = solana (base58 mints, case-sensitive);
+                                           a Solana swap is quoted with `get /v1/sol/trade/quote?...` (references/solana.md)
   stock SYMBOL                             one Robinhood Chain stock token: price, reference (NAV), gap, off-hours share
   ask QUESTION [--wallet 0x..]             Chord Ask, one JSON answer (needs CHORD_API_KEY)
   meta-quote CHAIN TOKEN_IN TOKEN_OUT AMOUNT [--wallet 0x..]
@@ -49,7 +49,7 @@ ZERO = "0x0000000000000000000000000000000000000000"
 ROUTER = "0x1b1fee89a381e595fe6536b99ba91f3e16e9601a"
 ARC_USDC = "0x3600000000000000000000000000000000000000"
 ADDR_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
-# Solana (read-only data, /v1/chains/solana/*): base58 addresses are CASE-SENSITIVE. Never lower-case one.
+# Solana (data /v1/chains/solana/*, swaps /v1/sol/trade/*): base58 addresses are CASE-SENSITIVE. Never lower-case one.
 SOL_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
 SOL_KEYS = ("solana", "sol")
 SOL_MAJORS = {"SOL": "So11111111111111111111111111111111111111112", "WSOL": "So11111111111111111111111111111111111111112",
@@ -93,10 +93,10 @@ def is_solana(raw):
 
 def chain_id(raw):
     if is_solana(raw):
-        die("Solana is read-only in Chord: use 'token solana QUERY', 'price solana MINT', 'board solana' or 'get /v1/chains/solana/...'. Chord does not quote, route or build Solana swaps.")
+        die("Solana swaps are not on /v1/quote or /v1/meta: quote one with 'get \"/v1/sol/trade/quote?mint=MINT&side=buy|sell&amount=BASE_UNITS&wallet=WALLET&slippageBps=100\"' (amount = lamports for a buy, the token's smallest unit for a sell; references/solana.md); the user's wallet signs quote.tx unchanged. Solana data: 'token solana QUERY', 'price solana MINT', 'board solana'.")
     cid = ALIASES.get(str(raw).strip().lower().replace(" ", "-"))
     if cid is None:
-        die(f"unsupported chain '{raw}'. Chord covers: " + ", ".join(f"{v['name']} ({k})" for k, v in CHAINS.items()) + ", plus Solana data (read-only). It does not cover Optimism, Polygon or other chains.")
+        die(f"unsupported chain '{raw}'. Chord covers: " + ", ".join(f"{v['name']} ({k})" for k, v in CHAINS.items()) + ", plus Solana (data, and swaps under /v1/sol/trade/*). It does not cover Optimism, Polygon or other chains.")
     return cid
 
 
@@ -342,7 +342,7 @@ def cmd_board(args):
     print(json.dumps({"chain": {"id": cid, "name": CHAINS[cid]["name"]}, "sort": sort, "window": "24h", "source": "Chord index", **meta, "rows": rows}, indent=1))
 
 
-# -- Solana (read-only) ---------------------------------------------------------------------------
+# -- Solana data -----------------------------------------------------------------------------------
 def sol_api(path):
     d = api("/v1/chains/solana" + path)
     if isinstance(d, dict) and "__http_error__" in d:
@@ -454,8 +454,8 @@ def cmd_ask(args):
 
 def cmd_chains(_args):
     rows = [{"chainId": k, "key": v["key"], "name": v["name"], "gasToken": v["gas"], "dataEndpoints": v["family"], "quoteAndSwap": True} for k, v in CHAINS.items()]
-    rows.append({"chainId": None, "key": "solana", "name": "Solana", "gasToken": "SOL", "dataEndpoints": "/v1/chains/solana/*", "quoteAndSwap": False})
-    print(json.dumps({"chains": rows, "router": ROUTER, "note": "The eight EVM chains answer /v1/quote, POST /v1/swap and /v1/candles with ?chain=<id>. Solana is data only, under /v1/chains/solana/* (no chain id; base58 addresses, case-sensitive)."}, indent=1))
+    rows.append({"chainId": None, "key": "solana", "name": "Solana", "gasToken": "SOL", "dataEndpoints": "/v1/chains/solana/*", "quoteAndSwap": "/v1/sol/trade/* (not /v1/quote)"})
+    print(json.dumps({"chains": rows, "router": ROUTER, "note": "The eight EVM chains answer /v1/quote, POST /v1/swap and /v1/candles with ?chain=<id>. Solana has no chain id: data under /v1/chains/solana/*, swaps under /v1/sol/trade/* (base58 addresses, case-sensitive)."}, indent=1))
 
 
 def cmd_get(args):

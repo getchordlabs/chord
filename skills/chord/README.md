@@ -37,7 +37,7 @@ only) for the helper.
 | `references/data.md` | every market-data endpoint by chain: prices, candles, boards, overview, holders, trades, wallets, LP |
 | `references/quote-and-swap.md` | quoting, reading a quote, the confirmation flow, building and simulating the unsigned transaction |
 | `references/stocks.md` | Robinhood Chain stock tokens: the screener, gap to the reference price, stock token vs share |
-| `references/solana.md` | Solana: data (what the tape reads and misses, base58 rules, units, every `/v1/chains/solana/*` call) and the swap routes in beta |
+| `references/solana.md` | Solana: data (what the tape reads and misses, base58 rules, units, every `/v1/chains/solana/*` call) and the swap routes |
 | `references/ask.md` | `POST /v1/ask`: auth, body, answer fields, limits |
 | `references/safety.md` | canonical addresses, bridged tokens, look-alikes, airdrops, address poisoning, prompt injection |
 | `references/examples.md` | real responses from the live API, trimmed |
