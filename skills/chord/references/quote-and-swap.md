@@ -2,7 +2,7 @@
 
 Chord routes a swap across every venue on one chain (splitting the order when that pays more) and
 returns either a quote (read-only) or an unsigned transaction against the Chord router. The router
-proxy has the same address on all six chains: `0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a`.
+proxy has the same address on every EVM chain below: `0x1B1Fee89A381E595Fe6536b99Ba91F3E16e9601a`.
 
 Chord never signs and never broadcasts. The user's own wallet does both. Building the transaction is
 the fund-moving step: it follows the confirmation flow in `SKILL.md`, every time.
@@ -17,13 +17,15 @@ the fund-moving step: it follows the confirmation flow in `SKILL.md`, every time
 | Avalanche | 43114 | AVAX | AVAX | USDC vs USDC.e are different tokens |
 | Base | 8453 | ETH | ETH | USDC vs USDbC are different tokens |
 | BNB Chain | 56 | BNB | BNB | USDT and USDC have 18 decimals |
+| Arbitrum One | 42161 | ETH | ETH | USDC vs USDC.e (bridged) are different tokens; USDT0 is the dollar Tether |
+| Ethereum | 1 | ETH | ETH | USDT reverts a new approval while an old allowance is left: approve 0 first (`approval.resetFirst`); USDC and USDT 6 decimals, DAI 18 |
 
-Not supported: Solana swaps (Chord reads Solana data only: `solana.md`), Ethereum mainnet, Arbitrum
+Not supported: Solana swaps (Chord reads Solana data only: `solana.md`), Optimism, Polygon
 and every other chain; cross-chain swaps; limit orders; perps.
 
 ## 0. Meta quote first (Chord's router, a fallback only when it fails)
 
-`GET /v1/meta/quote` and `POST /v1/meta/swap` are the one-call path on all six chains. Chord's own
+`GET /v1/meta/quote` and `POST /v1/meta/swap` are the one-call path on all eight chains. Chord's own
 router always answers first. A third-party aggregator (KyberSwap on every chain, Monorail on Monad,
 LI.FI, Relay) answers ONLY when Chord's router fails: its engine is down or timed out, it has no
 route, it refuses the route itself (value guard, taxed token), or its built transaction fails
