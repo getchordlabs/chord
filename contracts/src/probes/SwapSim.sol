@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
 /// @title SwapSim — run an unsigned swap AS the taker and measure what the taker ends up with

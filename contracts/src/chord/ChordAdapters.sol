@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
 import {UniV3AnyForkAdapter} from "../adapters/UniV3AnyForkAdapter.sol";

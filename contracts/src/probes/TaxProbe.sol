@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
 /// @title TaxProbe / TaxScratch — measure a token's transfer tax through eth_call state overrides

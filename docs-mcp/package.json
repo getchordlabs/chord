@@ -2,6 +2,7 @@
   "name": "@nullterminal/docs-mcp",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Chord Docs MCP — search and read the Chord developer docs and API reference from any MCP client (stdio locally, Streamable HTTP at getchord.xyz/docs/mcp)",
   "bin": { "chord-docs-mcp": "./stdio.mjs" },
