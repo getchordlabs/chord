@@ -830,7 +830,7 @@ def cmd_meta_swap(args):
         "providerName": s["providerName"],
         "fallbackReason": s["fallbackReason"],
         "transaction": m.get("tx"),
-        "approval": None if not m.get("approval") else dict(m["approval"], note="Approve exactly this amount (not unlimited) to this spender before the swap."),
+        "approval": None if not m.get("approval") else dict(m["approval"], note=("This token (USDT on Ethereum) reverts a new approval while an old one is left: approve 0 to this spender first, then exactly this amount, then swap." if m["approval"].get("resetFirst") else "Approve exactly this amount (not unlimited) to this spender before the swap.")),
         "simulation": m.get("simulation"),
         "summary": {k: s.get(k) for k in ("sell", "buy", "expectedOutAfterFee", "minimumReceived", "priceImpactPct", "valueLossPct", "route")},
         "warnings": m.get("warnings") or [],

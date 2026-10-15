@@ -253,7 +253,7 @@ const MetaQuote = obj({
   feeRecipient: nullable(ADDRESS),
   route: obj({ venues: arr(str(""), "Venue names.") }),
   tx: nullable(obj({ to: ADDRESS, data: str("Calldata."), value: WEI, gas: nullable(str("Gas limit to sign with.")), chainId: int("") }, "The UNSIGNED transaction. `null` without `taker`. `to` is the Chord router when `provider` is `chord`, the provider's own router otherwise.")),
-  approval: nullable(obj({ token: ADDRESS, spender: ADDRESS, amount: WEI }, "The approval to send first. `null` for a native input or when the taker's allowance already covers the amount.")),
+  approval: nullable(obj({ token: ADDRESS, spender: ADDRESS, amount: WEI, resetFirst: { type: "boolean", description: "Present only for a token that reverts `approve(x > 0)` while its allowance is non-zero (USDT on Ethereum). `true` = the taker has a left-over allowance: send `approve(spender, 0)` first, then this approval." } }, "The approval to send first. `null` for a native input or when the taker's allowance already covers the amount.")),
   simulation: nullable(obj({ ok: nullable(bool("`true` = ran and delivered at least `minAmountOut`; `null` = no verdict (only ever returned on the Chord path).")), amountOut: WEI, gasUsed: int(""), revert: str(""), reason: str("") }, "The transaction run as the taker (with the input supplied when the taker does not hold it), measuring the taker's own balance change. `null` without `taker`.")),
   safety: nullable(obj({ source: str("`goplus`"), token: ADDRESS, worstFlag: str("`none`, `low`, `medium`, `high`."), honeypot: nullable(bool("")), buyTaxPct: nullable(num("")), sellTaxPct: nullable(num("")), risks: arr(str("")) }, "A security scan of the unknown token, present when the value check could not run on a fallback answer.")),
   warnings: arr(str(""), "`INSUFFICIENT_BALANCE`, `UNPRICED`, `OUTPUT_WRAPPED`, `NO_ROUTE`, and on a price-only fallback `PRICE_CHECKED` (built and simulated for a placeholder wallet) or `UNVERIFIED_PRICE` (built, not simulatable) — each followed by a sentence."),
@@ -398,7 +398,7 @@ add("/meta/swap", "post", op(T.meta, "metaSwap", "Unsigned transaction on any ch
 Send the pair and amount, or the \`quoteId\` of a \`/meta/quote\` answer from the last 2 minutes. The policy runs again at the current state, so \`provider\` can differ from the quote's: compare before you sign.
 
 **Before signing**
-- \`approval\` not null: send \`token.approve(spender, amount)\` first. \`spender\` is \`tx.to\`.
+- \`approval\` not null: send \`token.approve(spender, amount)\` first. \`spender\` is \`tx.to\`. With \`approval.resetFirst: true\` (USDT on Ethereum, a left-over allowance) send \`approve(spender, 0)\` before it.
 - When \`provider\` is not \`chord\`, \`tx.to\` is that aggregator's router. Show the user which provider it is.
 
 ${META_POLICY}`,

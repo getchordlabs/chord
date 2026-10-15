@@ -57,7 +57,7 @@ The same shape whichever provider answered:
 | `feeBps`, `feeRecipient` | Chord path: Chord's fee and its FeeCollector. Fallback: the integrator fee Chord added (0 today); the provider's own fees are already inside `amountOut` |
 | `route.venues` | venue names |
 | `tx` | `{to, data, value, gas, chainId}`, unsigned; `null` without `taker` |
-| `approval` | `{token, spender, amount}` to send first, or `null` (native input, or the allowance already covers it) |
+| `approval` | `{token, spender, amount}` to send first, or `null` (native input, or the allowance already covers it). `resetFirst: true` (USDT on Ethereum with a left-over allowance) = send `approve(spender, 0)` before it |
 | `simulation` | the transaction run as the taker with the input supplied: `{ok, amountOut, gasUsed}`; a fallback transaction is only returned with `ok: true` |
 | `safety` | a GoPlus scan of the unknown token when the value check could not run |
 | `warnings` | `INSUFFICIENT_BALANCE`, `UNPRICED`, `OUTPUT_WRAPPED`, `NO_ROUTE` |
