@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {NullRouter} from "../../src/NullRouter.sol";
 import {INullRouter} from "../../src/interfaces/INullRouter.sol";
@@ -132,7 +133,9 @@ abstract contract ForkSwapHelpers is Test {
             adapter: adapter, tokenIn: tokenIn, tokenOut: tokenOut, amountIn: amountIn, extraData: extraData
         });
         vm.startPrank(user);
-        IERC20(tokenIn).approve(address(router), amountIn);
+        // forceApprove: Ethereum USDT returns nothing from approve (an IERC20 call would fail to decode) and
+        // refuses a non-zero → non-zero change; standard tokens take the same single approve.
+        SafeERC20.forceApprove(IERC20(tokenIn), address(router), amountIn);
         uint256 before = IERC20(tokenOut).balanceOf(user);
         uint256 g = gasleft();
         out = router.swap(tokenIn, tokenOut, amountIn, 1, block.timestamp + 600, step, address(0));
