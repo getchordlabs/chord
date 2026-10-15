@@ -3,7 +3,7 @@
   "name": "io.github.getchordlabs/chord",
   "title": "Chord",
   "description": "Swap quotes + unsigned txs on 7 EVM chains, plus Solana data: boards, candles, wallet PnL. No key.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "websiteUrl": "https://getchord.xyz/docs/agents/mcp/",
   "repository": {
     "url": "https://github.com/getchordlabs/chord",
@@ -13,6 +13,15 @@
     {
       "type": "streamable-http",
       "url": "https://api.getchord.xyz/v1/mcp"
+    }
+  ],
+  "icons": [
+    {
+      "src": "https://getchord.xyz/chord/pwa-512x512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
     }
   ]
 }
