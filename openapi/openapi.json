@@ -77,6 +77,10 @@
       "description": "Solana, read-only: chain totals, the 24-hour token board, search, one token's stats, prints, candles and traders, the day's trader board, a wallet's PnL, and liquidity (LP pools, positions, events, LP wallets on Meteora DLMM / DAMM v2, Raydium CLMM and PumpSwap), from Chord's own tape of the swap events of 11 Solana venues (PumpSwap, pump.fun, Meteora, Raydium, Orca). Prop AMMs and order books are not read. Addresses are base58 and case-sensitive; the path segment is the literal `solana`. Read the notes on each operation before comparing these numbers with an all-market source."
     },
     {
+      "name": "Solana swaps (beta)",
+      "description": "Solana swaps, beta: every quote builds Chord's own route (Raydium, Orca, Meteora, pump.fun, PumpSwap) and Jupiter's for the wallet, simulates them, and returns the one that leaves the wallet with the most; you sign and send it back."
+    },
+    {
       "name": "Backtests",
       "description": "Bar-close strategy backtests over Chord's stored candles: any Hyperliquid perp, 13 FX pairs and metals. Simulated, nothing is traded."
     },
@@ -23544,6 +23548,944 @@
         }
       }
     },
+    "/sol/trade/config": {
+      "get": {
+        "tags": [
+          "Solana swaps (beta)"
+        ],
+        "operationId": "solTradeConfig",
+        "summary": "May this caller trade",
+        "description": "`enabled` = the lane is on in this deployment, `open` = open to everyone, `allowed` = open to the caller who asks (a beta account, or everyone once `open`). Never gated, never cached.\n\n**Beta, not open yet.** Every route of this family except `/sol/trade/config` answers `503 TRADE_NOT_ENABLED` unless the caller is on the beta list; `/sol/trade/config` says whether yours is.\n\nA quote is SOL against one token, bought or sold. For every quote Chord builds, for **your wallet**, the transaction of each route — `direct` (Chord's own router: Raydium AMM v4 / CPMM / CLMM, Orca Whirlpool, Meteora DLMM / DAMM v2, Meteora DBC, Raydium LaunchLab, pump.fun, PumpSwap; up to two pools), `jupiter` (Jupiter's swap API, no Jupiter fee) and `jupiter_meta` (Jupiter's order: Metis, its RFQ market makers, DFlow, OKX; Jupiter's fee inside the amount) — simulates each on the chain and returns the one that leaves the wallet with the most: tokens for a buy, SOL for a sell, after every fee. Ties go to `direct`, then `jupiter`. A route handing back under half of the input's market value is refused.\n\nAmounts are base units as decimal strings: lamports for SOL, the token's smallest unit otherwise. Addresses are base58, case-sensitive. Chord takes no fee on Solana today. Nothing is signed by Chord: you sign `quote.tx` unchanged and send it back.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "description": ""
+                    },
+                    "open": {
+                      "type": "boolean",
+                      "description": ""
+                    },
+                    "allowed": {
+                      "type": "boolean",
+                      "description": ""
+                    }
+                  }
+                },
+                "example": {
+                  "enabled": true,
+                  "open": false,
+                  "allowed": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sol/trade/quote": {
+      "get": {
+        "tags": [
+          "Solana swaps (beta)"
+        ],
+        "operationId": "solTradeQuote",
+        "summary": "Best quote: Chord's route or Jupiter's",
+        "description": "The quote of the route that leaves the wallet with the most, its unsigned transaction, and what every route offered (`compared`). `ok: false` with `quote: null` and a `reason` is an answer (no route for this token, size or wallet), not an error.\n\n**Beta, not open yet.** Every route of this family except `/sol/trade/config` answers `503 TRADE_NOT_ENABLED` unless the caller is on the beta list; `/sol/trade/config` says whether yours is.\n\nA quote is SOL against one token, bought or sold. For every quote Chord builds, for **your wallet**, the transaction of each route — `direct` (Chord's own router: Raydium AMM v4 / CPMM / CLMM, Orca Whirlpool, Meteora DLMM / DAMM v2, Meteora DBC, Raydium LaunchLab, pump.fun, PumpSwap; up to two pools), `jupiter` (Jupiter's swap API, no Jupiter fee) and `jupiter_meta` (Jupiter's order: Metis, its RFQ market makers, DFlow, OKX; Jupiter's fee inside the amount) — simulates each on the chain and returns the one that leaves the wallet with the most: tokens for a buy, SOL for a sell, after every fee. Ties go to `direct`, then `jupiter`. A route handing back under half of the input's market value is refused.\n\nAmounts are base units as decimal strings: lamports for SOL, the token's smallest unit otherwise. Addresses are base58, case-sensitive. Chord takes no fee on Solana today. Nothing is signed by Chord: you sign `quote.tx` unchanged and send it back.",
+        "parameters": [
+          {
+            "name": "mint",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "The token."
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "buy",
+                "sell"
+              ]
+            },
+            "description": "`buy` = SOL in, token out · `sell` = token in, SOL out."
+          },
+          {
+            "name": "amount",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,19}$"
+            },
+            "description": "Input in base units: lamports for a buy, the token's smallest unit for a sell."
+          },
+          {
+            "name": "wallet",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "The wallet that will sign: every route is simulated for it, so it must hold the input (and SOL for fees)."
+          },
+          {
+            "name": "slippageBps",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000,
+              "default": 100
+            },
+            "description": "Tolerance that sets `minOut`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "description": ""
+                    },
+                    "quote": {
+                      "$ref": "#/components/schemas/SolTradeQuote",
+                      "type": [
+                        null,
+                        "null"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "not_a_token",
+                        "bad_request",
+                        "no_pool",
+                        "no_template",
+                        "no_route",
+                        "wallet_cannot",
+                        "pool_limit",
+                        "no_output",
+                        "simulation_failed",
+                        "too_large",
+                        "error",
+                        "off"
+                      ],
+                      "description": "Why a route has no quote. `wallet_cannot` (no funds, or no token account), `pool_limit` (a size the pool refuses, or under half the market value) and `no_output` are about the request; `no_pool` = the route does not cover this token; `simulation_failed`, `too_large`, `error` = the route failed; `off` = not asked or switched off."
+                    },
+                    "detail": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "compared": {
+                      "type": "object",
+                      "properties": {
+                        "direct": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "ok": {
+                                  "type": "boolean",
+                                  "const": true
+                                },
+                                "outAmount": {
+                                  "type": "string",
+                                  "pattern": "^\\d+$",
+                                  "description": "Base units as a decimal string (lamports for SOL)."
+                                },
+                                "measured": {
+                                  "type": "string",
+                                  "enum": [
+                                    "simulated",
+                                    "quoted"
+                                  ],
+                                  "description": "`simulated` = read from a simulation of the route's own transaction; `quoted` = Jupiter's own figure, shown when a route already in hand gives at least that much, so Jupiter's transaction was not built."
+                                },
+                                "networkFeeLamports": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "description": ""
+                                },
+                                "units": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "description": "Compute units."
+                                },
+                                "ms": {
+                                  "type": "number",
+                                  "description": ""
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "ok": {
+                                  "type": "boolean",
+                                  "const": false
+                                },
+                                "reason": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_a_token",
+                                    "bad_request",
+                                    "no_pool",
+                                    "no_template",
+                                    "no_route",
+                                    "wallet_cannot",
+                                    "pool_limit",
+                                    "no_output",
+                                    "simulation_failed",
+                                    "too_large",
+                                    "error",
+                                    "off"
+                                  ],
+                                  "description": "Why a route has no quote. `wallet_cannot` (no funds, or no token account), `pool_limit` (a size the pool refuses, or under half the market value) and `no_output` are about the request; `no_pool` = the route does not cover this token; `simulation_failed`, `too_large`, `error` = the route failed; `off` = not asked or switched off."
+                                },
+                                "detail": {
+                                  "type": "string",
+                                  "description": "What the route said, for a human."
+                                },
+                                "ms": {
+                                  "type": "number",
+                                  "description": ""
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "jupiter": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "ok": {
+                                  "type": "boolean",
+                                  "const": true
+                                },
+                                "outAmount": {
+                                  "type": "string",
+                                  "pattern": "^\\d+$",
+                                  "description": "Base units as a decimal string (lamports for SOL)."
+                                },
+                                "measured": {
+                                  "type": "string",
+                                  "enum": [
+                                    "simulated",
+                                    "quoted"
+                                  ],
+                                  "description": "`simulated` = read from a simulation of the route's own transaction; `quoted` = Jupiter's own figure, shown when a route already in hand gives at least that much, so Jupiter's transaction was not built."
+                                },
+                                "networkFeeLamports": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "description": ""
+                                },
+                                "units": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "description": "Compute units."
+                                },
+                                "ms": {
+                                  "type": "number",
+                                  "description": ""
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "ok": {
+                                  "type": "boolean",
+                                  "const": false
+                                },
+                                "reason": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_a_token",
+                                    "bad_request",
+                                    "no_pool",
+                                    "no_template",
+                                    "no_route",
+                                    "wallet_cannot",
+                                    "pool_limit",
+                                    "no_output",
+                                    "simulation_failed",
+                                    "too_large",
+                                    "error",
+                                    "off"
+                                  ],
+                                  "description": "Why a route has no quote. `wallet_cannot` (no funds, or no token account), `pool_limit` (a size the pool refuses, or under half the market value) and `no_output` are about the request; `no_pool` = the route does not cover this token; `simulation_failed`, `too_large`, `error` = the route failed; `off` = not asked or switched off."
+                                },
+                                "detail": {
+                                  "type": "string",
+                                  "description": "What the route said, for a human."
+                                },
+                                "ms": {
+                                  "type": "number",
+                                  "description": ""
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "jupiterMeta": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "ok": {
+                                  "type": "boolean",
+                                  "const": true
+                                },
+                                "outAmount": {
+                                  "type": "string",
+                                  "pattern": "^\\d+$",
+                                  "description": "Base units as a decimal string (lamports for SOL)."
+                                },
+                                "measured": {
+                                  "type": "string",
+                                  "enum": [
+                                    "simulated",
+                                    "quoted"
+                                  ],
+                                  "description": "`simulated` = read from a simulation of the route's own transaction; `quoted` = Jupiter's own figure, shown when a route already in hand gives at least that much, so Jupiter's transaction was not built."
+                                },
+                                "networkFeeLamports": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "description": ""
+                                },
+                                "units": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "description": "Compute units."
+                                },
+                                "ms": {
+                                  "type": "number",
+                                  "description": ""
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "ok": {
+                                  "type": "boolean",
+                                  "const": false
+                                },
+                                "reason": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_a_token",
+                                    "bad_request",
+                                    "no_pool",
+                                    "no_template",
+                                    "no_route",
+                                    "wallet_cannot",
+                                    "pool_limit",
+                                    "no_output",
+                                    "simulation_failed",
+                                    "too_large",
+                                    "error",
+                                    "off"
+                                  ],
+                                  "description": "Why a route has no quote. `wallet_cannot` (no funds, or no token account), `pool_limit` (a size the pool refuses, or under half the market value) and `no_output` are about the request; `no_pool` = the route does not cover this token; `simulation_failed`, `too_large`, `error` = the route failed; `off` = not asked or switched off."
+                                },
+                                "detail": {
+                                  "type": "string",
+                                  "description": "What the route said, for a human."
+                                },
+                                "ms": {
+                                  "type": "number",
+                                  "description": ""
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "description": "What each route offered. `direct` is the better of the pump route and Chord's router."
+                    },
+                    "ms": {
+                      "type": "number",
+                      "description": ""
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true,
+                  "quote": {
+                    "ok": true,
+                    "route": "direct",
+                    "mint": "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g",
+                    "side": "buy",
+                    "inAmount": "1000000000",
+                    "outAmount": "1291169314",
+                    "minOut": "1278257620",
+                    "slippageBps": 100,
+                    "feeLamports": "0",
+                    "feeBps": 0,
+                    "networkFeeLamports": 13462,
+                    "units": 53847,
+                    "walletLamportsDelta": "-1001501902",
+                    "tx": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAQAJF36MCIdgv94d3c8ywX8gm4JC7lKq8TH6zYjQ6ixtCwbybQ/ffN89KMzS1moKr3xD+eaLjFLD93Uu7/6fCChoRW+33r5/N5kXzVmVKDnDCPuAkyP2Gtb/z4vZXn9rJrNgnlYtVRIeQFP9RCTKJ4QcFXTmTFrjug4KMZNwxfvPi59T3FuLdqms3IWcwYxorNprzTnpS/UIS8cr22A9a0z5hMQguKAAE9blFXzMeY2Ul+aVjNz5CWJMPZFyDxSfYLteeLFBAdK4u9M26/E24V6FVw6ivZ7F6IKKhmtyA8AUTfymAHzJZSEoI1LREgsRMMb+c3W9Pk5HT+Ci3aCI/WgF+bbdWqpQ+Iq9Y9M30s68O5hGfLeLdlEbgXgDuUWpI64G0UeeEGWqwXbkX0swI7SX5eIdaHc3Qyw0ilOG3FwaVKK3wRwJ7Hd/cQIYGczxT34DxoMVJNeXfeJLQyrGn/5CRYApa3YIBFLBUkXofOcSUKM6WFvxPe9wsqWKl3DHs4sghgHyPnPlSprtPOAV8DiJLgrp8nHRCYh08HSC9eHtCKRKNckuzi1T27nDcSwt5D+6EBI+n21RbgNj47MiJk7XsmsDBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAIyXJY9OJInxuz0QKRSODYMLWhOZ2v8QhASOe9jb6fhZBpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAbd9uHXZaGT2cvhRs7reawctIXtX1s3kTqM9YV+/wCpeOF/+c+e8osV49WDJ0Hs54BOB9XJf0LvM+1fBZx0kl8E6eEvvIToJskyzOniZAzOFVkMHGJzsJJXCLo7hSCwvAVKU1qZKSEGTSTocWDaOHx8NbXdvJK7geQfqEBBBUSNsnDWf6mMUc8CEwUTWJYrrzV0K+1ZydlEXpwNDIXHzZF54KJrKMEZBlNIu3jg6xTnaDFVOdmUnu4hys0zsh+wiAgOAAUCiUoBAA4ACQOghgEAAAAAAA8GAAEAEBESAQEPBgACABMREgEBEQIAAQwCAAAAAMqaOwAAAAASAQEBERQWAwQFBgECEBMHFAASEhUWFAgJCgsMDRxBSz9M61tbiADKmjsAAAAA1KkwTAAAAAAAAAAAEgMBAAABCQA=",
+                    "txBytes": 962,
+                    "blockhash": "9CkzxZDnrGUqa6v7wWKq3jMxYFkLvqE1c8ogo7DURJjq",
+                    "lastValidBlockHeight": 435407004,
+                    "simulatedSlot": 457371000,
+                    "ms": 269,
+                    "venue": "meteora_dlmm",
+                    "pool": "6oQ9wVex4mKZti2GsGCfD8FWTMMC9PLQkztRU5cd6MK8",
+                    "hops": [
+                      {
+                        "label": "Meteora DLMM",
+                        "pool": "6oQ9wVex4mKZti2GsGCfD8FWTMMC9PLQkztRU5cd6MK8",
+                        "percent": 100
+                      }
+                    ]
+                  },
+                  "compared": {
+                    "direct": {
+                      "ok": true,
+                      "outAmount": "1291169314",
+                      "measured": "simulated",
+                      "networkFeeLamports": 13462,
+                      "units": 53847,
+                      "ms": 269
+                    },
+                    "jupiter": {
+                      "ok": true,
+                      "outAmount": "1291041752",
+                      "measured": "simulated",
+                      "networkFeeLamports": 23574,
+                      "units": 149660,
+                      "ms": 128
+                    },
+                    "jupiterMeta": {
+                      "ok": true,
+                      "outAmount": "1289637269",
+                      "measured": "simulated",
+                      "networkFeeLamports": 0,
+                      "units": 25294,
+                      "ms": 350
+                    }
+                  },
+                  "ms": 392
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS` / `BAD_SIDE` / `BAD_AMOUNT` / `BAD_SLIPPAGE`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`TRADE_BAD_ANSWER`: the Solana box answered something that is not the quote asked for (another mint, side, amount, tolerance or fee payer, or an unknown shape). Nothing is forwarded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`TRADE_NOT_ENABLED` (the lane is off on this deployment, or not open to this caller yet) or `TRADE_UNAVAILABLE` (the Solana box did not answer). Retry later; do not read it as \"no route\".",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sol/trade/send": {
+      "post": {
+        "tags": [
+          "Solana swaps (beta)"
+        ],
+        "operationId": "solTradeSend",
+        "summary": "Send the signed quote",
+        "description": "Relays a transaction Chord quoted in the last three minutes, signed by the wallet it was quoted for — anything else is refused. Chord sends it to several RPC providers and again every 2 seconds until it lands or its blockhash expires; a `jupiter_meta` order goes through Jupiter's execute endpoint instead (Jupiter or the market maker adds its signature). Then poll `/sol/trade/tx/{signature}`.\n\n**Beta, not open yet.** Every route of this family except `/sol/trade/config` answers `503 TRADE_NOT_ENABLED` unless the caller is on the beta list; `/sol/trade/config` says whether yours is.\n\nA quote is SOL against one token, bought or sold. For every quote Chord builds, for **your wallet**, the transaction of each route — `direct` (Chord's own router: Raydium AMM v4 / CPMM / CLMM, Orca Whirlpool, Meteora DLMM / DAMM v2, Meteora DBC, Raydium LaunchLab, pump.fun, PumpSwap; up to two pools), `jupiter` (Jupiter's swap API, no Jupiter fee) and `jupiter_meta` (Jupiter's order: Metis, its RFQ market makers, DFlow, OKX; Jupiter's fee inside the amount) — simulates each on the chain and returns the one that leaves the wallet with the most: tokens for a buy, SOL for a sell, after every fee. Ties go to `direct`, then `jupiter`. A route handing back under half of the input's market value is refused.\n\nAmounts are base units as decimal strings: lamports for SOL, the token's smallest unit otherwise. Addresses are base58, case-sensitive. Chord takes no fee on Solana today. Nothing is signed by Chord: you sign `quote.tx` unchanged and send it back.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tx": {
+                    "type": "string",
+                    "description": "`quote.tx` signed by the wallet, base64. Do not change the message."
+                  }
+                },
+                "required": [
+                  "tx"
+                ]
+              },
+              "example": {
+                "tx": "<base64 signed transaction>"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "description": ""
+                    },
+                    "signature": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,88}$",
+                      "description": "Transaction signature, base58."
+                    },
+                    "status": {
+                      "$ref": "#/components/schemas/SolTradeTx"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": ""
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_TRANSACTION` (not a transaction, or not base64) · `UNKNOWN_TRANSACTION` (not one a quote handed out in the last three minutes, or changed before signing — ask for a new quote) · `NOT_SIGNED` / `BAD_SIGNATURE` (not signed by the quoted wallet).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`SEND_FAILED`: no RPC accepted the transaction.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`TRADE_NOT_ENABLED` (the lane is off on this deployment, or not open to this caller yet) or `TRADE_UNAVAILABLE` (the Solana box did not answer). Retry later; do not read it as \"no route\".",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sol/trade/tx/{signature}": {
+      "get": {
+        "tags": [
+          "Solana swaps (beta)"
+        ],
+        "operationId": "solTradeTx",
+        "summary": "Status of a sent swap",
+        "description": "`pending` until the transaction is in a block, then `confirmed` / `finalized` with `receivedOut`, or `failed` / `expired` (its blockhash ran out; an RFQ order unseen for two minutes). Only transactions sent through `/sol/trade/send`.\n\n**Beta, not open yet.** Every route of this family except `/sol/trade/config` answers `503 TRADE_NOT_ENABLED` unless the caller is on the beta list; `/sol/trade/config` says whether yours is.\n\nA quote is SOL against one token, bought or sold. For every quote Chord builds, for **your wallet**, the transaction of each route — `direct` (Chord's own router: Raydium AMM v4 / CPMM / CLMM, Orca Whirlpool, Meteora DLMM / DAMM v2, Meteora DBC, Raydium LaunchLab, pump.fun, PumpSwap; up to two pools), `jupiter` (Jupiter's swap API, no Jupiter fee) and `jupiter_meta` (Jupiter's order: Metis, its RFQ market makers, DFlow, OKX; Jupiter's fee inside the amount) — simulates each on the chain and returns the one that leaves the wallet with the most: tokens for a buy, SOL for a sell, after every fee. Ties go to `direct`, then `jupiter`. A route handing back under half of the input's market value is refused.\n\nAmounts are base units as decimal strings: lamports for SOL, the token's smallest unit otherwise. Addresses are base58, case-sensitive. Chord takes no fee on Solana today. Nothing is signed by Chord: you sign `quote.tx` unchanged and send it back.",
+        "parameters": [
+          {
+            "name": "signature",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,88}$",
+              "description": "Transaction signature, base58."
+            },
+            "description": "From `/sol/trade/send`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolTradeTx"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_SIGNATURE`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`TX_NOT_FOUND`: not a transaction sent through this API, or done more than 15 minutes ago.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`TRADE_NOT_ENABLED` (the lane is off on this deployment, or not open to this caller yet) or `TRADE_UNAVAILABLE` (the Solana box did not answer). Retry later; do not read it as \"no route\".",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sol/trade/balances": {
+      "get": {
+        "tags": [
+          "Solana swaps (beta)"
+        ],
+        "operationId": "solTradeBalances",
+        "summary": "A wallet's SOL and one token",
+        "description": "For a swap form: lamports, and the token in the wallet's associated account (`amount`, what a sell spends) and in all its accounts of that mint (`total`).\n\n**Beta, not open yet.** Every route of this family except `/sol/trade/config` answers `503 TRADE_NOT_ENABLED` unless the caller is on the beta list; `/sol/trade/config` says whether yours is.\n\nA quote is SOL against one token, bought or sold. For every quote Chord builds, for **your wallet**, the transaction of each route — `direct` (Chord's own router: Raydium AMM v4 / CPMM / CLMM, Orca Whirlpool, Meteora DLMM / DAMM v2, Meteora DBC, Raydium LaunchLab, pump.fun, PumpSwap; up to two pools), `jupiter` (Jupiter's swap API, no Jupiter fee) and `jupiter_meta` (Jupiter's order: Metis, its RFQ market makers, DFlow, OKX; Jupiter's fee inside the amount) — simulates each on the chain and returns the one that leaves the wallet with the most: tokens for a buy, SOL for a sell, after every fee. Ties go to `direct`, then `jupiter`. A route handing back under half of the input's market value is refused.\n\nAmounts are base units as decimal strings: lamports for SOL, the token's smallest unit otherwise. Addresses are base58, case-sensitive. Chord takes no fee on Solana today. Nothing is signed by Chord: you sign `quote.tx` unchanged and send it back.",
+        "parameters": [
+          {
+            "name": "wallet",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": ""
+          },
+          {
+            "name": "mint",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "wallet": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "mint": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "lamports": {
+                      "type": "string",
+                      "pattern": "^\\d+$",
+                      "description": "Base units as a decimal string (lamports for SOL)."
+                    },
+                    "token": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "string",
+                          "pattern": "^\\d+$",
+                          "description": "Base units as a decimal string (lamports for SOL)."
+                        },
+                        "total": {
+                          "type": "string",
+                          "pattern": "^\\d+$",
+                          "description": "Base units as a decimal string (lamports for SOL)."
+                        },
+                        "decimals": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": ""
+                        }
+                      }
+                    },
+                    "slot": {
+                      "type": "integer",
+                      "description": ""
+                    }
+                  }
+                },
+                "example": {
+                  "wallet": "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+                  "mint": "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g",
+                  "lamports": "11175972108683952",
+                  "token": {
+                    "amount": "0",
+                    "total": "0",
+                    "decimals": 9
+                  },
+                  "slot": 457371001
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`TRADE_NOT_ENABLED` (the lane is off on this deployment, or not open to this caller yet) or `TRADE_UNAVAILABLE` (the Solana box did not answer). Retry later; do not read it as \"no route\".",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sol/trade/holdings": {
+      "get": {
+        "tags": [
+          "Solana swaps (beta)"
+        ],
+        "operationId": "solTradeHoldings",
+        "summary": "A wallet's SOL and tokens",
+        "description": "SOL and every token the wallet holds (both token programs, accounts summed), at most 50 by value; `more` = left out. Name, image and price from Chord's tape (null for a token it never saw).\n\n**Beta, not open yet.** Every route of this family except `/sol/trade/config` answers `503 TRADE_NOT_ENABLED` unless the caller is on the beta list; `/sol/trade/config` says whether yours is.\n\nA quote is SOL against one token, bought or sold. For every quote Chord builds, for **your wallet**, the transaction of each route — `direct` (Chord's own router: Raydium AMM v4 / CPMM / CLMM, Orca Whirlpool, Meteora DLMM / DAMM v2, Meteora DBC, Raydium LaunchLab, pump.fun, PumpSwap; up to two pools), `jupiter` (Jupiter's swap API, no Jupiter fee) and `jupiter_meta` (Jupiter's order: Metis, its RFQ market makers, DFlow, OKX; Jupiter's fee inside the amount) — simulates each on the chain and returns the one that leaves the wallet with the most: tokens for a buy, SOL for a sell, after every fee. Ties go to `direct`, then `jupiter`. A route handing back under half of the input's market value is refused.\n\nAmounts are base units as decimal strings: lamports for SOL, the token's smallest unit otherwise. Addresses are base58, case-sensitive. Chord takes no fee on Solana today. Nothing is signed by Chord: you sign `quote.tx` unchanged and send it back.",
+        "parameters": [
+          {
+            "name": "wallet",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "wallet": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                      "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                    },
+                    "lamports": {
+                      "type": "string",
+                      "pattern": "^\\d+$",
+                      "description": "Base units as a decimal string (lamports for SOL)."
+                    },
+                    "slot": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "more": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "mint": {
+                            "type": "string",
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "amount": {
+                            "type": "string",
+                            "pattern": "^\\d+$",
+                            "description": "Base units as a decimal string (lamports for SOL)."
+                          },
+                          "decimals": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "symbol": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "image": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "priceUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "valueUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": ""
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "wallet": "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+                  "lamports": "11175972108683952",
+                  "slot": 457371002,
+                  "more": 3059,
+                  "tokens": [
+                    {
+                      "mint": "BZLbGTNCSFfoth2GYDtwr7e4imWzpR5jqcUuGEwr646K",
+                      "amount": "9110839995100000",
+                      "decimals": 8,
+                      "symbol": "IO",
+                      "name": "IO",
+                      "image": "https://bafkreicnqsbhpzxiasdm5esr7fqi3vcjvcbfefo4sq4y3ff747rfqf7w7i.ipfs.nftstorage.link",
+                      "priceUsd": 0.16689062068413946,
+                      "valueUsd": 15205137.417361211
+                    },
+                    {
+                      "mint": "2qEHjDLDLbuBgRYvsxhc5D6uDWAivNFZGan56P1tpump",
+                      "amount": "305126997000000",
+                      "decimals": 6,
+                      "symbol": "Pnut",
+                      "name": "Peanut the Squirrel",
+                      "image": "https://ipfs.io/ipfs/QmNdTtJauw39u4DzGyTaZ35rRx4VgAxqb91wE89zjyHWd2",
+                      "priceUsd": 0.04610248419139405,
+                      "valueUsd": 14067112.555560041
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_ADDRESS`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`TRADE_NOT_ENABLED` (the lane is off on this deployment, or not open to this caller yet) or `TRADE_UNAVAILABLE` (the Solana box did not answer). Retry later; do not read it as \"no route\".",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/stream/market": {
       "get": {
         "tags": [
@@ -29101,6 +30043,255 @@
           }
         },
         "description": "One Solana LP position."
+      },
+      "SolTradeQuote": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "jupiter",
+              "jupiter_meta"
+            ],
+            "description": "`direct` = Chord's own route (pump pools or Chord's router) · `jupiter` = Jupiter's swap API · `jupiter_meta` = Jupiter's order (RFQ makers, DFlow, OKX)."
+          },
+          "mint": {
+            "type": "string",
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "inAmount": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "What the wallet puts in: lamports for a buy, the token's smallest unit for a sell."
+          },
+          "outAmount": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "What the simulation of `tx` delivered to the wallet: tokens for a buy, lamports for a sell (wSOL counted as SOL), after every fee."
+          },
+          "minOut": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "The least the transaction accepts before it fails, from `slippageBps`."
+          },
+          "slippageBps": {
+            "type": "integer",
+            "description": ""
+          },
+          "feeLamports": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Chord's fee. 0 today."
+          },
+          "feeBps": {
+            "type": "integer",
+            "description": "Chord's fee rate. 0 today."
+          },
+          "networkFeeLamports": {
+            "type": "integer",
+            "description": "Base + priority fee the wallet pays; 0 when Jupiter or a market maker pays (`gasless`)."
+          },
+          "units": {
+            "type": "integer",
+            "description": "Compute units of the simulation."
+          },
+          "walletLamportsDelta": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "The wallet's whole SOL change in the simulation, network fee and rent of new accounts included."
+          },
+          "tx": {
+            "type": "string",
+            "description": "The unsigned v0 transaction, base64 — exactly what was simulated. Sign it unchanged and POST it to `/sol/trade/send`."
+          },
+          "txBytes": {
+            "type": "integer",
+            "description": ""
+          },
+          "blockhash": {
+            "type": "string",
+            "description": ""
+          },
+          "lastValidBlockHeight": {
+            "type": "integer",
+            "description": "After this block height the transaction can no longer land."
+          },
+          "simulatedSlot": {
+            "type": "integer",
+            "description": ""
+          },
+          "ms": {
+            "type": "number",
+            "description": ""
+          },
+          "venue": {
+            "type": "string",
+            "description": "`direct` only: where it trades (the largest leg when the order is split): `pumpswap`, `pumpfun`, `raydium_v4`, `raydium_cpmm`, `raydium_clmm`, `orca`, `meteora_dlmm`, `meteora_damm_v2`, `meteora_dbc`, `raydium_launchlab`."
+          },
+          "layout": {
+            "type": "string",
+            "description": "`direct` on a pump pool: the instruction layout copied."
+          },
+          "solBased": {
+            "type": "boolean",
+            "description": "A PumpSwap pool whose base is SOL."
+          },
+          "pool": {
+            "type": "string",
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "A pump.fun curve had fewer tokens left than the input buys: the quote takes all it has, for at most `inAmount`."
+          },
+          "hops": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "description": "Venue."
+                },
+                "pool": {
+                  "type": "string",
+                  "description": "Pool."
+                },
+                "percent": {
+                  "type": "number",
+                  "description": "Share of the input, %."
+                }
+              }
+            },
+            "description": "The legs: Chord's router (one or two pools) or Jupiter's route plan."
+          },
+          "router": {
+            "type": "string",
+            "description": "`jupiter_meta`: which router won Jupiter's auction (`metis`, `jupiterz`, `dflow`, `okx`)."
+          },
+          "gasless": {
+            "type": "boolean",
+            "description": "`jupiter_meta`: Jupiter or the market maker pays the network fee; the wallet is a second signer."
+          },
+          "expireAt": {
+            "type": "integer",
+            "description": "`jupiter_meta` RFQ quotes: Unix seconds the market maker's price lives to. Ask again when under ten seconds are left."
+          }
+        },
+        "description": "One executable quote.",
+        "required": [
+          "ok",
+          "route",
+          "mint",
+          "side",
+          "inAmount",
+          "outAmount",
+          "minOut",
+          "tx"
+        ]
+      },
+      "SolTradeTx": {
+        "type": "object",
+        "properties": {
+          "signature": {
+            "type": "string",
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,88}$",
+            "description": "Transaction signature, base58."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed",
+              "finalized",
+              "failed",
+              "expired"
+            ]
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "jupiter",
+              "jupiter_meta"
+            ],
+            "description": "`direct` = Chord's own route (pump pools or Chord's router) · `jupiter` = Jupiter's swap API · `jupiter_meta` = Jupiter's order (RFQ makers, DFlow, OKX)."
+          },
+          "mint": {
+            "type": "string",
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "wallet": {
+            "type": "string",
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+          },
+          "sentAt": {
+            "type": "integer",
+            "description": "Unix seconds."
+          },
+          "sends": {
+            "type": "integer",
+            "description": "How many times Chord sent it (every 2 seconds until it lands or its blockhash expires)."
+          },
+          "slot": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": ""
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
+          },
+          "quotedOut": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Base units as a decimal string (lamports for SOL)."
+          },
+          "receivedOut": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+$",
+            "description": "What the wallet really got, read from the landed transaction with the quote's measure."
+          },
+          "confirmedAt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Unix seconds."
+          }
+        },
+        "description": "A sent swap."
       }
     }
   }

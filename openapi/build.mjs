@@ -291,6 +291,7 @@ const T = {
   rh: "Robinhood Chain data",
   chains: "Avalanche, Base, BNB Chain",
   sol: "Solana data",
+  solTrade: "Solana swaps (beta)",
   backtest: "Backtests",
   stream: "Streaming",
   account: "Account and health",
@@ -1080,6 +1081,90 @@ for (const [by, opId, title, key] of [
       responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, [by === "wallet" ? "owner" : by]: SOL_ADDR, events: arr(SOL_LP_EVENT), nextBefore: nullable(SOL_TS) }), ex(key)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_CURSOR`") } }));
 }
 
+// Solana swaps (beta) ─────────────────────────────────────────────────────────────────────────
+// routes/solTrade.ts (gate, validation) → services/solTrade.ts (fail-CLOSED: schemas/solTrade.ts drops unknown fields and refuses an
+// answer that is not the quote asked for) → the Solana box, packages/sol/src/trade/ (quote.ts: best of `direct` = the pump route +
+// Chord's router in router/, `jupiter`, `jupiter_meta`). Shapes here = schemas/solTrade.ts; change both in one commit.
+// Captured examples (openapi/examples.json, 2026-10-15 20:28 UTC): 1 SOL of HYPE (Solana mint), whose best route was Chord's router on a
+// Meteora DLMM pool, for a wallet that holds SOL.
+const SOL_TRADE_WALLET = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
+const SOL_TRADE_MINT = "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g";
+const SOL_TRADE_QUOTE_KEY = `/v1/sol/trade/quote?mint=${SOL_TRADE_MINT}&side=buy&amount=1000000000&wallet=${SOL_TRADE_WALLET}&slippageBps=100`;
+const SOL_TRADE_BAL_KEY = `/v1/sol/trade/balances?wallet=${SOL_TRADE_WALLET}&mint=${SOL_TRADE_MINT}`;
+const SOL_TRADE_HOLD_KEY = `/v1/sol/trade/holdings?wallet=${SOL_TRADE_WALLET}`;
+const SOL_TRADE_INTRO = `**Beta, not open yet.** Every route of this family except \`/sol/trade/config\` answers \`503 TRADE_NOT_ENABLED\` unless the caller is on the beta list; \`/sol/trade/config\` says whether yours is.
+
+A quote is SOL against one token, bought or sold. For every quote Chord builds, for **your wallet**, the transaction of each route — \`direct\` (Chord's own router: Raydium AMM v4 / CPMM / CLMM, Orca Whirlpool, Meteora DLMM / DAMM v2, Meteora DBC, Raydium LaunchLab, pump.fun, PumpSwap; up to two pools), \`jupiter\` (Jupiter's swap API, no Jupiter fee) and \`jupiter_meta\` (Jupiter's order: Metis, its RFQ market makers, DFlow, OKX; Jupiter's fee inside the amount) — simulates each on the chain and returns the one that leaves the wallet with the most: tokens for a buy, SOL for a sell, after every fee. Ties go to \`direct\`, then \`jupiter\`. A route handing back under half of the input's market value is refused.
+
+Amounts are base units as decimal strings: lamports for SOL, the token's smallest unit otherwise. Addresses are base58, case-sensitive. Chord takes no fee on Solana today. Nothing is signed by Chord: you sign \`quote.tx\` unchanged and send it back.`;
+const SOL_TRADE_ERR = (bad400) => ({
+  400: errRes(`${bad400}.`),
+  503: errRes("`TRADE_NOT_ENABLED` (the lane is off on this deployment, or not open to this caller yet) or `TRADE_UNAVAILABLE` (the Solana box did not answer). Retry later; do not read it as \"no route\"."),
+});
+const LAMPORTS = { type: "string", pattern: "^\\d+$", description: "Base units as a decimal string (lamports for SOL)." };
+const SOL_ROUTE = { type: "string", enum: ["direct", "jupiter", "jupiter_meta"], description: "`direct` = Chord's own route (pump pools or Chord's router) · `jupiter` = Jupiter's swap API · `jupiter_meta` = Jupiter's order (RFQ makers, DFlow, OKX)." };
+const SOL_REASON = { type: "string", enum: ["not_a_token", "bad_request", "no_pool", "no_template", "no_route", "wallet_cannot", "pool_limit", "no_output", "simulation_failed", "too_large", "error", "off"], description: "Why a route has no quote. `wallet_cannot` (no funds, or no token account), `pool_limit` (a size the pool refuses, or under half the market value) and `no_output` are about the request; `no_pool` = the route does not cover this token; `simulation_failed`, `too_large`, `error` = the route failed; `off` = not asked or switched off." };
+const SolRouteSummary = { oneOf: [
+  obj({ ok: { type: "boolean", const: true }, outAmount: LAMPORTS, measured: { type: "string", enum: ["simulated", "quoted"], description: "`simulated` = read from a simulation of the route's own transaction; `quoted` = Jupiter's own figure, shown when a route already in hand gives at least that much, so Jupiter's transaction was not built." }, networkFeeLamports: nullable(int("")), units: nullable(int("Compute units.")), ms: num("") }),
+  obj({ ok: { type: "boolean", const: false }, reason: SOL_REASON, detail: str("What the route said, for a human."), ms: num("") }),
+] };
+components.schemas.SolTradeQuote = obj({
+  ok: { type: "boolean", const: true }, route: SOL_ROUTE, mint: SOL_ADDR, side: { type: "string", enum: ["buy", "sell"] },
+  inAmount: { ...LAMPORTS, description: "What the wallet puts in: lamports for a buy, the token's smallest unit for a sell." },
+  outAmount: { ...LAMPORTS, description: "What the simulation of `tx` delivered to the wallet: tokens for a buy, lamports for a sell (wSOL counted as SOL), after every fee." },
+  minOut: { ...LAMPORTS, description: "The least the transaction accepts before it fails, from `slippageBps`." }, slippageBps: int(""),
+  feeLamports: { ...LAMPORTS, description: "Chord's fee. 0 today." }, feeBps: int("Chord's fee rate. 0 today."),
+  networkFeeLamports: int("Base + priority fee the wallet pays; 0 when Jupiter or a market maker pays (`gasless`)."), units: int("Compute units of the simulation."),
+  walletLamportsDelta: { type: "string", pattern: "^-?\\d+$", description: "The wallet's whole SOL change in the simulation, network fee and rent of new accounts included." },
+  tx: str("The unsigned v0 transaction, base64 — exactly what was simulated. Sign it unchanged and POST it to `/sol/trade/send`."), txBytes: int(""),
+  blockhash: str(""), lastValidBlockHeight: int("After this block height the transaction can no longer land."), simulatedSlot: int(""), ms: num(""),
+  venue: str("`direct` only: where it trades (the largest leg when the order is split): `pumpswap`, `pumpfun`, `raydium_v4`, `raydium_cpmm`, `raydium_clmm`, `orca`, `meteora_dlmm`, `meteora_damm_v2`, `meteora_dbc`, `raydium_launchlab`."),
+  layout: str("`direct` on a pump pool: the instruction layout copied."), solBased: bool("A PumpSwap pool whose base is SOL."), pool: SOL_ADDR,
+  partial: bool("A pump.fun curve had fewer tokens left than the input buys: the quote takes all it has, for at most `inAmount`."),
+  hops: arr(obj({ label: str("Venue."), pool: str("Pool."), percent: num("Share of the input, %.") }), "The legs: Chord's router (one or two pools) or Jupiter's route plan."),
+  router: str("`jupiter_meta`: which router won Jupiter's auction (`metis`, `jupiterz`, `dflow`, `okx`)."), gasless: bool("`jupiter_meta`: Jupiter or the market maker pays the network fee; the wallet is a second signer."),
+  expireAt: int("`jupiter_meta` RFQ quotes: Unix seconds the market maker's price lives to. Ask again when under ten seconds are left."),
+}, "One executable quote.", { required: ["ok", "route", "mint", "side", "inAmount", "outAmount", "minOut", "tx"] });
+components.schemas.SolTradeTx = obj({
+  signature: SOL_SIG, status: { type: "string", enum: ["pending", "confirmed", "finalized", "failed", "expired"] }, route: SOL_ROUTE, mint: SOL_ADDR, side: { type: "string", enum: ["buy", "sell"] }, wallet: SOL_ADDR,
+  sentAt: int("Unix seconds."), sends: int("How many times Chord sent it (every 2 seconds until it lands or its blockhash expires)."), slot: nullable(int("")), error: nullable(str("")),
+  quotedOut: LAMPORTS, receivedOut: nullable({ type: "string", pattern: "^-?\\d+$", description: "What the wallet really got, read from the landed transaction with the quote's measure." }), confirmedAt: nullable(int("Unix seconds.")),
+}, "A sent swap.");
+
+add("/sol/trade/config", "get", op(T.solTrade, "solTradeConfig", "May this caller trade", `\`enabled\` = the lane is on in this deployment, \`open\` = open to everyone, \`allowed\` = open to the caller who asks (a beta account, or everyone once \`open\`). Never gated, never cached.\n\n${SOL_TRADE_INTRO}`,
+  { responses: { 200: ok("", obj({ enabled: bool(""), open: bool(""), allowed: bool("") }), ex("/v1/sol/trade/config")) } }));
+
+add("/sol/trade/quote", "get", op(T.solTrade, "solTradeQuote", "Best quote: Chord's route or Jupiter's", `The quote of the route that leaves the wallet with the most, its unsigned transaction, and what every route offered (\`compared\`). \`ok: false\` with \`quote: null\` and a \`reason\` is an answer (no route for this token, size or wallet), not an error.\n\n${SOL_TRADE_INTRO}`,
+  { params: [
+      q("mint", SOL_ADDR, "The token.", true), q("side", { type: "string", enum: ["buy", "sell"] }, "`buy` = SOL in, token out · `sell` = token in, SOL out.", true),
+      q("amount", { type: "string", pattern: "^[1-9]\\d{0,19}$" }, "Input in base units: lamports for a buy, the token's smallest unit for a sell.", true),
+      q("wallet", SOL_ADDR, "The wallet that will sign: every route is simulated for it, so it must hold the input (and SOL for fees).", true),
+      q("slippageBps", { type: "integer", minimum: 1, maximum: 5000, default: 100 }, "Tolerance that sets `minOut`."),
+    ],
+    responses: { 200: ok("", obj({ ok: bool(""), quote: nullable(ref("SolTradeQuote")), reason: SOL_REASON, detail: str(""),
+      compared: obj({ direct: SolRouteSummary, jupiter: SolRouteSummary, jupiterMeta: SolRouteSummary }, "What each route offered. `direct` is the better of the pump route and Chord's router."), ms: num("") }),
+      ex(SOL_TRADE_QUOTE_KEY)), ...SOL_TRADE_ERR("`BAD_ADDRESS` / `BAD_SIDE` / `BAD_AMOUNT` / `BAD_SLIPPAGE`"),
+      502: errRes("`TRADE_BAD_ANSWER`: the Solana box answered something that is not the quote asked for (another mint, side, amount, tolerance or fee payer, or an unknown shape). Nothing is forwarded."),
+    } }));
+
+add("/sol/trade/send", "post", op(T.solTrade, "solTradeSend", "Send the signed quote", `Relays a transaction Chord quoted in the last three minutes, signed by the wallet it was quoted for — anything else is refused. Chord sends it to several RPC providers and again every 2 seconds until it lands or its blockhash expires; a \`jupiter_meta\` order goes through Jupiter's execute endpoint instead (Jupiter or the market maker adds its signature). Then poll \`/sol/trade/tx/{signature}\`.\n\n${SOL_TRADE_INTRO}`,
+  { body: bodyJson(obj({ tx: str("`quote.tx` signed by the wallet, base64. Do not change the message.") }, undefined, { required: ["tx"] }), { tx: "<base64 signed transaction>" }),
+    responses: { 200: ok("", obj({ ok: bool(""), signature: SOL_SIG, status: ref("SolTradeTx"), error: str(""), message: str("") })), ...SOL_TRADE_ERR("`BAD_TRANSACTION` (not a transaction, or not base64) · `UNKNOWN_TRANSACTION` (not one a quote handed out in the last three minutes, or changed before signing — ask for a new quote) · `NOT_SIGNED` / `BAD_SIGNATURE` (not signed by the quoted wallet)"),
+      502: errRes("`SEND_FAILED`: no RPC accepted the transaction."),
+    } }));
+
+add("/sol/trade/tx/{signature}", "get", op(T.solTrade, "solTradeTx", "Status of a sent swap", `\`pending\` until the transaction is in a block, then \`confirmed\` / \`finalized\` with \`receivedOut\`, or \`failed\` / \`expired\` (its blockhash ran out; an RFQ order unseen for two minutes). Only transactions sent through \`/sol/trade/send\`.\n\n${SOL_TRADE_INTRO}`,
+  { params: [p("signature", SOL_SIG, "From `/sol/trade/send`.")],
+    responses: { 200: ok("", ref("SolTradeTx")), 404: errRes("`TX_NOT_FOUND`: not a transaction sent through this API, or done more than 15 minutes ago."), ...SOL_TRADE_ERR("`BAD_SIGNATURE`") } }));
+
+add("/sol/trade/balances", "get", op(T.solTrade, "solTradeBalances", "A wallet's SOL and one token", `For a swap form: lamports, and the token in the wallet's associated account (\`amount\`, what a sell spends) and in all its accounts of that mint (\`total\`).\n\n${SOL_TRADE_INTRO}`,
+  { params: [q("wallet", SOL_ADDR, "", true), q("mint", SOL_ADDR, "", true)],
+    responses: { 200: ok("", obj({ wallet: SOL_ADDR, mint: SOL_ADDR, lamports: LAMPORTS, token: obj({ amount: LAMPORTS, total: LAMPORTS, decimals: nullable(int("")) }), slot: int("") }), ex(SOL_TRADE_BAL_KEY)), ...SOL_TRADE_ERR("`BAD_ADDRESS`") } }));
+
+add("/sol/trade/holdings", "get", op(T.solTrade, "solTradeHoldings", "A wallet's SOL and tokens", `SOL and every token the wallet holds (both token programs, accounts summed), at most 50 by value; \`more\` = left out. Name, image and price from Chord's tape (null for a token it never saw).\n\n${SOL_TRADE_INTRO}`,
+  { params: [q("wallet", SOL_ADDR, "", true)],
+    responses: { 200: ok("", obj({ wallet: SOL_ADDR, lamports: LAMPORTS, slot: int(""), more: int(""), tokens: arr(obj({ mint: SOL_ADDR, amount: LAMPORTS, decimals: nullable(int("")), symbol: nullable(str("")), name: nullable(str("")), image: nullable(str("")), priceUsd: nullable(num("")), valueUsd: nullable(num("")) })) }), ex(SOL_TRADE_HOLD_KEY)), ...SOL_TRADE_ERR("`BAD_ADDRESS`") } }));
+
 // Streaming (documented as operations so they appear in the reference; protocol detail lives in Concepts → Streaming) ──
 add("/stream/market", "get", op(T.stream, "streamMarket", "Server-sent events: prices", `One \`text/event-stream\` feed, no key, EventSource-friendly with automatic reconnect. Events: \`rh-ticker\` (fresh prices for chain 4663, about every 10 s, only addresses whose price moved), \`ticker\` / \`whales\` / \`defi\` (Monad), \`ping\` every 5 s. Capacity 500 clients (\`503\` beyond). Arc and Robinhood Chain boards stream faster over the WebSocket \`prices\` channel — see Concepts → Streaming.`,
   { responses: { 200: { description: "`text/event-stream`", content: { "text/event-stream": { schema: { type: "string" }, example: 'event: rh-ticker\ndata: {"items":[{"address":"0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec","priceUsd":220.97,"change24h":-0.71}]}\n\nevent: ping\ndata: 1789891855\n' } } }, 503: errRes("At capacity.") } }));
@@ -1278,6 +1363,7 @@ Amounts are decimal strings in the token's smallest unit. Timestamps are Unix se
     { name: T.rh, description: "Robinhood Chain (chain 4663): chain totals, tokens and tokenized stocks from the rollup tables." },
     { name: T.chains, description: "Avalanche C-Chain (43114), Base (8453), BNB Chain (56), Arbitrum One (42161) and Ethereum (1): chain totals, the 24-hour token board, prints, one token's tape, venue share and a wallet's PnL, from Chord's own index of every swap on those chains. One set of routes, the chain in the path." },
     { name: T.sol, description: "Solana, read-only: chain totals, the 24-hour token board, search, one token's stats, prints, candles and traders, the day's trader board, a wallet's PnL, and liquidity (LP pools, positions, events, LP wallets on Meteora DLMM / DAMM v2, Raydium CLMM and PumpSwap), from Chord's own tape of the swap events of 11 Solana venues (PumpSwap, pump.fun, Meteora, Raydium, Orca). Prop AMMs and order books are not read. Addresses are base58 and case-sensitive; the path segment is the literal `solana`. Read the notes on each operation before comparing these numbers with an all-market source." },
+    { name: T.solTrade, description: "Solana swaps, beta: every quote builds Chord's own route (Raydium, Orca, Meteora, pump.fun, PumpSwap) and Jupiter's for the wallet, simulates them, and returns the one that leaves the wallet with the most; you sign and send it back." },
     { name: T.backtest, description: "Bar-close strategy backtests over Chord's stored candles: any Hyperliquid perp, 13 FX pairs and metals. Simulated, nothing is traded." },
     { name: T.stream, description: "Server-sent events and the public WebSocket." },
     { name: T.account, description: "Your key, and the service's own health." },

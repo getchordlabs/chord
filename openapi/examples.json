@@ -5632,5 +5632,109 @@
   "truncated": false,
   "operator": false,
   "updatedAt": 1791831176348
+ },
+ "/v1/sol/trade/config": {
+  "enabled": true,
+  "open": false,
+  "allowed": false
+ },
+ "/v1/sol/trade/quote?mint=98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g&side=buy&amount=1000000000&wallet=9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM&slippageBps=100": {
+  "ok": true,
+  "quote": {
+   "ok": true,
+   "route": "direct",
+   "mint": "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g",
+   "side": "buy",
+   "inAmount": "1000000000",
+   "outAmount": "1291169314",
+   "minOut": "1278257620",
+   "slippageBps": 100,
+   "feeLamports": "0",
+   "feeBps": 0,
+   "networkFeeLamports": 13462,
+   "units": 53847,
+   "walletLamportsDelta": "-1001501902",
+   "tx": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAQAJF36MCIdgv94d3c8ywX8gm4JC7lKq8TH6zYjQ6ixtCwbybQ/ffN89KMzS1moKr3xD+eaLjFLD93Uu7/6fCChoRW+33r5/N5kXzVmVKDnDCPuAkyP2Gtb/z4vZXn9rJrNgnlYtVRIeQFP9RCTKJ4QcFXTmTFrjug4KMZNwxfvPi59T3FuLdqms3IWcwYxorNprzTnpS/UIS8cr22A9a0z5hMQguKAAE9blFXzMeY2Ul+aVjNz5CWJMPZFyDxSfYLteeLFBAdK4u9M26/E24V6FVw6ivZ7F6IKKhmtyA8AUTfymAHzJZSEoI1LREgsRMMb+c3W9Pk5HT+Ci3aCI/WgF+bbdWqpQ+Iq9Y9M30s68O5hGfLeLdlEbgXgDuUWpI64G0UeeEGWqwXbkX0swI7SX5eIdaHc3Qyw0ilOG3FwaVKK3wRwJ7Hd/cQIYGczxT34DxoMVJNeXfeJLQyrGn/5CRYApa3YIBFLBUkXofOcSUKM6WFvxPe9wsqWKl3DHs4sghgHyPnPlSprtPOAV8DiJLgrp8nHRCYh08HSC9eHtCKRKNckuzi1T27nDcSwt5D+6EBI+n21RbgNj47MiJk7XsmsDBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAIyXJY9OJInxuz0QKRSODYMLWhOZ2v8QhASOe9jb6fhZBpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAbd9uHXZaGT2cvhRs7reawctIXtX1s3kTqM9YV+/wCpeOF/+c+e8osV49WDJ0Hs54BOB9XJf0LvM+1fBZx0kl8E6eEvvIToJskyzOniZAzOFVkMHGJzsJJXCLo7hSCwvAVKU1qZKSEGTSTocWDaOHx8NbXdvJK7geQfqEBBBUSNsnDWf6mMUc8CEwUTWJYrrzV0K+1ZydlEXpwNDIXHzZF54KJrKMEZBlNIu3jg6xTnaDFVOdmUnu4hys0zsh+wiAgOAAUCiUoBAA4ACQOghgEAAAAAAA8GAAEAEBESAQEPBgACABMREgEBEQIAAQwCAAAAAMqaOwAAAAASAQEBERQWAwQFBgECEBMHFAASEhUWFAgJCgsMDRxBSz9M61tbiADKmjsAAAAA1KkwTAAAAAAAAAAAEgMBAAABCQA=",
+   "txBytes": 962,
+   "blockhash": "9CkzxZDnrGUqa6v7wWKq3jMxYFkLvqE1c8ogo7DURJjq",
+   "lastValidBlockHeight": 435407004,
+   "simulatedSlot": 457371000,
+   "ms": 269,
+   "venue": "meteora_dlmm",
+   "pool": "6oQ9wVex4mKZti2GsGCfD8FWTMMC9PLQkztRU5cd6MK8",
+   "hops": [
+    {
+     "label": "Meteora DLMM",
+     "pool": "6oQ9wVex4mKZti2GsGCfD8FWTMMC9PLQkztRU5cd6MK8",
+     "percent": 100
+    }
+   ]
+  },
+  "compared": {
+   "direct": {
+    "ok": true,
+    "outAmount": "1291169314",
+    "measured": "simulated",
+    "networkFeeLamports": 13462,
+    "units": 53847,
+    "ms": 269
+   },
+   "jupiter": {
+    "ok": true,
+    "outAmount": "1291041752",
+    "measured": "simulated",
+    "networkFeeLamports": 23574,
+    "units": 149660,
+    "ms": 128
+   },
+   "jupiterMeta": {
+    "ok": true,
+    "outAmount": "1289637269",
+    "measured": "simulated",
+    "networkFeeLamports": 0,
+    "units": 25294,
+    "ms": 350
+   }
+  },
+  "ms": 392
+ },
+ "/v1/sol/trade/balances?wallet=9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM&mint=98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g": {
+  "wallet": "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+  "mint": "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g",
+  "lamports": "11175972108683952",
+  "token": {
+   "amount": "0",
+   "total": "0",
+   "decimals": 9
+  },
+  "slot": 457371001
+ },
+ "/v1/sol/trade/holdings?wallet=9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM": {
+  "wallet": "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+  "lamports": "11175972108683952",
+  "slot": 457371002,
+  "more": 3059,
+  "tokens": [
+   {
+    "mint": "BZLbGTNCSFfoth2GYDtwr7e4imWzpR5jqcUuGEwr646K",
+    "amount": "9110839995100000",
+    "decimals": 8,
+    "symbol": "IO",
+    "name": "IO",
+    "image": "https://bafkreicnqsbhpzxiasdm5esr7fqi3vcjvcbfefo4sq4y3ff747rfqf7w7i.ipfs.nftstorage.link",
+    "priceUsd": 0.16689062068413946,
+    "valueUsd": 15205137.417361211
+   },
+   {
+    "mint": "2qEHjDLDLbuBgRYvsxhc5D6uDWAivNFZGan56P1tpump",
+    "amount": "305126997000000",
+    "decimals": 6,
+    "symbol": "Pnut",
+    "name": "Peanut the Squirrel",
+    "image": "https://ipfs.io/ipfs/QmNdTtJauw39u4DzGyTaZ35rRx4VgAxqb91wE89zjyHWd2",
+    "priceUsd": 0.04610248419139405,
+    "valueUsd": 14067112.555560041
+   }
+  ]
  }
 }

@@ -20,8 +20,8 @@ the fund-moving step: it follows the confirmation flow in `SKILL.md`, every time
 | Arbitrum One | 42161 | ETH | ETH | USDC vs USDC.e (bridged) are different tokens; USDT0 is the dollar Tether |
 | Ethereum | 1 | ETH | ETH | USDT reverts a new approval while an old allowance is left: approve 0 first (`approval.resetFirst`); USDC and USDT 6 decimals, DAI 18 |
 
-Not supported: Solana swaps (Chord reads Solana data only: `solana.md`), Optimism, Polygon
-and every other chain; cross-chain swaps; limit orders; perps.
+Not supported here: Solana swaps (their own family, `/v1/sol/trade/*`, in beta and not open to API
+keys yet: `solana.md`), Optimism, Polygon and every other chain; cross-chain swaps; limit orders; perps.
 
 ## 0. Meta quote first (Chord's router, a fallback only when it fails)
 

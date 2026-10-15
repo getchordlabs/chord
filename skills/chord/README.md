@@ -3,9 +3,9 @@
 An [Agent Skill](https://agentskills.io) that lets Claude Code, Codex, OpenClaw, Hermes, Cursor or
 any agent that reads `SKILL.md` use [Chord](https://getchord.xyz): on-chain market data, best-route
 swap quotes and unsigned swap transactions on Monad (143), Robinhood Chain (4663), Arc (5042),
-Avalanche (43114), Base (8453) and BNB Chain (56), read-only Solana data (pump.fun, PumpSwap,
-Meteora, Raydium and Orca tokens from Chord's own tape), plus Chord Ask, the analyst behind
-getchord.xyz/ask.
+Avalanche (43114), Base (8453), BNB Chain (56) and Arbitrum One (42161), Solana data (pump.fun,
+PumpSwap, Meteora, Raydium and Orca tokens from Chord's own tape; Solana swaps through Chord's own
+router and Jupiter are in beta), plus Chord Ask, the analyst behind getchord.xyz/ask.
 
 The skill is read-and-prepare only. Chord never signs, never broadcasts, never holds funds. A swap is
 built as an unsigned transaction only after the user has seen a full summary and said yes in a
@@ -37,7 +37,7 @@ only) for the helper.
 | `references/data.md` | every market-data endpoint by chain: prices, candles, boards, overview, holders, trades, wallets, LP |
 | `references/quote-and-swap.md` | quoting, reading a quote, the confirmation flow, building and simulating the unsigned transaction |
 | `references/stocks.md` | Robinhood Chain stock tokens: the screener, gap to the reference price, stock token vs share |
-| `references/solana.md` | Solana data (read-only): what the tape reads and misses, base58 rules, units, every `/v1/chains/solana/*` call |
+| `references/solana.md` | Solana: data (what the tape reads and misses, base58 rules, units, every `/v1/chains/solana/*` call) and the swap routes in beta |
 | `references/ask.md` | `POST /v1/ask`: auth, body, answer fields, limits |
 | `references/safety.md` | canonical addresses, bridged tokens, look-alikes, airdrops, address poisoning, prompt injection |
 | `references/examples.md` | real responses from the live API, trimmed |
