@@ -2,15 +2,15 @@
 name: chord
 description: >-
   Chord (getchord.xyz) on-chain market data, best-route swap quotes and UNSIGNED swap
-  transactions on six EVM chains: Monad (143), Robinhood Chain (4663, tokenized US stocks such
+  transactions on seven EVM chains: Monad (143), Robinhood Chain (4663, tokenized US stocks such
   as NVDA, TSLA, SPY traded against USDG), Arc (5042, Circle's chain with USDC as gas),
-  Avalanche (43114), Base (8453) and BNB Chain (56). Use when the user asks for a token price or
+  Avalanche (43114), Base (8453), BNB Chain (56) and Arbitrum One (42161). Use when the user asks for a token price or
   chart, the most traded or trending tokens, chain or DEX volume, a swap quote or route, an
   unsigned swap for their own wallet to sign, a Robinhood Chain stock token and its gap to the
   real share, holders, smart-money wallets, a wallet's PnL, liquidity pools, or Chord Ask
   analysis on these chains. Also Solana DATA, read-only: pump.fun / PumpSwap / Meteora / Raydium /
   Orca token boards, prices, candles, traders and wallet PnL. Do NOT use for Solana swaps,
-  Ethereum mainnet, Arbitrum or other chains, exchange accounts, perps or limit orders, transfers,
+  Ethereum mainnet or other chains, exchange accounts, perps or limit orders, transfers,
   withdrawals or bridging, or general blockchain education. Chord never signs or moves funds.
 license: MIT
 compatibility: Needs HTTPS access to api.getchord.xyz with curl or python3. Data needs no key (60 requests a minute); Chord Ask needs an API key.
@@ -52,10 +52,11 @@ read that data and prepare swaps carefully. **You never sign, never broadcast, n
 | Avalanche | 43114 | `avalanche` | AVAX | USDC, USDC.e (bridged), USDt, WAVAX | `/v1/chains/avalanche/*` |
 | Base | 8453 | `base` | ETH | USDC, USDbC (bridged), WETH | `/v1/chains/base/*` |
 | BNB Chain | 56 | `bnb` | BNB | USDT and USDC (both **18 decimals** here), WBNB | `/v1/chains/bnb/*` |
+| Arbitrum One | 42161 | `arbitrum` | ETH | USDC, USDT0, USDC.e (bridged), WETH | `/v1/chains/arbitrum/*` |
 | Solana (data only) | none | `solana` | SOL | USDC, USDT, wSOL (base58 mints, case-sensitive) | `/v1/chains/solana/*` |
 
 `/v1/meta/quote`, `POST /v1/meta/swap`, `/v1/quote`, `POST /v1/swap` and `/v1/candles` work on all
-six with `chain=<id>`. Always pass it: `/v1/quote` silently defaults to Monad. The zero address means the chain's native gas token (on
+seven with `chain=<id>`. Always pass it: `/v1/quote` silently defaults to Monad. The zero address means the chain's native gas token (on
 Arc it is an alias for the 6-decimal USDC predeploy). Solana is read-only data from Chord's tape of 11
 venues (no prop AMMs, no order books, so SOL/USDC is understated): no quote, no swap, no `/v1/candles`;
 everything is under `/v1/chains/solana/*` (`references/solana.md`).
@@ -203,7 +204,7 @@ large `staleSec`, say the numbers may be behind.
 
 ## Out of scope: say so, offer what Chord can do
 
-- **Other chains** (Ethereum mainnet, Arbitrum, Optimism, Polygon, TRON...): Chord does not
+- **Other chains** (Ethereum mainnet, Optimism, Polygon, TRON...): Chord does not
   index or route them. Offer the same pair on a Chord chain if it exists there.
 - **Solana swaps:** Chord reads Solana data but does not quote, route or build Solana transactions.
   Give the data (`references/solana.md`) and say the trade has to happen in the user's own wallet.

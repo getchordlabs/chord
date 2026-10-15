@@ -44,10 +44,10 @@ token, and adds the CoinGecko cross-check where it exists. Raw calls:
 | Robinhood 4663 | `GET /tokens/market?chain=4663` | same shape, plus `txns24h`, `liquidityUsd`, `spark` (24 hourly closes) |
 | Robinhood 4663, one token | `GET /rh/token/{addr}?hours=24` | `token.priceUsd`, `token.change24hPct`, `token.volume24h` |
 | Arc 5042 | `GET /arc/token/{addr}?hours=24` | `token.priceUsd`, `token.change24hPct`, `token.marketCapUsd` |
-| Avalanche, Base, BNB | `GET /chains/{key}/token/{addr}?hours=24` | `stats24h.priceUsd`, `stats24h.change24hPct`, `stats24h.volUsd`, `byDex` |
-| Avalanche, Base, BNB | `GET /chains/{key}/token/{addr}/ref-price` | CoinGecko `priceUsd`; `404 NOT_LISTED` = CoinGecko does not know this contract |
+| Avalanche, Base, BNB, Arbitrum | `GET /chains/{key}/token/{addr}?hours=24` | `stats24h.priceUsd`, `stats24h.change24hPct`, `stats24h.volUsd`, `byDex` |
+| Avalanche, Base, BNB, Arbitrum | `GET /chains/{key}/token/{addr}/ref-price` | CoinGecko `priceUsd`; `404 NOT_LISTED` = CoinGecko does not know this contract |
 
-`{key}` is `avalanche`, `base` or `bnb` (the numeric id also works). The zero address in a
+`{key}` is `avalanche`, `base`, `bnb` or `arbitrum` (the numeric id also works). The zero address in a
 `/chains/...` path means the chain's wrapped native token.
 
 ```bash
@@ -84,7 +84,7 @@ any of the six chains. Raw calls (always pass `limit`):
 |---|---|---|
 | Arc 5042 | `GET /arc/tokens?sort=volume&limit=10` (sorts: `volume trades traders change mcap`; default limit 100; `includeUnlisted=1` adds tokens without curated metadata) | `GET /arc/trending?limit=10` (2-hour acceleration score) |
 | Robinhood 4663 | `GET /rh/tokens?sort=volume&limit=10` (`volume trades traders change`) | `sort=change` |
-| Avalanche, Base, BNB | `GET /chains/{key}/tokens?sort=volume&limit=10` (`volume trades change`) | `sort=change` |
+| Avalanche, Base, BNB, Arbitrum | `GET /chains/{key}/tokens?sort=volume&limit=10` (`volume trades change`) | `sort=change` |
 | Monad 143 | `GET /tokens/market?chain=143`, sort rows by `volume24h` yourself | sort by `change24h` |
 
 Arc rows carry `flags`: `wash` (a day's volume carried by one or two wallets) and `impostor` (an
@@ -123,14 +123,14 @@ burned supply, not holders.
 curl -s "$BASE/smart-money/top?chain=4663&source=onchain&window=7d&limit=10"   # 5042, 4663, 143; window 24h 7d 30d all
 curl -s "$BASE/portfolio/{wallet}/pnl?chain=4663"     # 5042, 4663, 143 or all
 curl -s "$BASE/portfolio/{wallet}/trades?chain=4663"
-curl -s "$BASE/chains/base/wallet/{wallet}"           # Avalanche, Base, BNB: swaps + average-cost PnL
+curl -s "$BASE/chains/base/wallet/{wallet}"           # Avalanche, Base, BNB, Arbitrum: swaps + average-cost PnL
 ```
 
 - PnL is average-cost from the wallet's swaps. Tokens that arrived by transfer have no cost basis and
   are excluded (`untrackedAmount`). It is not a balance sheet.
 - The smart-money board ranks by a skill-adjusted score with routers and bots removed; `pnlUsd` can
   be mostly unrealized (`unrealizedUsd`). Say that when you quote it.
-- On Avalanche, Base and BNB the raw tape is short (days, see the `window` field): say how far back
+- On Avalanche, Base, BNB and Arbitrum the raw tape is short (days, see the `window` field): say how far back
   the numbers go.
 - Chord has no balance endpoint in the public REST API. For "what is in my wallet" use Ask with the
   wallet (`references/ask.md`) or the user's wallet / block explorer.

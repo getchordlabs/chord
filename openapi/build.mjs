@@ -54,9 +54,9 @@ const UNIX_MS = int("Unix time, milliseconds — when the server built this answ
 
 const q = (name, schema, description, required = false) => ({ name, in: "query", required, schema, description });
 const p = (name, schema, description) => ({ name, in: "path", required: true, schema, description });
-const CHAIN_DESC = { 5042: "Arc", 4663: "Robinhood Chain", 143: "Monad", 43114: "Avalanche C-Chain", 8453: "Base", 56: "BNB Chain" };
+const CHAIN_DESC = { 5042: "Arc", 4663: "Robinhood Chain", 143: "Monad", 43114: "Avalanche C-Chain", 8453: "Base", 56: "BNB Chain", 42161: "Arbitrum One" };
 // Chains the router is live on through the API (TX_CHAINS in packages/api/src/config/contracts.ts).
-const SWAP_CHAINS = [5042, 4663, 143, 43114, 8453, 56];
+const SWAP_CHAINS = [5042, 4663, 143, 43114, 8453, 56, 42161];
 const chainQ = (chains, { required = false, def, note = "" } = {}) => {
   const list = chains.map((c) => `\`${c}\` ${CHAIN_DESC[c]}`).join(" · ");
   return q("chain", { type: "integer", enum: chains, ...(def !== undefined ? { default: def } : {}) }, `Chain id: ${list}.${def !== undefined ? ` Omitted = ${def}.` : ""}${note ? ` ${note}` : ""}`, required);
@@ -233,7 +233,7 @@ const ChainTokenRow = obj({
   dominantDex: nullable(str("Venue id with the most 24-hour volume.")), lastTradeTs: UNIX_S,
 }, "One token on a chain-keyed chain with its 24-hour tape. No curated list, no honesty flags, no trader counts yet.");
 
-const META_CHAINS = [143, 4663, 5042, 43114, 8453, 56];
+const META_CHAINS = [143, 4663, 5042, 43114, 8453, 56, 42161];
 const MetaAttempt = obj({
   provider: str("`chord`, `kyberswap`, `monorail`, `lifi` or `relay`."),
   status: str("`ok`, or why this provider did not produce the answer: `no_route`, `timeout`, `http_error`, `rate_limited`, `invalid_response`, `not_allowlisted`, `calldata_mismatch`, `min_out_too_low`, `value_gap`, `unsafe_token`, `simulation_failed`, `unverified`, `breaker_open`, `skipped`; for Chord also `engine_error`, `engine_timeout`, `engine_down`, `route_refused`, `build_failed`, `chain_not_live`."),
@@ -372,7 +372,7 @@ const META_POLICY = `**Policy**
 - Without \`taker\`, a fallback price is shown only after the provider BUILT the route and it was simulated for a placeholder wallet (\`PRICE_CHECKED\`); a provider that prices a size but will not build it is skipped. The placeholder's transaction is never returned.
 - An input the simulation cannot supply (a balance that is not a plain storage mapping, e.g. rebasing shares) while the taker does not hold it: HTTP 422 \`INPUT_NOT_SIMULATABLE\` — hold the input and ask again.`;
 const metaParams = [
-  q("chain", { type: "string" }, "Chain id or key: `143` monad · `4663` robinhood · `5042` arc · `43114` avalanche · `8453` base · `56` bnb.", true),
+  q("chain", { type: "string" }, "Chain id or key: `143` monad · `4663` robinhood · `5042` arc · `43114` avalanche · `8453` base · `56` bnb · `42161` arbitrum.", true),
   q("tokenIn", ADDRESS, "Token you sell. The zero address = the chain's native asset (on Arc it aliases to the USDC predeploy). `inputMint` is accepted too.", true),
   q("tokenOut", ADDRESS, "Token you buy. `outputMint` is accepted too.", true),
   q("amount", WEI, "Input amount, smallest unit.", true),
@@ -493,7 +493,7 @@ add("/tokens/search", "get", op(T.tokens, "searchTokens", "Search tokens on a ch
 
 - \`4663\` Robinhood Chain: the curated list (\`verified: true\`, stocks tagged \`stock\`) plus tokens that traded in the last 24 hours and are not on it (\`verified: false\`, no logo).
 - \`5042\` Arc: every token traded in the last 24 hours, the same index as \`/arc/tokens/search\`. \`verified\` is true for tokens on the curated Arc list.
-- \`43114\` / \`8453\` / \`56\`: that chain's token list, all \`verified: true\`. A chain that is not public yet answers \`404 CHAIN_NOT_PUBLIC\` unless the request carries an \`X-API-Key\`.
+- \`43114\` / \`8453\` / \`56\` / \`42161\`: that chain's token list, all \`verified: true\`. A chain that is not public yet answers \`404 CHAIN_NOT_PUBLIC\` unless the request carries an \`X-API-Key\`.
 - no \`chain\`, or \`143\`: Monad off-list discovery. Tokens found through DexScreener that are **not** on the curated Monad list, with a logo and on-chain decimals, all \`verified: false\`. This mode answers \`{ tokens }\` only, returns up to 8 rows whatever \`limit\` says, and returns an empty list for a query under 2 characters.
 
 Ranking: the exact address, then the exact symbol, a symbol prefix, a name prefix, then any substring; verified rows first within a rank, one row per address. A leading \`$\` is ignored. Treat \`verified: false\` as unvetted and check the address before trading it.
@@ -501,7 +501,7 @@ Ranking: the exact address, then the exact symbol, a symbol prefix, a name prefi
 **Arc**: \`/arc/tokens/search\` returns full board rows (price, volume, pools, flags) for the same query.`,
   { params: [
       q("q", { type: "string", minLength: 1, maxLength: 64 }, "Symbol, name or address fragment.", true),
-      chainQ([4663, 5042, 43114, 8453, 56, 143], { def: 143, note: "Pass the chain you want: the default is Monad off-list discovery." }),
+      chainQ([4663, 5042, 43114, 8453, 56, 42161, 143], { def: 143, note: "Pass the chain you want: the default is Monad off-list discovery." }),
       q("limit", { type: "integer", minimum: 1, maximum: 25, default: 8 }, "Rows to return, clamped to 1–25. Ignored in Monad mode."),
     ],
     responses: {
@@ -523,8 +523,8 @@ add("/tokens/chart/{address}", "get", op(T.tokens, "tokenChart", "Candles", `OHL
   { params: [p("address", ADDRESS, ""), q("tf", { type: "string", enum: ["1m", "5m", "15m", "1h", "4h", "1d", "1w"], default: "1h" }, "Timeframe."), q("before", UNIX_S, "Return the 200 candles before this time (paging).")],
     responses: withErr({ 200: ok("", obj({ candles: arr(ref("Candle"), "Oldest first."), tf: str(""), source: str("`db` = Chord's tape.") }), ex(`/v1/tokens/chart/${TOK}?tf=1h`)) }, [400, 404, 503]) }));
 
-add("/candles", "get", op(T.tokens, "candles", "Candles (data API)", `OHLCV for any token Chord indexes on Arc, Robinhood Chain, Avalanche, Base, BNB Chain or Monad, built only from Chord's own index — never a third-party feed, so \`source\` is always \`index\`. 1m / 5m / 15m come from a 1-minute rollup that keeps history after raw trades are retired; 1h and above from the hourly rollup; the newest minutes straight from the tape. Each candle carries \`n\`, the trades in the bucket. Buckets without a trade are absent unless \`fill=1\`, which carries the previous close through them.\n\nPaging: the default window ends with the still-open bucket (\`forming: true\`) and holds \`limit\` buckets. A \`from\`–\`to\` range wider than \`limit\` keeps the newest buckets; ask for the previous page with \`to\` = this page's \`from\`. The token must trade on the chain you name — \`404 UNKNOWN_TOKEN\` says which chain it trades on when it is another one. The zero address stands for the chain's native asset (its wrapped twin, or the USDC predeploy on Arc). For live candles subscribe on \`/v1/ws/live\` (see Streaming).\n\n**Avalanche, Base, BNB Chain** (\`43114\`, \`8453\`, \`56\`): candles come from chain-keyed tables, so one address on two chains is two tokens, and \`404 UNKNOWN_TOKEN\` means no indexed trades on the chain you named. These chains answer once their tape runs and, until the chain is public, only to requests with an \`X-API-Key\` (\`400 UNSUPPORTED_CHAIN\` otherwise; all three are public today). Where the tape runs with an ingest floor (BNB Chain, $100 today) the response carries \`ingestFloor\`, and \`v\` and \`n\` count only trades at or above it.`,
-  { params: [chainQ([5042, 4663, 43114, 8453, 56, 143], { def: 143 }), q("token", ADDRESS, "Token address.", true), q("tf", { type: "string", enum: ["1m", "5m", "15m", "1h", "4h", "1d", "1w"], default: "1h" }, "Timeframe."), q("from", UNIX_S, "Start, inclusive. Default: `to` minus `limit` buckets."), q("to", UNIX_S, "End, exclusive, snapped up to a bucket edge. Default: the end of the open bucket."), q("limit", { type: "integer", minimum: 1, maximum: 1000, default: 300 }, "Buckets per page."), q("fill", { type: "string", enum: ["1"] }, "Carry the previous close through empty buckets (v = 0, n = 0).")],
+add("/candles", "get", op(T.tokens, "candles", "Candles (data API)", `OHLCV for any token Chord indexes on Arc, Robinhood Chain, Avalanche, Base, BNB Chain, Arbitrum or Monad, built only from Chord's own index — never a third-party feed, so \`source\` is always \`index\`. 1m / 5m / 15m come from a 1-minute rollup that keeps history after raw trades are retired; 1h and above from the hourly rollup; the newest minutes straight from the tape. Each candle carries \`n\`, the trades in the bucket. Buckets without a trade are absent unless \`fill=1\`, which carries the previous close through them.\n\nPaging: the default window ends with the still-open bucket (\`forming: true\`) and holds \`limit\` buckets. A \`from\`–\`to\` range wider than \`limit\` keeps the newest buckets; ask for the previous page with \`to\` = this page's \`from\`. The token must trade on the chain you name — \`404 UNKNOWN_TOKEN\` says which chain it trades on when it is another one. The zero address stands for the chain's native asset (its wrapped twin, or the USDC predeploy on Arc). For live candles subscribe on \`/v1/ws/live\` (see Streaming).\n\n**Avalanche, Base, BNB Chain** (\`43114\`, \`8453\`, \`56\`): candles come from chain-keyed tables, so one address on two chains is two tokens, and \`404 UNKNOWN_TOKEN\` means no indexed trades on the chain you named. These chains answer once their tape runs and, until the chain is public, only to requests with an \`X-API-Key\` (\`400 UNSUPPORTED_CHAIN\` otherwise; all three are public today). Where the tape runs with an ingest floor (BNB Chain, $100 today) the response carries \`ingestFloor\`, and \`v\` and \`n\` count only trades at or above it.`,
+  { params: [chainQ([5042, 4663, 43114, 8453, 56, 42161, 143], { def: 143 }), q("token", ADDRESS, "Token address.", true), q("tf", { type: "string", enum: ["1m", "5m", "15m", "1h", "4h", "1d", "1w"], default: "1h" }, "Timeframe."), q("from", UNIX_S, "Start, inclusive. Default: `to` minus `limit` buckets."), q("to", UNIX_S, "End, exclusive, snapped up to a bucket edge. Default: the end of the open bucket."), q("limit", { type: "integer", minimum: 1, maximum: 1000, default: 300 }, "Buckets per page."), q("fill", { type: "string", enum: ["1"] }, "Carry the previous close through empty buckets (v = 0, n = 0).")],
     responses: withErr({ 200: ok("", obj({ chain: int(""), token: ADDRESS, tf: str(""), source: str("Always `index`."), from: UNIX_S, to: UNIX_S, forming: bool("The last candle is the still-open bucket."), ingestFloor: { ...ref("IngestFloor"), description: "Only on 43114 / 8453 / 56 when the tape runs with a floor (BNB Chain)." }, candles: arr(obj({ t: UNIX_S, o: num(""), h: num(""), l: num(""), c: num(""), v: num("USD volume in the bucket."), n: nullable(int("Trades in the bucket.")) }), "Oldest first.") }), ex(`/v1/candles?chain=5042&token=${TOK}&tf=1h&limit=2`)) }, [400, 404, 503]) }));
 
 add("/tokens/trades/{address}", "get", op(T.tokens, "tokenTrades", "Trade tape", `Recent swaps of a token, newest first, with the venue, side, size, price and the attributed wallet. Filter by side, venue, minimum size or wallet; page with \`page\`. \`stats24h\` sums the day.`,
@@ -741,7 +741,7 @@ const CHAINS_INTRO = `Chain-keyed data for Avalanche C-Chain, Base and BNB Chain
 - **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers \`400 UNSUPPORTED_CHAIN\` ("chain N is not served yet") unless the request carries an \`X-API-Key\`; those answers are sent \`Cache-Control: private\`.
 - **Ingest floor.** Every count, volume and print covers trades at or above the chain's floor, returned as \`ingestFloor\`. BNB Chain runs at $100 today; Avalanche and Base at 0.
 - **Readiness.** \`503 NOT_READY\` until the chain's rollup has run on this deployment; \`503 CHAIN_DATA_UNAVAILABLE\` when the store cannot be read. Never treat either as "no trades".`;
-const CHAIN_P = p("chain", { type: "string", enum: ["avalanche", "base", "bnb", "43114", "8453", "56"] }, "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes.");
+const CHAIN_P = p("chain", { type: "string", enum: ["avalanche", "base", "bnb", "arbitrum", "43114", "8453", "56", "42161"] }, "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56`, `arbitrum` or `42161` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes.");
 const CH_ADDR_P = p("address", ADDRESS, "Token address. The zero address means the chain's wrapped native token (WAVAX, WETH, WBNB).");
 const CH_503 = errRes("`NOT_READY` (the chain's rollup has not run on this deployment yet) or `CHAIN_DATA_UNAVAILABLE` (the store could not be read). Retry later; do not treat it as an empty answer.");
 const CH_503_STORE = errRes("`CHAIN_DATA_UNAVAILABLE`: the store could not be read. Retry later; do not treat it as an empty answer.");
@@ -1163,7 +1163,7 @@ add("/me", "get", op(T.account, "me", "Your key's plan and usage", "The tier, li
 // ── Agents and status (docs/prompts/chain-ai-infra.md W1–W3; routes/chains.ts, routes/health.ts, routes/mcp.ts, routes/agent.ts, packages/edge) ──
 const CAP_ROUTE = nullable(obj({ method: str("`GET` or `POST`."), path: str("Path under the host, with `{address}` / `{wallet}` placeholders to fill."), query: loose("Fixed query values; `{address}` / `{wallet}` / `{q}` inside a value are placeholders too.") }, "The route that serves this capability on this chain, or null when the chain does not have it."));
 const CAP_NAMES = ["overview", "tokens", "search", "token", "trades", "candles", "wallet", "walletTrades", "smartMoney", "holders", "lpPools", "lpPositions", "quote", "swap"];
-const CHAIN_KEYS = ["monad", "robinhood", "arc", "avalanche", "base", "bnb", "solana"];
+const CHAIN_KEYS = ["monad", "robinhood", "arc", "avalanche", "base", "bnb", "arbitrum", "solana"];
 
 add("/chains", "get", op(T.agents, "chainsDirectory", "Every chain and the route of each capability",
   "The directory an agent starts from. One entry per chain Chord serves, with its constants (native asset, wrapped native, dollar anchors with real decimals, explorer) and, for each capability, the route that serves it on that chain. A capability the chain does not have is `null`: the data routes grew chain by chain, so this is the one place that says where to read what. Solana is listed with `id: null` and base58, case-sensitive addresses. A chain that is not public yet appears only for a caller with an API key.",
@@ -1251,7 +1251,7 @@ const doc = {
   info: {
     title: "Chord API",
     version: "2026-10-05",
-    summary: "Trade, data and agent endpoints for Arc (5042) and Robinhood Chain (4663), plus chain data for Avalanche (43114), Base (8453), BNB Chain (56) and Solana (read-only).",
+    summary: "Trade, data and agent endpoints for Arc (5042) and Robinhood Chain (4663), plus chain data for Avalanche (43114), Base (8453), BNB Chain (56), Arbitrum One (42161) and Solana (read-only).",
     description: `Chord is a non-custodial trading app and on-chain data index. The API has three kinds of endpoint:
 
 - **Trade**: \`/quote\` finds the best route across every venue on the chain; \`/swap\` turns it into a transaction you sign yourself. Chord never holds funds or keys.
@@ -1276,7 +1276,7 @@ Amounts are decimal strings in the token's smallest unit. Timestamps are Unix se
     { name: T.ask, description: "The analyst agent over the Arc index, its picks and research notes." },
     { name: T.bridge, description: "Circle CCTP fast transfer to Arc, and LI.FI routes from 60+ chains." },
     { name: T.rh, description: "Robinhood Chain (chain 4663): chain totals, tokens and tokenized stocks from the rollup tables." },
-    { name: T.chains, description: "Avalanche C-Chain (43114), Base (8453) and BNB Chain (56): chain totals, the 24-hour token board, prints, one token's tape, venue share and a wallet's PnL, from Chord's own index of every swap on those chains. One set of routes, the chain in the path." },
+    { name: T.chains, description: "Avalanche C-Chain (43114), Base (8453), BNB Chain (56) and Arbitrum One (42161): chain totals, the 24-hour token board, prints, one token's tape, venue share and a wallet's PnL, from Chord's own index of every swap on those chains. One set of routes, the chain in the path." },
     { name: T.sol, description: "Solana, read-only: chain totals, the 24-hour token board, search, one token's stats, prints, candles and traders, the day's trader board, a wallet's PnL, and liquidity (LP pools, positions, events, LP wallets on Meteora DLMM / DAMM v2, Raydium CLMM and PumpSwap), from Chord's own tape of the swap events of 11 Solana venues (PumpSwap, pump.fun, Meteora, Raydium, Orca). Prop AMMs and order books are not read. Addresses are base58 and case-sensitive; the path segment is the literal `solana`. Read the notes on each operation before comparing these numbers with an all-market source." },
     { name: T.backtest, description: "Bar-close strategy backtests over Chord's stored candles: any Hyperliquid perp, 13 FX pairs and metals. Simulated, nothing is traded." },
     { name: T.stream, description: "Server-sent events and the public WebSocket." },

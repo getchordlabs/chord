@@ -9,7 +9,7 @@ Commands
   chains                                   the six chains (+ Solana, data only), their ids, gas tokens and data families
   get PATH                                 GET any public /v1 path, print the JSON
   token CHAIN QUERY                        resolve a symbol, name or 0x address to token candidates
-  price CHAIN TOKEN                        price and 24h stats from Chord's index (+ CoinGecko on 43114/8453/56)
+  price CHAIN TOKEN                        price and 24h stats from Chord's index (+ CoinGecko on 43114/8453/56/42161)
   board CHAIN [--sort volume] [--limit 10] most traded / moving tokens in the last 24h, compact rows
                                            token / price / board also take CHAIN = solana (read-only: base58 mints,
                                            case-sensitive; Chord does not quote or build Solana swaps)
@@ -66,6 +66,7 @@ CHAINS = {
     43114: {"key": "avalanche", "name": "Avalanche", "gas": "AVAX", "native": "AVAX", "family": "/v1/chains/avalanche/*"},
     8453: {"key": "base", "name": "Base", "gas": "ETH", "native": "ETH", "family": "/v1/chains/base/*"},
     56: {"key": "bnb", "name": "BNB Chain", "gas": "BNB", "native": "BNB", "family": "/v1/chains/bnb/*"},
+    42161: {"key": "arbitrum", "name": "Arbitrum One", "gas": "ETH", "native": "ETH", "family": "/v1/chains/arbitrum/*"},
 }
 ALIASES = {
     "monad": 143, "mon": 143, "143": 143,
@@ -74,6 +75,7 @@ ALIASES = {
     "avalanche": 43114, "avax": 43114, "43114": 43114,
     "base": 8453, "8453": 8453,
     "bnb": 56, "bsc": 56, "bnb-chain": 56, "bnbchain": 56, "56": 56,
+    "arbitrum": 42161, "arbitrum-one": 42161, "arb": 42161, "arb1": 42161, "42161": 42161,
 }
 
 
@@ -91,7 +93,7 @@ def chain_id(raw):
         die("Solana is read-only in Chord: use 'token solana QUERY', 'price solana MINT', 'board solana' or 'get /v1/chains/solana/...'. Chord does not quote, route or build Solana swaps.")
     cid = ALIASES.get(str(raw).strip().lower().replace(" ", "-"))
     if cid is None:
-        die(f"unsupported chain '{raw}'. Chord covers: " + ", ".join(f"{v['name']} ({k})" for k, v in CHAINS.items()) + ", plus Solana data (read-only). It does not cover Ethereum mainnet, Arbitrum or other chains.")
+        die(f"unsupported chain '{raw}'. Chord covers: " + ", ".join(f"{v['name']} ({k})" for k, v in CHAINS.items()) + ", plus Solana data (read-only). It does not cover Ethereum mainnet or other chains.")
     return cid
 
 
@@ -155,7 +157,7 @@ def detail_decimals(cid, addr):
         d = api(f"/v1/arc/token/{a}?hours=1")
     elif cid == 4663:
         d = api(f"/v1/rh/token/{a}?hours=1")
-    elif cid in (43114, 8453, 56):
+    elif cid in (43114, 8453, 56, 42161):
         d = api(f"/v1/chains/{cid}/token/{a}?hours=1")
     else:
         return None
@@ -450,7 +452,7 @@ def cmd_ask(args):
 def cmd_chains(_args):
     rows = [{"chainId": k, "key": v["key"], "name": v["name"], "gasToken": v["gas"], "dataEndpoints": v["family"], "quoteAndSwap": True} for k, v in CHAINS.items()]
     rows.append({"chainId": None, "key": "solana", "name": "Solana", "gasToken": "SOL", "dataEndpoints": "/v1/chains/solana/*", "quoteAndSwap": False})
-    print(json.dumps({"chains": rows, "router": ROUTER, "note": "The six EVM chains answer /v1/quote, POST /v1/swap and /v1/candles with ?chain=<id>. Solana is data only, under /v1/chains/solana/* (no chain id; base58 addresses, case-sensitive)."}, indent=1))
+    print(json.dumps({"chains": rows, "router": ROUTER, "note": "The seven EVM chains answer /v1/quote, POST /v1/swap and /v1/candles with ?chain=<id>. Solana is data only, under /v1/chains/solana/* (no chain id; base58 addresses, case-sensitive)."}, indent=1))
 
 
 def cmd_get(args):

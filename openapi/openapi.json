@@ -3,7 +3,7 @@
   "info": {
     "title": "Chord API",
     "version": "2026-10-05",
-    "summary": "Trade, data and agent endpoints for Arc (5042) and Robinhood Chain (4663), plus chain data for Avalanche (43114), Base (8453), BNB Chain (56) and Solana (read-only).",
+    "summary": "Trade, data and agent endpoints for Arc (5042) and Robinhood Chain (4663), plus chain data for Avalanche (43114), Base (8453), BNB Chain (56), Arbitrum One (42161) and Solana (read-only).",
     "description": "Chord is a non-custodial trading app and on-chain data index. The API has three kinds of endpoint:\n\n- **Trade**: `/quote` finds the best route across every venue on the chain; `/swap` turns it into a transaction you sign yourself. Chord never holds funds or keys.\n- **Read**: every swap on the chain, rolled up by token, venue and hour, from Chord's own index — tokens, launches, holders, top wallets, portfolio PnL, liquidity positions and pools. No key needed. Avalanche, Base and BNB Chain have the same rollups under `/chains/{chain}/*`; Solana has its own read-only family under `/chains/solana/*` (base58 addresses, case-sensitive).\n- **Agent**: the analyst (`/ask`) and the streams.\n\nAmounts are decimal strings in the token's smallest unit. Timestamps are Unix seconds unless the field is `updatedAt` (milliseconds). Reads answer anonymous callers at 60 requests a minute per IP; an `X-API-Key` header raises that to your plan. Every non-2xx body is `{ error, message }`.",
     "contact": {
       "name": "Chord",
@@ -70,7 +70,7 @@
     },
     {
       "name": "Avalanche, Base, BNB Chain",
-      "description": "Avalanche C-Chain (43114), Base (8453) and BNB Chain (56): chain totals, the 24-hour token board, prints, one token's tape, venue share and a wallet's PnL, from Chord's own index of every swap on those chains. One set of routes, the chain in the path."
+      "description": "Avalanche C-Chain (43114), Base (8453), BNB Chain (56) and Arbitrum One (42161): chain totals, the 24-hour token board, prints, one token's tape, venue share and a wallet's PnL, from Chord's own index of every swap on those chains. One set of routes, the chain in the path."
     },
     {
       "name": "Solana data",
@@ -111,11 +111,12 @@
                 143,
                 43114,
                 8453,
-                56
+                56,
+                42161
               ],
               "default": 143
             },
-            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain. Omitted = 143. Always pass it."
+            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain · `42161` Arbitrum One. Omitted = 143. Always pass it."
           },
           {
             "name": "inputMint",
@@ -303,7 +304,8 @@
                       143,
                       43114,
                       8453,
-                      56
+                      56,
+                      42161
                     ],
                     "default": 143,
                     "description": "Must match the quote."
@@ -439,11 +441,12 @@
                 143,
                 43114,
                 8453,
-                56
+                56,
+                42161
               ],
               "default": 143
             },
-            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain. Omitted = 143."
+            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain · `42161` Arbitrum One. Omitted = 143."
           },
           {
             "name": "tokenIn",
@@ -604,7 +607,8 @@
                       143,
                       43114,
                       8453,
-                      56
+                      56,
+                      42161
                     ]
                   },
                   "from": {
@@ -730,7 +734,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Chain id or key: `143` monad · `4663` robinhood · `5042` arc · `43114` avalanche · `8453` base · `56` bnb."
+            "description": "Chain id or key: `143` monad · `4663` robinhood · `5042` arc · `43114` avalanche · `8453` base · `56` bnb · `42161` arbitrum."
           },
           {
             "name": "tokenIn",
@@ -3903,7 +3907,7 @@
         ],
         "operationId": "searchTokens",
         "summary": "Search tokens on a chain",
-        "description": "Symbol, name or address. What it searches depends on `chain`:\n\n- `4663` Robinhood Chain: the curated list (`verified: true`, stocks tagged `stock`) plus tokens that traded in the last 24 hours and are not on it (`verified: false`, no logo).\n- `5042` Arc: every token traded in the last 24 hours, the same index as `/arc/tokens/search`. `verified` is true for tokens on the curated Arc list.\n- `43114` / `8453` / `56`: that chain's token list, all `verified: true`. A chain that is not public yet answers `404 CHAIN_NOT_PUBLIC` unless the request carries an `X-API-Key`.\n- no `chain`, or `143`: Monad off-list discovery. Tokens found through DexScreener that are **not** on the curated Monad list, with a logo and on-chain decimals, all `verified: false`. This mode answers `{ tokens }` only, returns up to 8 rows whatever `limit` says, and returns an empty list for a query under 2 characters.\n\nRanking: the exact address, then the exact symbol, a symbol prefix, a name prefix, then any substring; verified rows first within a rank, one row per address. A leading `$` is ignored. Treat `verified: false` as unvetted and check the address before trading it.\n\n**Arc**: `/arc/tokens/search` returns full board rows (price, volume, pools, flags) for the same query.",
+        "description": "Symbol, name or address. What it searches depends on `chain`:\n\n- `4663` Robinhood Chain: the curated list (`verified: true`, stocks tagged `stock`) plus tokens that traded in the last 24 hours and are not on it (`verified: false`, no logo).\n- `5042` Arc: every token traded in the last 24 hours, the same index as `/arc/tokens/search`. `verified` is true for tokens on the curated Arc list.\n- `43114` / `8453` / `56` / `42161`: that chain's token list, all `verified: true`. A chain that is not public yet answers `404 CHAIN_NOT_PUBLIC` unless the request carries an `X-API-Key`.\n- no `chain`, or `143`: Monad off-list discovery. Tokens found through DexScreener that are **not** on the curated Monad list, with a logo and on-chain decimals, all `verified: false`. This mode answers `{ tokens }` only, returns up to 8 rows whatever `limit` says, and returns an empty list for a query under 2 characters.\n\nRanking: the exact address, then the exact symbol, a symbol prefix, a name prefix, then any substring; verified rows first within a rank, one row per address. A leading `$` is ignored. Treat `verified: false` as unvetted and check the address before trading it.\n\n**Arc**: `/arc/tokens/search` returns full board rows (price, volume, pools, flags) for the same query.",
         "parameters": [
           {
             "name": "q",
@@ -3928,11 +3932,12 @@
                 43114,
                 8453,
                 56,
+                42161,
                 143
               ],
               "default": 143
             },
-            "description": "Chain id: `4663` Robinhood Chain · `5042` Arc · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain · `143` Monad. Omitted = 143. Pass the chain you want: the default is Monad off-list discovery."
+            "description": "Chain id: `4663` Robinhood Chain · `5042` Arc · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain · `42161` Arbitrum One · `143` Monad. Omitted = 143. Pass the chain you want: the default is Monad off-list discovery."
           },
           {
             "name": "limit",
@@ -4211,7 +4216,7 @@
         ],
         "operationId": "candles",
         "summary": "Candles (data API)",
-        "description": "OHLCV for any token Chord indexes on Arc, Robinhood Chain, Avalanche, Base, BNB Chain or Monad, built only from Chord's own index — never a third-party feed, so `source` is always `index`. 1m / 5m / 15m come from a 1-minute rollup that keeps history after raw trades are retired; 1h and above from the hourly rollup; the newest minutes straight from the tape. Each candle carries `n`, the trades in the bucket. Buckets without a trade are absent unless `fill=1`, which carries the previous close through them.\n\nPaging: the default window ends with the still-open bucket (`forming: true`) and holds `limit` buckets. A `from`–`to` range wider than `limit` keeps the newest buckets; ask for the previous page with `to` = this page's `from`. The token must trade on the chain you name — `404 UNKNOWN_TOKEN` says which chain it trades on when it is another one. The zero address stands for the chain's native asset (its wrapped twin, or the USDC predeploy on Arc). For live candles subscribe on `/v1/ws/live` (see Streaming).\n\n**Avalanche, Base, BNB Chain** (`43114`, `8453`, `56`): candles come from chain-keyed tables, so one address on two chains is two tokens, and `404 UNKNOWN_TOKEN` means no indexed trades on the chain you named. These chains answer once their tape runs and, until the chain is public, only to requests with an `X-API-Key` (`400 UNSUPPORTED_CHAIN` otherwise; all three are public today). Where the tape runs with an ingest floor (BNB Chain, $100 today) the response carries `ingestFloor`, and `v` and `n` count only trades at or above it.",
+        "description": "OHLCV for any token Chord indexes on Arc, Robinhood Chain, Avalanche, Base, BNB Chain, Arbitrum or Monad, built only from Chord's own index — never a third-party feed, so `source` is always `index`. 1m / 5m / 15m come from a 1-minute rollup that keeps history after raw trades are retired; 1h and above from the hourly rollup; the newest minutes straight from the tape. Each candle carries `n`, the trades in the bucket. Buckets without a trade are absent unless `fill=1`, which carries the previous close through them.\n\nPaging: the default window ends with the still-open bucket (`forming: true`) and holds `limit` buckets. A `from`–`to` range wider than `limit` keeps the newest buckets; ask for the previous page with `to` = this page's `from`. The token must trade on the chain you name — `404 UNKNOWN_TOKEN` says which chain it trades on when it is another one. The zero address stands for the chain's native asset (its wrapped twin, or the USDC predeploy on Arc). For live candles subscribe on `/v1/ws/live` (see Streaming).\n\n**Avalanche, Base, BNB Chain** (`43114`, `8453`, `56`): candles come from chain-keyed tables, so one address on two chains is two tokens, and `404 UNKNOWN_TOKEN` means no indexed trades on the chain you named. These chains answer once their tape runs and, until the chain is public, only to requests with an `X-API-Key` (`400 UNSUPPORTED_CHAIN` otherwise; all three are public today). Where the tape runs with an ingest floor (BNB Chain, $100 today) the response carries `ingestFloor`, and `v` and `n` count only trades at or above it.",
         "parameters": [
           {
             "name": "chain",
@@ -4225,11 +4230,12 @@
                 43114,
                 8453,
                 56,
+                42161,
                 143
               ],
               "default": 143
             },
-            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain · `143` Monad. Omitted = 143."
+            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain · `42161` Arbitrum One · `143` Monad. Omitted = 143."
           },
           {
             "name": "token",
@@ -15965,12 +15971,14 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
                 "43114",
                 "8453",
-                "56"
+                "56",
+                "42161"
               ]
             },
-            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56`, `arbitrum` or `42161` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
           }
         ],
         "responses": {
@@ -16122,12 +16130,14 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
                 "43114",
                 "8453",
-                "56"
+                "56",
+                "42161"
               ]
             },
-            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56`, `arbitrum` or `42161` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
           }
         ],
         "responses": {
@@ -16394,12 +16404,14 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
                 "43114",
                 "8453",
-                "56"
+                "56",
+                "42161"
               ]
             },
-            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56`, `arbitrum` or `42161` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
           },
           {
             "name": "limit",
@@ -16582,12 +16594,14 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
                 "43114",
                 "8453",
-                "56"
+                "56",
+                "42161"
               ]
             },
-            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56`, `arbitrum` or `42161` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
           },
           {
             "name": "limit",
@@ -16758,12 +16772,14 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
                 "43114",
                 "8453",
-                "56"
+                "56",
+                "42161"
               ]
             },
-            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56`, `arbitrum` or `42161` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
           },
           {
             "name": "address",
@@ -17125,12 +17141,14 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
                 "43114",
                 "8453",
-                "56"
+                "56",
+                "42161"
               ]
             },
-            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56`, `arbitrum` or `42161` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
           },
           {
             "name": "address",
@@ -17255,12 +17273,14 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
                 "43114",
                 "8453",
-                "56"
+                "56",
+                "42161"
               ]
             },
-            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56`, `arbitrum` or `42161` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
           },
           {
             "name": "address",
@@ -17488,12 +17508,14 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
                 "43114",
                 "8453",
-                "56"
+                "56",
+                "42161"
               ]
             },
-            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56`, `arbitrum` or `42161` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
           },
           {
             "name": "days",
@@ -17703,12 +17725,14 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
                 "43114",
                 "8453",
-                "56"
+                "56",
+                "42161"
               ]
             },
-            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56`, `arbitrum` or `42161` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
           },
           {
             "name": "address",
@@ -17965,12 +17989,14 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
                 "43114",
                 "8453",
-                "56"
+                "56",
+                "42161"
               ]
             },
-            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56`, `arbitrum` or `42161` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
           },
           {
             "name": "address",
@@ -24345,6 +24371,7 @@
                               "avalanche",
                               "base",
                               "bnb",
+                              "arbitrum",
                               "solana"
                             ]
                           },
@@ -25021,6 +25048,7 @@
                               "avalanche",
                               "base",
                               "bnb",
+                              "arbitrum",
                               "solana"
                             ]
                           },
@@ -25605,6 +25633,7 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
                 "solana"
               ]
             },
@@ -25976,6 +26005,7 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
                 "solana"
               ]
             },
