@@ -108,11 +108,14 @@
               "enum": [
                 5042,
                 4663,
-                143
+                143,
+                43114,
+                8453,
+                56
               ],
               "default": 143
             },
-            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad. Omitted = 143. Chord surfaces are 5042 and 4663. Always pass it."
+            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain. Omitted = 143. Always pass it."
           },
           {
             "name": "inputMint",
@@ -276,7 +279,7 @@
         ],
         "operationId": "buildSwap",
         "summary": "Build an unsigned swap transaction",
-        "description": "Turns a quote into a transaction against the Chord router. You sign it and broadcast it; Chord never sees a key and never holds funds.\n\n**Notes**\n- Send the `/quote` body back unmodified. `chain` must match the quote.\n- For an ERC-20 input, approve the router (`transaction.to`) for at least `inputAmount` first — or run `/swap/simulate` and let it tell you.\n- `slippageBps` is a consistency check only: the signed minimum output is the quote's `otherAmountThreshold`. A different value is refused with `SLIPPAGE_MISMATCH` — re-quote at the slippage you want.\n- On Arc the native sentinel aliases to the USDC predeploy: a \"native\" input is pulled by `transferFrom`, a \"native\" output is delivered as the predeploy, and `value` is always 0.\n- `batch: \"7702\"` is Monad-only (EIP-7702 one-signature approve+swap); it is ignored on 5042 / 4663.",
+        "description": "Turns a quote into a transaction against the Chord router. You sign it and broadcast it; Chord never sees a key and never holds funds.\n\n**Notes**\n- Send the `/quote` body back unmodified. `chain` must match the quote.\n- For an ERC-20 input, approve the router (`transaction.to`) for at least `inputAmount` first — or run `/swap/simulate` and let it tell you.\n- `slippageBps` is a consistency check only: the signed minimum output is the quote's `otherAmountThreshold`. A different value is refused with `SLIPPAGE_MISMATCH` — re-quote at the slippage you want.\n- On Arc the native sentinel aliases to the USDC predeploy: a \"native\" input is pulled by `transferFrom`, a \"native\" output is delivered as the predeploy, and `value` is always 0.\n- `batch: \"7702\"` is Monad-only (EIP-7702 one-signature approve+swap); it is ignored on every other chain.",
         "requestBody": {
           "required": true,
           "content": {
@@ -297,7 +300,10 @@
                     "enum": [
                       5042,
                       4663,
-                      143
+                      143,
+                      43114,
+                      8453,
+                      56
                     ],
                     "default": 143,
                     "description": "Must match the quote."
@@ -430,11 +436,14 @@
               "enum": [
                 5042,
                 4663,
-                143
+                143,
+                43114,
+                8453,
+                56
               ],
               "default": 143
             },
-            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad. Omitted = 143."
+            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain. Omitted = 143."
           },
           {
             "name": "tokenIn",
@@ -592,7 +601,10 @@
                     "enum": [
                       5042,
                       4663,
-                      143
+                      143,
+                      43114,
+                      8453,
+                      56
                     ]
                   },
                   "from": {

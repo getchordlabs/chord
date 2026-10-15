@@ -55,6 +55,8 @@ const UNIX_MS = int("Unix time, milliseconds — when the server built this answ
 const q = (name, schema, description, required = false) => ({ name, in: "query", required, schema, description });
 const p = (name, schema, description) => ({ name, in: "path", required: true, schema, description });
 const CHAIN_DESC = { 5042: "Arc", 4663: "Robinhood Chain", 143: "Monad", 43114: "Avalanche C-Chain", 8453: "Base", 56: "BNB Chain" };
+// Chains the router is live on through the API (TX_CHAINS in packages/api/src/config/contracts.ts).
+const SWAP_CHAINS = [5042, 4663, 143, 43114, 8453, 56];
 const chainQ = (chains, { required = false, def, note = "" } = {}) => {
   const list = chains.map((c) => `\`${c}\` ${CHAIN_DESC[c]}`).join(" · ");
   return q("chain", { type: "integer", enum: chains, ...(def !== undefined ? { default: def } : {}) }, `Chain id: ${list}.${def !== undefined ? ` Omitted = ${def}.` : ""}${note ? ` ${note}` : ""}`, required);
@@ -308,7 +310,7 @@ add("/quote", "get", op(T.swap, "getQuote", "Best route for a swap",
 - An empty \`routePlan\` is a real answer (no route at this size); read \`noRouteReason\`.`,
   {
     params: [
-      chainQ([5042, 4663, 143], { def: 143, note: "Chord surfaces are 5042 and 4663. Always pass it." }),
+      chainQ(SWAP_CHAINS, { def: 143, note: "Always pass it." }),
       q("inputMint", ADDRESS, "Token you sell. The zero address means the native unit (an alias for the USDC predeploy on Arc; ETH on Robinhood Chain).", true),
       q("outputMint", ADDRESS, "Token you buy.", true),
       q("amount", WEI, "Input amount, smallest unit.", true),
@@ -327,11 +329,11 @@ add("/swap", "post", op(T.swap, "buildSwap", "Build an unsigned swap transaction
 - For an ERC-20 input, approve the router (\`transaction.to\`) for at least \`inputAmount\` first — or run \`/swap/simulate\` and let it tell you.
 - \`slippageBps\` is a consistency check only: the signed minimum output is the quote's \`otherAmountThreshold\`. A different value is refused with \`SLIPPAGE_MISMATCH\` — re-quote at the slippage you want.
 - On Arc the native sentinel aliases to the USDC predeploy: a "native" input is pulled by \`transferFrom\`, a "native" output is delivered as the predeploy, and \`value\` is always 0.
-- \`batch: "7702"\` is Monad-only (EIP-7702 one-signature approve+swap); it is ignored on 5042 / 4663.`,
+- \`batch: "7702"\` is Monad-only (EIP-7702 one-signature approve+swap); it is ignored on every other chain.`,
   {
     body: bodyJson(obj({
       quoteResponse: ref("QuoteResponse"), userPublicKey: { ...ADDRESS, description: "Wallet that signs and receives the output." },
-      chain: { type: "integer", enum: [5042, 4663, 143], default: 143, description: "Must match the quote." },
+      chain: { type: "integer", enum: SWAP_CHAINS, default: 143, description: "Must match the quote." },
       slippageBps: { type: "integer", minimum: 1, maximum: 5000, description: "Optional consistency check — same value the quote was requested with." },
       feeAccount: { ...ADDRESS, description: "Referrer credited with the referral share of the protocol fee." },
       wrapUnwrapMON: { type: "boolean", default: true, description: "Wrap / unwrap the native unit around the swap where the chain has a wrapped native (not Arc)." },
@@ -343,14 +345,14 @@ add("/swap", "post", op(T.swap, "buildSwap", "Build an unsigned swap transaction
 add("/swap/calldata", "get", op(T.swap, "swapCalldata", "Quote and build in one call",
 `For contracts and bots that call the router directly: routes and encodes in a single request. The output goes to \`msg.sender\`; the caller approves the router for \`tokenIn\` and sends the calldata.`,
   {
-    params: [chainQ([5042, 4663, 143], { def: 143 }), q("tokenIn", ADDRESS, "Token the caller approves and sends.", true), q("tokenOut", ADDRESS, "Token returned to msg.sender.", true), q("amountIn", WEI, "", true), q("slippageBps", { type: "integer", minimum: 1, maximum: 5000, default: 100 }, "Sets `minOut` on the returned calldata.")],
+    params: [chainQ(SWAP_CHAINS, { def: 143 }), q("tokenIn", ADDRESS, "Token the caller approves and sends.", true), q("tokenOut", ADDRESS, "Token returned to msg.sender.", true), q("amountIn", WEI, "", true), q("slippageBps", { type: "integer", minimum: 1, maximum: 5000, default: 100 }, "Sets `minOut` on the returned calldata.")],
     responses: withErr({ 200: ok("Router call.", obj({ to: ADDRESS, data: str(""), value: WEI, minOut: str("Minimum output, human units."), expectedOut: str("Quoted output, human units."), gasLimit: str("") }), { to: ROUTER, data: "0x…", value: "0", minOut: "0.0942", expectedOut: "0.0951", gasLimit: "1000000" }) }, [400, 404, 429, 502]),
   }));
 
 add("/swap/simulate", "post", op(T.swap, "simulateSwap", "Simulate a built transaction before signing",
 `\`eth_call\`s the built calldata from the user's address and estimates gas, so a revert is caught before the wallet opens. Known selectors are decoded (\`NotRouter\`, a paused Kuru market, allowance and balance errors). An allowance revert is advisory: approve first, then swap.`,
   {
-    body: bodyJson(obj({ chain: { type: "integer", enum: [5042, 4663, 143] }, from: ADDRESS, to: ADDRESS, data: str("Calldata from `/swap`."), value: WEI }, undefined, { required: ["from", "to", "data", "value"] }), { chain: 5042, from: WAL, to: ROUTER, data: "0xdc72a437…", value: "0" }),
+    body: bodyJson(obj({ chain: { type: "integer", enum: SWAP_CHAINS }, from: ADDRESS, to: ADDRESS, data: str("Calldata from `/swap`."), value: WEI }, undefined, { required: ["from", "to", "data", "value"] }), { chain: 5042, from: WAL, to: ROUTER, data: "0xdc72a437…", value: "0" }),
     responses: withErr({ 200: ok("`ok: true` with the simulated output and gas, or `ok: false` with the decoded revert.", obj({ ok: bool(""), amountOut: nullable(str("Simulated output, smallest unit.")), gas: nullable(int("Estimated gas units.")), revert: str("Decoded reason (when `ok` is false)."), selector: nullable(str("4-byte error selector.")) }), { ok: true, amountOut: "465", gas: 318189 }) }, [400, 503]),
   }));
 
