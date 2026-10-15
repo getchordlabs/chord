@@ -4,8 +4,8 @@ A stdio bridge to the hosted Chord MCP server, plus a function-calling manifest.
 
 The tools live in the API (`POST https://api.getchord.xyz/v1/mcp`, source `packages/api/src/services/mcp/tools.ts`).
 This package only carries the protocol: it lists and calls those tools over HTTP, so a new or changed tool reaches every
-install without a release. 17 tools today; every data tool takes a `chain` (`monad`, `robinhood`, `arc`, `avalanche`,
-`base`, `bnb`, `arbitrum`, `solana`). Nothing signs or sends: `chord_swap_tx` returns an unsigned transaction for the caller's wallet.
+install without a release. 17 tools today; every data tool takes a `chain` (`ethereum`, `monad`, `robinhood`, `arc`,
+`avalanche`, `base`, `bnb`, `arbitrum`, `solana`). Nothing signs or sends: `chord_swap_tx` returns an unsigned transaction for the caller's wallet.
 
 **Use the hosted server directly when your client speaks HTTP** (Claude Code, Claude Desktop, Cursor):
 
