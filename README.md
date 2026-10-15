@@ -144,4 +144,7 @@ for these folders, so every commit dated 2026-09-13 or later was made during or 
 
 ## License
 
-All rights reserved. The source is public for review; no license to reuse it is granted (most contracts carry `SPDX-License-Identifier: UNLICENSED`).
+MIT, see [`LICENSE`](LICENSE). It covers everything in this repository: contracts, agent, skill, Docs MCP, OpenAPI spec
+and SDK. The submodules in `contracts/lib/` keep their own licenses (OpenZeppelin MIT, forge-std MIT or Apache-2.0).
+Sources verified on-chain before 2026-10-15 still read `SPDX-License-Identifier: UNLICENSED`; the code is the same and
+is MIT from that date.
