@@ -1,0 +1,9 @@
+{
+  "name": "chord",
+  "version": "1.2.0",
+  "mcpServers": {
+    "chord": {
+      "httpUrl": "https://api.getchord.xyz/v1/mcp"
+    }
+  }
+}

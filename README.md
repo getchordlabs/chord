@@ -20,6 +20,7 @@ The hosted MCP server needs no key and no install (Streamable HTTP). `?chain=<ke
 
 ```bash
 claude mcp add --transport http chord https://api.getchord.xyz/v1/mcp
+gemini extensions install https://github.com/getchordlabs/chord   # Gemini CLI, reads gemini-extension.json
 ```
 
 17 tools, each taking a `chain`: `chord_chains`, `chord_status`, `chord_overview`, `chord_tokens`, `chord_search`,
