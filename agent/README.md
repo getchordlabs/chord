@@ -5,7 +5,7 @@ A stdio bridge to the hosted Chord MCP server, plus a function-calling manifest.
 The tools live in the API (`POST https://api.getchord.xyz/v1/mcp`, source `packages/api/src/services/mcp/tools.ts`).
 This package only carries the protocol: it lists and calls those tools over HTTP, so a new or changed tool reaches every
 install without a release. 17 tools today; every data tool takes a `chain` (`monad`, `robinhood`, `arc`, `avalanche`,
-`base`, `bnb`, `solana`). Nothing signs or sends: `chord_swap_tx` returns an unsigned transaction for the caller's wallet.
+`base`, `bnb`, `arbitrum`, `solana`). Nothing signs or sends: `chord_swap_tx` returns an unsigned transaction for the caller's wallet.
 
 **Use the hosted server directly when your client speaks HTTP** (Claude Code, Claude Desktop, Cursor):
 
@@ -15,9 +15,10 @@ claude mcp add --transport http chord https://api.getchord.xyz/v1/mcp
 
 This package is for clients that only speak stdio, and for calling the tools from code.
 
-**Availability.** Not published to npm, and this repository is not public. Outside developers use the hosted server,
-the manifest at https://api.getchord.xyz/v1/mcp/tools.json, the Agent skill (https://getchord.xyz/docs/agents/skill/)
-and the REST API. Public docs: https://getchord.xyz/docs/agents/mcp/.
+**Availability.** Not published to npm; the source is public at https://github.com/getchordlabs/chord (folder `agent/`).
+Most developers use the hosted server (MCP Registry name `io.github.getchordlabs/chord`), the manifest at
+https://api.getchord.xyz/v1/mcp/tools.json, the Agent skill (https://getchord.xyz/docs/agents/skill/) and the REST API.
+Public docs: https://getchord.xyz/docs/agents/mcp/.
 
 ## stdio
 

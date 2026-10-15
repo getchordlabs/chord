@@ -1,7 +1,7 @@
 {
   "name": "chord-agent",
   "version": "0.2.0",
-  "description": "Chord agent harness: a stdio bridge to the hosted Chord MCP and a function-calling manifest. Market data and unsigned swap transactions on Monad, Robinhood Chain, Arc, Avalanche, Base, BNB Chain and Solana; the chain is a parameter of every tool.",
+  "description": "Chord agent harness: a stdio bridge to the hosted Chord MCP and a function-calling manifest. Market data and unsigned swap transactions on Monad, Robinhood Chain, Arc, Avalanche, Base, BNB Chain, Arbitrum One and Solana; the chain is a parameter of every tool.",
   "type": "module",
   "bin": {
     "chord-agent": "./dist/mcp.js"
