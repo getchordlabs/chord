@@ -48,6 +48,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -76,6 +78,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -114,6 +118,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -147,6 +153,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -180,6 +188,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -219,6 +229,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -270,6 +282,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -303,6 +317,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -336,6 +352,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -380,6 +398,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -419,6 +439,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -453,6 +475,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -486,6 +510,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."
@@ -542,6 +568,8 @@
                 "avalanche",
                 "base",
                 "bnb",
+                "arbitrum",
+                "ethereum",
                 "solana"
               ],
               "description": "Chain key. chord_chains lists what each chain supports."

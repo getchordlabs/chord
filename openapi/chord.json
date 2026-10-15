@@ -3694,11 +3694,16 @@
               "enum": [
                 5042,
                 4663,
-                143
+                143,
+                43114,
+                8453,
+                56,
+                42161,
+                1
               ],
               "default": 143
             },
-            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad. Omitted = 143."
+            "description": "Chain id: `5042` Arc · `4663` Robinhood Chain · `143` Monad · `43114` Avalanche C-Chain · `8453` Base · `56` BNB Chain · `42161` Arbitrum One · `1` Ethereum. Omitted = 143."
           }
         ],
         "responses": {
@@ -4931,7 +4936,12 @@
               "enum": [
                 5042,
                 4663,
-                143
+                143,
+                43114,
+                8453,
+                56,
+                42161,
+                1
               ]
             },
             "description": ""
