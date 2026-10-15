@@ -1,8 +1,8 @@
 # Chord
 
-Non-custodial trading API and AI agent. One quote call finds the best route across the DEXs of seven EVM chains
-(Monad, Robinhood Chain, Arc, Avalanche, Base, BNB Chain and Arbitrum One), and one router contract executes it in a
-single transaction. Next to trading, Chord keeps a live index of swaps, holders, LP positions and wallet PnL on those
+Non-custodial trading API and AI agent. One quote call finds the best route across the DEXs of eight EVM chains
+(Ethereum, Monad, Robinhood Chain, Arc, Avalanche, Base, BNB Chain and Arbitrum One), and one router contract executes
+it in a single transaction. Next to trading, Chord keeps a live index of swaps, holders, LP positions and wallet PnL on those
 chains and on Solana, which apps and AI agents can query.
 
 - App (Ask, AI trading agent + wallet): https://getchord.xyz/ask
@@ -36,6 +36,7 @@ function-calling manifest at https://api.getchord.xyz/v1/mcp/tools.json.
 
 | Chain | Chain id | Swaps (quote + unsigned transaction) | Data |
 |---|---|---|---|
+| Ethereum | 1 | yes | tokens, trades, candles, wallet PnL |
 | Monad | 143 | yes | tokens, trades, candles, wallet PnL, smart money, LP |
 | Robinhood Chain | 4663 | yes | tokens, trades, candles, wallet PnL, smart money, holders, LP |
 | Arc | 5042 | yes | tokens, trades, candles, wallet PnL, smart money, holders, LP |
@@ -63,7 +64,7 @@ The routing engine (Rust) and the API server (TypeScript) are not in this reposi
 
 ## Contracts
 
-The three proxies sit at the same addresses on all seven EVM chains (aligned deployer nonces):
+The three proxies sit at the same addresses on all eight EVM chains (aligned deployer nonces):
 
 | Contract | Address |
 |---|---|
@@ -103,6 +104,19 @@ Router upgrade on Robinhood Chain: tx `0x9111f311319d778d2b53cce16fe7d471a15e61b
 
 All verified on Sourcify. Each venue was swapped both ways on mainnet through the router before the engine routed it.
 
+### Ethereum (chain id 1, deployed 2026-10-15)
+
+Same addresses as on Arbitrum One for the router implementation and the three core adapters:
+
+| Contract | Address |
+|---|---|
+| ChordRouter implementation | `0x1cd8CeED960dE0c9787295c8F1BF278D4A36698c` |
+| ChordV3Adapter (Uniswap V3, PancakeSwap V3, SushiSwap V3) | `0xd55fe37e30435cF15fe2C7fcAAF1aBf19d13b195` |
+| ChordV2Adapter (Uniswap V2, SushiSwap V2) | `0xa61C202C4c989a1724E1B432C96A9f064856574d` |
+| ChordV4Adapter | `0xFE82b7714c36083AB518067f03680C59ac57840a` |
+
+All 9 contracts of the stack match on Sourcify; every venue was swapped both ways on mainnet before going public.
+
 ## Build and test
 
 ```bash
@@ -116,6 +130,8 @@ forge test --no-match-contract 'ForkTest$'
 
 - **Arbitrum One**: aligned Chord stack, deploy script and fork test (`edd957a`), swaps and the Ask side (`c28203c`),
   public on Oct 15 (`ca79736`).
+- **Ethereum**: aligned Chord stack, deploy script and fork test (`79233bc`), swaps and the Ask side (`8a46f39`),
+  tokens that need `approve(0)` first such as USDT (`69a06af`), public on Oct 15 (`38b466e`).
 - **New venues**: Metric v1 on Monad and Avalanche (`80daf2c`, `23bfe8c`), ERC-4626 deposit on Monad, which mints
   aprMON, shMON and gMON at the vault's rate when pools price below it (`a41a703`), WOOFi (`83283af`), Camelot V3
   through the Algebra Integral adapter (`454091c`), DODO V2 on Avalanche and Arbitrum (`1975d08`), LFJ Liquidity Book
