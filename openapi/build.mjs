@@ -1081,7 +1081,7 @@ for (const [by, opId, title, key] of [
       responses: { 200: ok("", obj({ chain: { type: "string", const: "solana" }, [by === "wallet" ? "owner" : by]: SOL_ADDR, events: arr(SOL_LP_EVENT), nextBefore: nullable(SOL_TS) }), ex(key)), ...SOL_ERR("`BAD_ADDRESS` / `BAD_LIMIT` / `BAD_CURSOR`") } }));
 }
 
-// Solana swaps (beta) ─────────────────────────────────────────────────────────────────────────
+// Solana swaps (open since 2026-10-15 21:25 UTC) ─────────────────────────────────────────────────────────────────────────
 // routes/solTrade.ts (gate, validation) → services/solTrade.ts (fail-CLOSED: schemas/solTrade.ts drops unknown fields and refuses an
 // answer that is not the quote asked for) → the Solana box, packages/sol/src/trade/ (quote.ts: best of `direct` = the pump route +
 // Chord's router in router/, `jupiter`, `jupiter_meta`). Shapes here = schemas/solTrade.ts; change both in one commit.
