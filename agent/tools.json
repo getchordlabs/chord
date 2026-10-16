@@ -511,10 +511,9 @@
                 "base",
                 "bnb",
                 "arbitrum",
-                "ethereum",
-                "solana"
+                "ethereum"
               ],
-              "description": "Chain key. chord_chains lists what each chain supports."
+              "description": "EVM chain key. Solana swaps are REST only: GET /v1/sol/trade/quote."
             },
             "tokenIn": {
               "type": "string",
@@ -569,10 +568,9 @@
                 "base",
                 "bnb",
                 "arbitrum",
-                "ethereum",
-                "solana"
+                "ethereum"
               ],
-              "description": "Chain key. chord_chains lists what each chain supports."
+              "description": "EVM chain key. Solana swaps are REST only: GET /v1/sol/trade/quote."
             },
             "tokenIn": {
               "type": "string",
