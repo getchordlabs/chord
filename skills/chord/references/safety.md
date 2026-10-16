@@ -12,12 +12,12 @@ How to check, at call time:
 
 1. `GET /v1/tokens?chain=ID` is Chord's curated list: the canonical address and decimals of each
    listed symbol on that chain.
-2. On Avalanche, Base and BNB Chain, `GET /v1/chains/{key}/token/{addr}/ref-price` asks CoinGecko
+2. On Avalanche, Base, BNB Chain, Arbitrum and Ethereum, `GET /v1/chains/{key}/token/{addr}/ref-price` asks CoinGecko
    about that exact contract. `404 NOT_LISTED` means CoinGecko does not know it: a "USDT" there is not
    Tether.
 3. If the user gave both a name and an address and they disagree, stop and show both.
 
-Reference snapshot (read from the API on 2026-10-02; the API wins if it ever differs):
+Reference snapshot (read from the API on 2026-10-02, Arbitrum and Ethereum rows from Chord's chain registry on 2026-10-16; the API wins if it ever differs):
 
 | Chain | Token | Address | Decimals |
 |---|---|---|---|
@@ -40,6 +40,14 @@ Reference snapshot (read from the API on 2026-10-02; the API wins if it ever dif
 | Robinhood 4663 | WETH | `0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73` | 18 |
 | Monad 143 | USDC | `0x754704Bc059F8C67012fEd69BC8A327a5aafb603` | 6 |
 | Monad 143 | WMON | `0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A` | 18 |
+| Arbitrum 42161 | USDC (native, Circle) | `0xaf88d065e77c8cc2239327c5edb3a432268e5831` | 6 |
+| Arbitrum 42161 | USDC.e (bridged) | `0xff970a61a04b1ca14834a43f5de4533ebddb5cc8` | 6 |
+| Arbitrum 42161 | USDT0 | `0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9` | 6 |
+| Arbitrum 42161 | WETH | `0x82af49447d8a07e3bd95bd0d56f35241523fbab1` | 18 |
+| Ethereum 1 | USDC | `0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48` | 6 |
+| Ethereum 1 | USDT (approve 0 first) | `0xdac17f958d2ee523a2206206994597c13d831ec7` | 6 |
+| Ethereum 1 | DAI | `0x6b175474e89094c44da98b954eedeac495271d0f` | 18 |
+| Ethereum 1 | WETH | `0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2` | 18 |
 
 Wording when it fires: "0x1234...5678 is not the canonical USDT on BNB Chain (that is
 0x55d398326f99059ff775485246999027b3197955). A token can copy any name and symbol. I will not quote

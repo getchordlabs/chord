@@ -3,7 +3,7 @@
 An [Agent Skill](https://agentskills.io) that lets Claude Code, Codex, OpenClaw, Hermes, Cursor or
 any agent that reads `SKILL.md` use [Chord](https://getchord.xyz): on-chain market data, best-route
 swap quotes and unsigned swap transactions on Monad (143), Robinhood Chain (4663), Arc (5042),
-Avalanche (43114), Base (8453), BNB Chain (56) and Arbitrum One (42161), Solana data (pump.fun,
+Avalanche (43114), Base (8453), BNB Chain (56), Arbitrum One (42161) and Ethereum (1), Solana data (pump.fun,
 PumpSwap, Meteora, Raydium and Orca tokens from Chord's own tape; Solana swaps through Chord's own
 router and Jupiter are in beta), plus Chord Ask, the analyst behind getchord.xyz/ask.
 

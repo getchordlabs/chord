@@ -1,7 +1,7 @@
 # Chord Ask over the API
 
 Ask is Chord's analyst: the chat at https://getchord.xyz/ask, callable by programs. It runs about a
-hundred tools over Chord's index on all six chains and over outside market data (Hyperliquid prices
+hundred tools over Chord's index (Arc, Robinhood Chain, Avalanche, Base, BNB Chain, Arbitrum, Ethereum and Solana) and over outside market data (Hyperliquid prices
 for crypto majors, the Nasdaq quote for a US ticker, CoinGecko, DefiLlama, news, X posts, web pages),
 then answers in plain language with the sources it read.
 
@@ -9,7 +9,7 @@ Use it for judgement and for questions the REST data does not cover:
 
 - "Is this launch real, who is buying, is it safe?"; "where is support for ARGUS?"
 - "What is moving on Base and why?"; "compare these three tokens"
-- "What does wallet 0x... hold and how did it trade?" (balances on the six chains)
+- "What does wallet 0x... hold and how did it trade?" (balances on the eight EVM chains)
 - BTC, ETH or SOL price and structure, gold, FX, the real NVDA share, earnings dates, news
 - A wallet's open perps on Hyperliquid (read-only)
 
@@ -115,7 +115,7 @@ shared token budget.
 
 ## Picks
 
-`GET /v1/ask/picks` (public, no key): the analyst's current board of Arc tokens, rebuilt every four
+`GET /v1/ask/picks` (public, no key): the analyst's current board of tokens on Arc, Robinhood Chain, Avalanche, Base, BNB Chain, Arbitrum and Ethereum, rebuilt every four
 hours: side (bullish / bearish), score, confidence, reasons for and against, and a seven-day track
 record (picks graded, the share that moved their way, the average move). It carries no targets or
 stops. Relay it as Chord's model output, with its track record, never as a recommendation to buy or
