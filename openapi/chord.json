@@ -25325,7 +25325,7 @@
         ],
         "operationId": "chainsDirectory",
         "summary": "Every chain and the route of each capability",
-        "description": "The directory an agent starts from. One entry per chain Chord serves, with its constants (native asset, wrapped native, dollar anchors with real decimals, explorer) and, for each capability, the route that serves it on that chain. A capability the chain does not have is `null`: the data routes grew chain by chain, so this is the one place that says where to read what. Solana is listed with `id: null` and base58, case-sensitive addresses. A chain that is not public yet appears only for a caller with an API key.",
+        "description": "The directory an agent starts from. One entry per chain Chord serves, with its constants (native asset, wrapped native, dollar anchors with real decimals, explorer) and, for each capability, the route that serves it on that chain. A capability the chain does not have is `null`: the data routes grew chain by chain, so this is the one place that says where to read what. Solana is listed with `id: null` and base58, case-sensitive addresses; its `quote` and `swap` are `/sol/trade/quote` and `/sol/trade/send` while its trade lane is open to everyone. A chain that is not public yet appears only for a caller with an API key.",
         "responses": {
           "200": {
             "description": "",
@@ -27913,7 +27913,7 @@
           },
           "feeBps": {
             "type": "integer",
-            "description": "Protocol fee on the output token — tiered per token on-chain (`FeeCollector.feeBpsFor`): 0 on USDC/EURC on Arc, 25 default for new tokens."
+            "description": "Protocol fee on the output token, per token on-chain (`FeeCollector.feeBpsFor`): 5 bps by default on every chain, 0 on the stablecoins and majors a chain exempts (USDC / EURC on Arc, WETH / USDG and stocks on Robinhood Chain), capped at 100."
           },
           "feeAmount": {
             "type": "string",

@@ -148,7 +148,7 @@ const QuoteResponse = obj({
   routePlan: arr(ref("RouteLeg"), "Empty with `outputAmount` \"0\" = no route (an honest answer, never a fabricated price)."),
   noRouteReason: str("Only when `routePlan` is empty: `INSUFFICIENT_LIQUIDITY` (try a smaller amount) or `NO_POOLS`."),
   gasEstimate: str("Gas units, from the venue quoter or the RPC."), gasCostUSD: str(""), blockNumber: int(""), timeTaken: num("Engine seconds."),
-  feeBps: int("Protocol fee on the output token — tiered per token on-chain (`FeeCollector.feeBpsFor`): 0 on USDC/EURC on Arc, 25 default for new tokens."),
+  feeBps: int("Protocol fee on the output token, per token on-chain (`FeeCollector.feeBpsFor`): 5 bps by default on every chain, 0 on the stablecoins and majors a chain exempts (USDC / EURC on Arc, WETH / USDG and stocks on Robinhood Chain), capped at 100."),
   feeAmount: WEI, feeMint: ADDRESS, feeTier: str("`major` · `stable` · `standard` · `meme` · `new`."),
   preliminary: bool("Present only on `fast=1` answers: single-hop, ~400 ms, replace it with the full quote."),
 });
@@ -1251,7 +1251,7 @@ const CAP_NAMES = ["overview", "tokens", "search", "token", "trades", "candles",
 const CHAIN_KEYS = ["monad", "robinhood", "arc", "avalanche", "base", "bnb", "arbitrum", "ethereum", "solana"];
 
 add("/chains", "get", op(T.agents, "chainsDirectory", "Every chain and the route of each capability",
-  "The directory an agent starts from. One entry per chain Chord serves, with its constants (native asset, wrapped native, dollar anchors with real decimals, explorer) and, for each capability, the route that serves it on that chain. A capability the chain does not have is `null`: the data routes grew chain by chain, so this is the one place that says where to read what. Solana is listed with `id: null` and base58, case-sensitive addresses. A chain that is not public yet appears only for a caller with an API key.",
+  "The directory an agent starts from. One entry per chain Chord serves, with its constants (native asset, wrapped native, dollar anchors with real decimals, explorer) and, for each capability, the route that serves it on that chain. A capability the chain does not have is `null`: the data routes grew chain by chain, so this is the one place that says where to read what. Solana is listed with `id: null` and base58, case-sensitive addresses; its `quote` and `swap` are `/sol/trade/quote` and `/sol/trade/send` while its trade lane is open to everyone. A chain that is not public yet appears only for a caller with an API key.",
   { responses: withErr({ 200: ok("", obj({
     chains: arr(obj({
       key: str("Chain key, the value every `chain` parameter accepts.", { enum: CHAIN_KEYS }), id: nullable(int("EVM chain id; null for Solana.")), name: str(""), short: str("Short label."),
