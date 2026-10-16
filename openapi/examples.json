@@ -5736,5 +5736,68 @@
     "valueUsd": 14067112.555560041
    }
   ]
+ },
+ "/v1/agent/router/wallet/0x0f1171209dad379af0e486f2c77d275d6e0a4f79?days=30": {
+  "wallet": "0x0f1171209dad379af0e486f2c77d275d6e0a4f79",
+  "days": 30,
+  "since": 1789587369,
+  "swaps": 297,
+  "volumeUsd": 974.44,
+  "pricedBy": {
+   "stable": 279,
+   "coin": 18
+  },
+  "unpriced": 0,
+  "lastSwapAt": 1792094831,
+  "byChain": [
+   {
+    "chain": 1,
+    "key": "ethereum",
+    "swaps": 58,
+    "volumeUsd": 284.1
+   },
+   {
+    "chain": 42161,
+    "key": "arbitrum",
+    "swaps": 51,
+    "volumeUsd": 156.87
+   },
+   {
+    "chain": 56,
+    "key": "bnb",
+    "swaps": 40,
+    "volumeUsd": 144.68
+   },
+   {
+    "chain": 4663,
+    "key": "robinhood",
+    "swaps": 15,
+    "volumeUsd": 104.93
+   },
+   {
+    "chain": 8453,
+    "key": "base",
+    "swaps": 30,
+    "volumeUsd": 100.98
+   },
+   {
+    "chain": 143,
+    "key": "monad",
+    "swaps": 23,
+    "volumeUsd": 65.9
+   },
+   {
+    "chain": 43114,
+    "key": "avalanche",
+    "swaps": 53,
+    "volumeUsd": 63.45
+   },
+   {
+    "chain": 5042,
+    "key": "arc",
+    "swaps": 27,
+    "volumeUsd": 53.52
+   }
+  ]
  }
 }

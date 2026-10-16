@@ -1315,6 +1315,18 @@ add("/agent/stats", "get", op(T.agents, "agentStats", "Agent traffic per chain",
     updatedAt: str("ISO time."),
   }), ex("/v1/agent/stats?chain=arc&days=7")) }, [400, 429, 503]) }));
 
+add("/agent/router/wallet/{address}", "get", op(T.agents, "agentRouterWallet", "One wallet's swaps through Chord's router",
+  "What one address swapped through Chord's router contract in the last `days` × 24 h (rolling), read from the router's own `Swap` events: count and USD volume, in total and per chain. A swap with a dollar-stable leg is worth that leg; one with the chain's own coin (native or wrapped) on a leg is worth that amount at CoinGecko's price now; anything else is `unpriced` and counts for $0. MoltNode (moltnode.ag/quest) sizes RPC keys from `volumeUsd`. Public: router events are public chain data. Cached 60 s.",
+  { params: [p("address", ADDRESS, "The `sender` of the router swap (the wallet that called the router)."), q("days", { type: "integer", minimum: 1, maximum: 90, default: 30 }, "Window in days of 24 h, ending now.")],
+    responses: withErr({ 200: ok("", obj({
+      wallet: ADDRESS, days: int(""), since: int("Unix seconds: the start of the window."),
+      swaps: int("Swaps through the router in the window."), volumeUsd: num("USD of the priced swaps."),
+      pricedBy: obj({ stable: int("Valued by a dollar-stable leg."), coin: int("Valued by the chain coin's leg at today's price.") }),
+      unpriced: int("Swaps with neither leg: counted in `swaps`, worth $0 here."),
+      lastSwapAt: nullable(int("Unix seconds of the latest swap.")),
+      byChain: arr(obj({ chain: int(""), key: str(""), swaps: int(""), volumeUsd: num("") }), "Largest volume first."),
+    }), ex(`/v1/agent/router/wallet/${"0x0f1171209dad379af0e486f2c77d275d6e0a4f79"}?days=30`)) }, [400, 429, 503]) }));
+
 add("/mcp", "post", op(T.agents, "mcp", "Hosted MCP server",
   "Model Context Protocol over stateless Streamable HTTP: POST one JSON-RPC message (or a batch of up to 20), get JSON back. Methods: `initialize`, `ping`, `tools/list`, `tools/call`. 17 tools; every data tool takes a `chain`. `?chain=<key>` pins a default chain and names the server `chord-<key>`. The handshake and the tool list need no credentials and are not metered; a tool call is an ordinary request to this API made as the caller, so it is limited and metered exactly like the REST call it wraps. Send a key as `X-API-Key`, `Authorization: Bearer`, or `?apiKey=`. A tool-level failure is a normal result with `isError: true` and a sentence the model can act on. Guide: https://getchord.xyz/docs/agents/mcp/",
   { params: [q("chain", str("", { enum: CHAIN_KEYS }), "Default chain for this endpoint."), q("apiKey", str(""), "Your key, for connectors that cannot set a header.")],
