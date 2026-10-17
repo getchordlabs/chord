@@ -44,7 +44,7 @@ One row per stock token (no parameters; filter by `symbol` or `address` yourself
 | `volume24h`, `buyVolume24h`, `sellVolume24h`, `trades24h`, `traders` | 24h activity |
 | `liquidityUsd` | pool liquidity Chord sees for the token |
 | `navUsd` | the reference price of the underlying, when one is published |
-| `navSource` | `xyz-perp` = the trade.xyz perpetual's mark on Hyperliquid (tracks the underlying 24/7, can carry a small funding premium off-hours); `catalogue` = the issuer's exchange rate at the last catalogue refresh |
+| `navSource` | `xyz-perp` = the trade.xyz perpetual's mark on Hyperliquid (tracks the underlying 24/7, can carry a small funding premium off-hours); null when the stock has no perp (then `navUsd` and `basisPct` are null too) |
 | `basisPct` | gap of the token to `navUsd`, percent: `(priceUsd / navUsd - 1) x 100`. Positive = the token trades above the reference |
 | `offHours7d.sharePct` | share of the last 7 days' volume traded outside the NYSE session (09:30 to 16:00 New York, Mon to Fri; holidays not modelled) |
 
