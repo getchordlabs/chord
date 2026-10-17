@@ -11543,7 +11543,7 @@
         ],
         "operationId": "ask",
         "summary": "Ask the analyst",
-        "description": "Chord's analyst over the Arc index and the router — 40+ tools (trending, a token's flow, holders and risk, support and resistance, top traders on a token, a wallet's PnL and trades, largest prints, launches, depth, a bridge quote, read-only SQL over the index). Returns the answer, source links, an optional route card, tables and charts the analysis produced, and a report when one was built. It analyses: a plan (zones, tranches, an exit, the level where the idea is wrong) is written only when the question asks for one, and is illustrative, with its assumptions stated.\n\n**Layout**: `text` is the whole answer on its own. The optional fields `shape`, `parts`, `details`, `followUpKinds` and `focus` say how the chat lays it out: `parts` is the same answer in order, with the tables and charts of `viz` placed inside the text (in `text` a placed table is written out as a Markdown table), and `details` is further depth the chat folds, which `text` does not repeat. A client that ignores them loses nothing of the answer.\n\n**Auth**: a developer API key (`X-API-Key`) or a Google session bearer. Metered per key per day against the deployment's token budget; 8 questions a minute per caller.\n\n**Agents**: send `\"stream\": false` for one JSON answer (5–40 s). Without it the response is `text/event-stream` with `status` events (which tool is running), one `answer` event, then `done`.",
+        "description": "Chord's analyst over the Arc index and the router — 40+ tools (trending, a token's flow, holders and risk, support and resistance, top traders on a token, a wallet's PnL and trades, largest prints, launches, depth, a bridge quote, read-only SQL over the index). Returns the answer, source links, an optional route card, tables and charts the analysis produced, and a report when one was built. It analyses: a plan (zones, tranches, an exit, the level where the idea is wrong) is written only when the question asks for one, and is illustrative, with its assumptions stated.\n\n**Layout**: `text` is the whole answer on its own. The optional fields `shape`, `parts`, `details`, `followUpKinds` and `focus` say how the chat lays it out: `parts` is the same answer in order, with the tables and charts of `viz` placed inside the text (in `text` a placed table is written out as a Markdown table), and `details` is further depth the chat folds, which `text` does not repeat. A client that ignores them loses nothing of the answer.\n\n**Auth**: a developer API key (`X-API-Key`) or a Google session bearer. Metered per key per day against the deployment's token budget; 8 questions a minute per caller.\n\n**Agents**: send `\"stream\": false` for one JSON answer (5–40 s). Without it the response is `text/event-stream` with `status` events (which tool is running), `step` events (a lookup finished, with the chain it read), one `answer` event, then `done`.",
         "requestBody": {
           "required": true,
           "content": {
@@ -11713,11 +11713,83 @@
                       "type": "array",
                       "items": {
                         "type": "string"
-                      }
+                      },
+                      "description": "Every tool called, by name. One tool serves several chains: `steps[].chain` says which chain each lookup read (not on a deep or researched answer, whose steps are its research parts)."
                     },
                     "tokens": {
                       "type": "integer",
                       "description": "Model tokens spent."
+                    },
+                    "steps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tool": {
+                            "type": "string",
+                            "description": "The tool's name."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "What the chat showed while it ran."
+                          },
+                          "round": {
+                            "type": "integer",
+                            "description": "The model round it ran in, from 0."
+                          },
+                          "ms": {
+                            "type": "integer",
+                            "description": "How long it took."
+                          },
+                          "detail": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "What it was asked for: a token, a wallet, a query."
+                          },
+                          "chain": {
+                            "type": "string",
+                            "enum": [
+                              "arc",
+                              "robinhood",
+                              "monad",
+                              "avalanche",
+                              "base",
+                              "bnb",
+                              "arbitrum",
+                              "ethereum",
+                              "solana"
+                            ],
+                            "description": "The chain this lookup read (`chain_token` reads a token on Arc, Base or Solana alike). Absent when it read no chain or several: a search over every chain, a macro board, a research part of a deep answer."
+                          },
+                          "sources": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "label": {
+                                  "type": "string",
+                                  "description": ""
+                                },
+                                "href": {
+                                  "type": "string",
+                                  "description": ""
+                                }
+                              }
+                            },
+                            "description": "The links this lookup read."
+                          }
+                        },
+                        "description": "One lookup.",
+                        "required": [
+                          "tool",
+                          "label",
+                          "round",
+                          "ms"
+                        ]
+                      },
+                      "description": "What ran, in order, one row per lookup. On a deep or researched answer the rows are its research parts instead (`tool` `deep_research`, `detail` \"N lookups\", no `chain`); `toolsUsed` names every lookup."
                     },
                     "followUps": {
                       "type": "array",

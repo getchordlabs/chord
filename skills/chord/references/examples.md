@@ -1006,7 +1006,7 @@ Answer to the first call (guest session, 2.4 s):
     "align": ["l", "r", "... 6 more"]
    }
   ],
- "toolsUsed": ["arc_tokens"],
+ "toolsUsed": ["chain_tokens"],
  "tokens": 56714,
  "credits": {"plan": "guest", "cost": 1, "remaining": 9, "allowance": 10},
  "clarify": null,

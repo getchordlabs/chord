@@ -69,7 +69,8 @@ Body:
   "citations": [{ "label": "Markets", "href": "/markets" }],
   "quote": null,
   "artifact": null,
-  "toolsUsed": ["arc_tokens"],
+  "toolsUsed": ["chain_tokens"],
+  "steps": [{ "tool": "chain_tokens", "label": "...", "round": 0, "ms": 640, "detail": null, "chain": "arc" }],
   "followUps": ["...", "...", "Alert me if ..."],
   "followUpKinds": ["deeper", "ask", "alert"],
   "assets": [],
@@ -96,10 +97,11 @@ Body:
 | `clarify` | when not null, Ask is asking the user something back: relay the question |
 | `dyor`, `disclaimer` | present on market answers: keep the disclaimer with the answer |
 | `toolsUsed`, `tokens`, `credits` | what ran and what it cost |
+| `steps` | what ran, in order, one row per lookup: `{ tool, label, round, ms, detail, chain }`. One tool serves several chains, so `chain` says which one a lookup read (`arc`, `robinhood`, `monad`, `avalanche`, `base`, `bnb`, `arbitrum`, `ethereum`, `solana`); absent when it read none or several. Name that chain when you say where a number came from. On a deep or researched answer the rows are its research parts (`deep_research`, "N lookups", no `chain`); `toolsUsed` names every lookup |
 
 `chord.py ask` prints `text`, `details`, `citations`, `quote`, `artifact`, `viz`, `clarify`,
 `disclaimer`, `followUps`, `toolsUsed`, `credits` and `elapsedMs`. `shape`, `parts`, `followUpKinds`,
-`assets`, `focus`, `revokes`, `dyor` and `tokens` come only with the direct API call.
+`assets`, `focus`, `revokes`, `steps`, `dyor` and `tokens` come only with the direct API call.
 
 ## Limits and errors
 
