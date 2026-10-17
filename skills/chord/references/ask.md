@@ -86,19 +86,20 @@ Body:
 | `shape` | the kind of answer the question got: `fact`, `explain`, `brief` (a call with its evidence), `board` (a ranked list), `why`, `overview`, `compare`, `post`, `do`, `report`, `auto` |
 | `parts` | the same answer in order for a client that draws blocks: `{ "t": "md", "text" }` or `{ "t": "viz", "i" }` (the table or chart `viz[i]` placed there). `text` already holds it all: do not relay both |
 | `details` | `{ text, parts }` or null: further depth the chat folds away, not repeated in `text`. Relay `details.text` after the answer when the user wants the full analysis (`chord.py ask` prints it too) |
-| `citations` | where to check the numbers: `{ label, href }` each, `href` a Chord page (a path under https://getchord.xyz) or the source's own URL. Cite them; to verify a number that matters, read it from the REST data |
+| `citations` | where to check the numbers: `{ label, href }` each, `href` a Chord page (a path under https://getchord.xyz) or the source's own URL. Cite them; to verify a number that matters, read it from the REST data. A deep answer numbers them: `[n]` in `text` is `citations[n-1]`, each with `tier` (1 primary data, 2 major media, 3 blog or other site, 4 social) and `kind` (`index`, `data`, `official`, `media`, `blog`, `social`, `other`). Keep the numbers with the sources when you relay |
 | `quote` | a route card when the question implied a trade: the two tokens, the amounts in whole tokens, the venues, price impact, fee and a link to the trade on Chord. A preview, not a `/v1/quote` response: get a fresh `/v1/quote` before any swap, and the swap still needs the full confirmation flow in `SKILL.md` |
 | `artifact` | the token the answer is about: its stats and where volume traded (support, resistance, VWAP), a report link when one was built. No entry ladder, stop or targets. Present levels as the analyst's reading, not as orders |
 | `viz` | tables and charts it computed (`kind`: table, bar, line, donut), at most 6; the ones `parts` and `details` place come first. A table placed in the answer is already written out in `text`: do not show it twice |
 | `followUps`, `followUpKinds` | up to three next questions and, for each, `deeper`, `alert` or `ask`. Offer them; never set an alert the user did not ask for |
-| `assets`, `focus` | price chips for the assets named; `focus` = index of the one asset the answer is about, or null |
+| `assets`, `focus` | price chips for the assets named; `focus` = index of the one asset the answer is about, or null. A chip may carry `risk` `{ verdict, reasons }`: Chord's safety verdict on that token (`avoid`, `caution`, `ok`). Relay an `avoid` or `caution` with its reasons |
+| `revokes` | only after a wallet's approvals were read: the unsigned revoke for each risky approval (`to`, `data`, `value` "0", `label`). The user signs it in their own wallet after confirming; never sign one for them |
 | `clarify` | when not null, Ask is asking the user something back: relay the question |
 | `dyor`, `disclaimer` | present on market answers: keep the disclaimer with the answer |
 | `toolsUsed`, `tokens`, `credits` | what ran and what it cost |
 
 `chord.py ask` prints `text`, `details`, `citations`, `quote`, `artifact`, `viz`, `clarify`,
 `disclaimer`, `followUps`, `toolsUsed`, `credits` and `elapsedMs`. `shape`, `parts`, `followUpKinds`,
-`assets`, `focus`, `dyor` and `tokens` come only with the direct API call.
+`assets`, `focus`, `revokes`, `dyor` and `tokens` come only with the direct API call.
 
 ## Limits and errors
 

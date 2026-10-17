@@ -239,6 +239,27 @@ const MetaAttempt = obj({
   status: str("`ok`, or why this provider did not produce the answer: `no_route`, `timeout`, `http_error`, `rate_limited`, `invalid_response`, `not_allowlisted`, `calldata_mismatch`, `min_out_too_low`, `value_gap`, `unsafe_token`, `simulation_failed`, `unverified`, `breaker_open`, `skipped`; for Chord also `engine_error`, `engine_timeout`, `engine_down`, `route_refused`, `build_failed`, `chain_not_live`."),
   ms: int("Time spent on this provider."), error: nullable(str("Short reason from a fixed vocabulary, never provider text.")),
 }, "One provider that was asked, in order.");
+// Chord's safety report (packages/api services/security/types.ts TokenRiskReport, Ask v4 D4): one shape for every chain.
+const RiskCheck = obj({
+  id: str("Stable id, snake_case: `honeypot`, `buy_tax`, `sell_tax`, `transfer_tax`, `round_trip`, `owner_can_mint`, `blacklist`, `pausable`, `owner_privileges`, `hidden_owner`, `proxy_upgradeable`, `unverified_source`, `lp_unlocked`, `top10_holders`, `creator_holds`, `creator_history`, `tape_screen`, `impostor_ticker`, `own_checks` …; Solana adds `freeze_authority`, `mint_authority`, `token2022_extensions`, `mutable_metadata`, `liquidity` …"),
+  label: str("Short English label (`Sell tax`, `Owner can mint`)."),
+  status: { type: "string", enum: ["pass", "warn", "fail", "unknown"], description: "`unknown` = the source that reads it did not answer, or nothing could test it. Never `pass` for a check that did not run." },
+  detail: str("One sentence with the measured number (`Selling loses 40% to the token's own tax (Chord simulation 40%, GoPlus 40%).`)."),
+  source: str("Who read it, in words, at most 60 characters (`Chord simulation`, `Chord contract scan`, `Chord tape`, `RugCheck`, `Sourcify`). A reading from GoPlus says `GoPlus (Powered by Go+ Security)`."),
+}, "One check of the report.", { required: ["id", "label", "status", "detail", "source"] });
+const TokenRiskReport = obj({
+  chain: { oneOf: [{ type: "integer" }, { type: "string", const: "solana" }], description: "The chain id, or `solana`." },
+  address: str("The token (0x, lower-cased) or the Solana mint (case kept)."),
+  symbol: nullable(str("As the contract or the token list names it: chosen by whoever launched the token.")), name: nullable(str("")),
+  verdict: { type: "string", enum: ["avoid", "caution", "ok", "unknown"], description: "Decided in code from the checks, never by a model. `avoid`: it cannot be sold, a sell tax of 30% or more, a scam verdict of Chord's tape screen, or a copy of a listed token's ticker. `caution`: a check that warns (taxes of 5 to 30%, an owner who can mint, block wallets or pause, code one wallet can upgrade, unverified source, unlocked liquidity one provider can pull, top 10 holders over 60% …). `ok`: none of that, with two independent sources answering and a sell test passing. `unknown`: too few sources, or nothing could test selling it. Never read `ok` as a guarantee." },
+  score: nullable(int("0 (worst) to 100, in the verdict's band; null when the verdict is `unknown`.")),
+  checks: arr(ref("RiskCheck"), "Every check, in a fixed order."),
+  facts: loose("The numbers behind the checks: `buyTaxPct`, `sellTaxPct`, `transferTaxPct`, `honeypot`, `owner`, `ownerRenounced`, `proxy`, `implementation`, `upgrader`, `verifiedSource`, `mintable`, `blacklist`, `pausable`, `lpLockedPct`, `top10Pct`, `holders`, `creator`, `creatorPct`, `screenLevel`, `screenReasons`, `simulation` (Chord's $20 buy and sell back: status, taxes, round trip), `reasons` (the counted reasons, worst first), `answered` / `missing` (the sources), `goplusOnly` (only GoPlus answered: the report is partial). Solana adds `mintAuthority`, `freezeAuthority`, `token2022Extensions`, `permanentDelegate`, `liquidityUsd`, `pools`, `topHolders`, `jupiterVerified`, `rugcheckScore` …"),
+  sources: arr(obj({ label: str(""), href: str("") }), "Where to read it yourself (explorer, GoPlus, RugCheck, Sourcify, Jupiter)."),
+  checkedAt: UNIX_MS, partial: bool("True when at least one source did not answer, or when GoPlus was the only one that did."),
+  vetted: bool("On a list Chord trusts (stock / ETF / bridged list token, the bridge provider's list, Monad's verified list, a registry anchor; on Solana Jupiter-verified majors): the issuer's own powers (mint, freeze, pause, upgrades) are listed but do not raise the verdict. Taxes and the sell test still count."),
+}, "Chord's safety report for one token.", { required: ["chain", "address", "verdict", "score", "checks", "facts", "sources", "checkedAt", "partial", "vetted"] });
+
 const MetaQuote = obj({
   chain: int("Chain id."), tokenIn: ADDRESS, tokenOut: ADDRESS, amountIn: WEI, taker: nullable({ ...ADDRESS, description: "The wallet the transaction was built and simulated for; null on a price-only quote." }),
   slippageBps: int("The slippage `minAmountOut` reflects."),
@@ -268,7 +289,7 @@ const components = {
   schemas: {
     AgentCounts: obj({ calls: int("Requests answered 2xx."), reads: int(""), quotes: int(""), swapTx: int("Swap transactions built, not executed."), asks: int("Questions to the analyst."), callers: int("Distinct callers in the window.") }, "Counts for one surface or a sum of surfaces."),
     Error: obj({ error: str("Stable machine code, e.g. `INVALID_PARAMS`, `NOT_READY`, `RATE_LIMIT_EXCEEDED`."), message: str("For humans."), statusCode: int("HTTP status, when included.") }, "Every non-2xx body.", { required: ["error"], example: { error: "INVALID_PARAMS", message: "amount must be an integer string in the token's smallest unit" } }),
-    Coverage, TokenLite, ArcTokenRow, ArcTrendingRow, ArcGraduatedRow, RhTokenRow, RhStockRow, RouteLeg, QuoteResponse, SwapTx, MetaAttempt, MetaQuote, Candle, TradeRow, StatsWindow, SmartWallet, PnlToken, LpEvent, PoolListRow, LpPosition, LpLeaderRow, SimResult, LauncherStat, IngestFloor, ChainCoverage, ChainTokenRow, ChainVenueShare,
+    RiskCheck, TokenRiskReport, Coverage, TokenLite, ArcTokenRow, ArcTrendingRow, ArcGraduatedRow, RhTokenRow, RhStockRow, RouteLeg, QuoteResponse, SwapTx, MetaAttempt, MetaQuote, Candle, TradeRow, StatsWindow, SmartWallet, PnlToken, LpEvent, PoolListRow, LpPosition, LpLeaderRow, SimResult, LauncherStat, IngestFloor, ChainCoverage, ChainTokenRow, ChainVenueShare,
   },
 };
 
@@ -287,6 +308,7 @@ const T = {
   lp: "Liquidity",
   points: "Points",
   ask: "Ask agent",
+  safety: "Token safety",
   bridge: "Bridge",
   rh: "Robinhood Chain data",
   chains: "Avalanche, Base, BNB Chain",
@@ -671,19 +693,45 @@ add("/ask", "post", op(T.ask, "ask", "Ask the analyst",
     body: bodyJson(obj({ question: { type: "string", maxLength: 1000, description: "May be empty when `images` is set." }, stream: { type: "boolean", description: "false = one JSON response instead of SSE." }, history: arr(obj({ role: { type: "string", enum: ["user", "assistant"] }, content: { type: "string", maxLength: 4000 }, images: arr({ type: "string" }, "Image ids that user turn carried — their reading comes back as context.") }), "Up to 12 prior turns."), wallet: { ...ADDRESS, description: "The caller's wallet, so \"my PnL\" resolves." }, mode: { type: "string", enum: ["quick", "deep"], description: "How long an answer to write. `quick`: the shortest form (the verdict, its claim, at most three rows of evidence, 120 words at most), faster. `deep`: a judgement or an explanation comes back as a full research note (`shape: \"report\"`), any other answer with a longer folded `details`. Omitted: the length the question calls for. Any other value is ignored." }, images: arr({ type: "string", pattern: "^[a-f0-9]{32}$" }, "Up to 4 ids from `POST /v1/ask/image` (your own, 30 days). The analyst reads each image — chart, positions, a swap or wallet screenshot — before it answers, and can zoom into one.") }, undefined, { required: ["question"] }), { question: "What is moving on Arc right now, and is ARGUS still being bought by real wallets?", stream: false }),
     responses: withErr({ 200: ok("With `stream: false`: the whole answer. Otherwise `text/event-stream`.", obj({
       text: str("The answer, Markdown, complete on its own: a table the answer placed is written out in it (its first 8 rows and 6 columns). `details` is not repeated here."),
-      citations: arr(obj({ label: str("What the link is."), href: str("A Chord page as a path under `https://getchord.xyz` (`/arc/token/0x…`), or the source's own URL.") }, "A source link."), "Where to check the numbers: the Chord pages and outside sources behind the answer."),
+      citations: arr(obj({ label: str("What the link is."), href: str("A Chord page as a path under `https://getchord.xyz` (`/arc/token/0x…`), or the source's own URL."),
+        tier: { type: "integer", enum: [1, 2, 3, 4], description: "Deep answers only: 1 primary data (Chord's index, an exchange, an explorer, DefiLlama, CoinGecko, an official page), 2 major media, 3 a blog or another site, 4 social." },
+        kind: { type: "string", enum: ["index", "data", "official", "media", "blog", "social", "other"], description: "Deep answers only: the kind of source (`index` = Chord's own index)." } }, "A source link.", { required: ["label", "href"] }),
+        "Where to check the numbers: the Chord pages and outside sources behind the answer. On a deep answer (`mode: \"deep\"`, or a question that asks for deep research) they are numbered: `[n]` in `text` is `citations[n-1]`."),
       quote: nullable(loose("A route card when the question implied a trade: the two tokens, the amounts in whole tokens, the venues, price impact, fee and a link to the trade on Chord. A preview, not a `/v1/quote` response: `/v1/swap` needs a fresh `/v1/quote`.")),
       artifact: nullable(loose("The token the answer is about: its stats, where volume traded (support, resistance, VWAP), a report link when one was built.")), walletArtifact: nullable(loose("")),
       viz: arr(loose("Tables and charts (`kind`: table · bar · line · donut), at most 6: the ones `parts` and `details` place come first, in that order.")),
       toolsUsed: arr({ type: "string" }), tokens: int("Model tokens spent."),
       followUps: arr({ type: "string" }, "Up to three next questions: one that goes deeper, one that widens, one action (an alert, a chart, a plan)."),
-      assets: arr(loose("Price chips for the assets the answer names (symbol, label, price, 24h change), at most 8.")),
+      assets: arr(loose("Price chips for the assets the answer names (symbol, label, price, 24h change), at most 8. A chip of a token Chord checked in this answer carries `risk` `{ verdict, reasons }`: `avoid`, `caution` or `ok` from Chord's safety check (`GET /v1/security/token/{chain}/{address}`), its reasons worst first.")),
+      revokes: arr(obj({ chainId: int("Chain id."), kind: { type: "string", enum: ["erc20", "nft"], description: "`erc20` = `approve(spender, 0)`, `nft` = `setApprovalForAll(spender, false)`." }, token: ADDRESS, spender: ADDRESS, to: { ...ADDRESS, description: "Where the revoke is sent: the token or the NFT collection." }, data: str("The calldata, hex."), value: { type: "string", const: "0" }, label: str("What the button says (`Revoke USDT for 0x… (1inch Aggregation Router v6)`).") }, "One revoke.", { required: ["chainId", "kind", "token", "spender", "to", "data", "value", "label"] }),
+        "Only when the answer read a wallet's approvals: the unsigned transaction that revokes each risky one, for the wallet's owner to sign. At most 20."),
       shape: { type: "string", enum: ["fact", "explain", "brief", "board", "why", "overview", "compare", "post", "do", "report", "auto"], description: "The kind of answer the question got: a single fact, an explanation, a call with its evidence (`brief`), a ranked list (`board`), why something moves, a market overview, a comparison, something to post, something to do on Chord, a full report, or `auto` when nothing matched." },
       parts: arr(ASK_PART, "The answer body in order: text, and the blocks of `viz` placed inside it. Absent on a question back (`clarify`)."),
       details: nullable(obj({ text: str("The folded part as Markdown, placed tables written out."), parts: arr(ASK_PART, "`i` indexes the same `viz`.") }, "Further depth (a per-venue breakdown, a longer history) that the chat folds under \"Show full analysis\". Not part of `text`. Null when the answer has none.")),
       followUpKinds: arr({ type: "string", enum: ["ask", "alert", "deeper"] }, "Parallel to `followUps`: `alert` = it asks for an alert, `deeper` = it goes deeper into this answer, `ask` = any other question."),
       focus: nullable(int("Index into `assets` of the one asset the answer is about, when there is one.")),
     })) }, [400, 401, 429, 503]) }));
+// Token safety ─────────────────────────────────────────────────────────────────────────────────── (packages/api routes/security.ts → services/security/route.ts)
+add("/security/token/{chain}/{address}", "get", op(T.safety, "getTokenSecurity", "Is a token safe",
+`Chord's safety report for one token: the same report the Ask analyst, the trade dock and the trade card read.
+
+**What runs**: on the EVM chains, Chord's own contract scan (proxy wiring and who can upgrade it, the owner and what the owner can do: mint, block wallets, pause, change taxes or limits), a $20 buy and its sell back through Chord's router simulated as a test wallet (nothing is sent), the transfer-tax probe, GoPlus, Sourcify and Chord's own tape screen (wash trading, buyer clusters, rugs, buyers who cannot sell, a copied ticker). On Solana: RugCheck, GoPlus, Jupiter and the screen of Chord's Solana tape (mint and freeze authority, Token-2022 extensions, LP lock, holders, the creator's history). A source that does not answer leaves its checks \`unknown\` and the report \`partial\`; it is never read as a pass.
+
+**Use it for**: "is this token safe to buy", a rug or honeypot check before a trade, an agent's pre-trade gate (refuse \`avoid\`, warn on \`caution\`).
+
+**Notes**
+- Cached 10 minutes (2 to 3 minutes when a source did not answer, seconds when nothing could test selling an unvetted token or the check was cut short on Chord's side; such a partial report is sent \`Cache-Control: private, max-age=10\`). A report built cold on an EVM chain can take up to about 20 seconds. An address with no contract answers 404 at once.
+- A report already cached answers anyone. Without an API key (or an Ask session), one IP builds at most 10 new reports every 10 minutes, and every such caller together a limited number a minute; past either the answer is 429 or 503 \`BUSY\` with \`Retry-After\`, and nothing is checked. Send an \`X-API-Key\` for more.
+- \`verdict\` is decided in code from \`checks\`. No verdict rests on GoPlus alone: when only GoPlus answered, the report is \`partial\` and says Chord's own checks did not run. A reading from GoPlus names it "GoPlus (Powered by Go+ Security)".
+- A Solana mint is used exactly as given (base58 is case-sensitive).`,
+  { params: [p("chain", { type: "string" }, "Chain id or name: `1` / `ethereum`, `56` / `bnb`, `143` / `monad`, `4663` / `robinhood`, `5042` / `arc`, `8453` / `base`, `42161` / `arbitrum`, `43114` / `avalanche`, or `solana`."),
+    p("address", { type: "string" }, "The token contract (0x followed by 40 hex characters), or the Solana mint exactly as written (base58, 32 bytes).")],
+    responses: { 200: ok("The report.", ref("TokenRiskReport")),
+      400: errRes("`UNSUPPORTED_CHAIN` (a chain Chord does not check, or one not served yet) or `INVALID_ADDRESS`."),
+      404: errRes("`NOT_A_CONTRACT`: the chain answered and there is no contract at this address. `NOT_A_MINT`: no Solana source knows this address as a token."),
+      429: errRes("`RATE_LIMITED`: without an API key, this IP built its 10 new reports of the last 10 minutes (`Retry-After`); cached reports still answer. Or `RATE_LIMIT_EXCEEDED`, the per-minute limit of every route."),
+      503: errRes("`BUSY`: too many new reports are being built for callers without a key right now (`Retry-After`). `UNAVAILABLE`: the check could not run just now. Retry; do not treat either as a clean result.") } }));
+
 // What leaves the route is services/askPicks publicPick / publicRecord: no target, stop or hit counts (owner 2026-09-27).
 add("/ask/picks", "get", op(T.ask, "askPicks", "Ask Picks board", "The analyst's current picks (rebuilt every four hours over tokens with real activity): side, score, confidence, the reasons for and against, and the facts behind them, plus the seven-day track record: picks graded, the share that moved their way and the average move. It carries no targets or stops.", { responses: { 200: ok("", obj({ chain: { type: "integer", const: 5042 }, computedAt: nullable(UNIX_S), picks: arr(obj({ ts: UNIX_S, token: ADDRESS, symbol: nullable(str("")), side: { type: "string", enum: ["bullish", "bearish"] }, score: num(""), confidence: { type: "string", enum: ["low", "medium", "high"] }, priceUsd: num(""), why: arr({ type: "string" }), against: arr({ type: "string" }), facts: loose("") })), trackRecord7d: nullable(obj({ graded: int(""), open: int(""), rightWayPct: nullable(num("Of the graded picks that have a price move so far, the share that moved the pick's way, percent. Null while none has one.")), avgMovePct: nullable(num("Their average move in the pick's direction, percent. Null while none has one.")) })) }), ex("/v1/ask/picks")) } }));
 add("/ask/report", "post", op(T.ask, "askReport", "Build a research note", "Builds Chord's three-page research note for a token (HTML → PDF in the browser, plus Markdown) and returns links good for seven days.", { security: [{ Session: [] }], body: bodyJson(obj({ token: str("Address or symbol on Arc."), summary: { type: "string", maxLength: 4000, description: "Optional analyst text to place on the first page." } }, undefined, { required: ["token"] }), { token: "ARGUS" }), responses: withErr({ 200: ok("", obj({ id: str(""), url: str("HTML."), mdUrl: str("Markdown.") })) }, [400, 401, 404, 429, 503]) }));
@@ -1371,6 +1419,7 @@ Amounts are decimal strings in the token's smallest unit. Timestamps are Unix se
     { name: T.lp, description: "Liquidity: events, pools ranked for providers, positions valued live, LP leaderboard, range planning and backtests, alerts." },
     { name: T.points, description: "The Chord points program on Arc." },
     { name: T.ask, description: "The analyst agent over the Arc index, its picks and research notes." },
+    { name: T.safety, description: "Chord's safety report for one token on its eight EVM chains or Solana: its own contract scan and buy-then-sell simulation, GoPlus (Powered by Go+ Security), Sourcify, RugCheck and Chord's tape, one verdict decided in code." },
     { name: T.bridge, description: "Circle CCTP fast transfer to Arc, and LI.FI routes from 60+ chains." },
     { name: T.rh, description: "Robinhood Chain (chain 4663): chain totals, tokens and tokenized stocks from the rollup tables." },
     { name: T.chains, description: "Avalanche C-Chain (43114), Base (8453), BNB Chain (56), Arbitrum One (42161) and Ethereum (1): chain totals, the 24-hour token board, prints, one token's tape, venue share and a wallet's PnL, from Chord's own index of every swap on those chains. One set of routes, the chain in the path." },

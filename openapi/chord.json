@@ -61,6 +61,10 @@
       "description": "The analyst agent over the Arc index, its picks and research notes."
     },
     {
+      "name": "Token safety",
+      "description": "Chord's safety report for one token on its eight EVM chains or Solana: its own contract scan and buy-then-sell simulation, GoPlus (Powered by Go+ Security), Sourcify, RugCheck and Chord's tape, one verdict decided in code."
+    },
+    {
       "name": "Bridge",
       "description": "Circle CCTP fast transfer to Arc, and LI.FI routes from 60+ chains."
     },
@@ -11395,11 +11399,38 @@
                           "href": {
                             "type": "string",
                             "description": "A Chord page as a path under `https://getchord.xyz` (`/arc/token/0x…`), or the source's own URL."
+                          },
+                          "tier": {
+                            "type": "integer",
+                            "enum": [
+                              1,
+                              2,
+                              3,
+                              4
+                            ],
+                            "description": "Deep answers only: 1 primary data (Chord's index, an exchange, an explorer, DefiLlama, CoinGecko, an official page), 2 major media, 3 a blog or another site, 4 social."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "index",
+                              "data",
+                              "official",
+                              "media",
+                              "blog",
+                              "social",
+                              "other"
+                            ],
+                            "description": "Deep answers only: the kind of source (`index` = Chord's own index)."
                           }
                         },
-                        "description": "A source link."
+                        "description": "A source link.",
+                        "required": [
+                          "label",
+                          "href"
+                        ]
                       },
-                      "description": "Where to check the numbers: the Chord pages and outside sources behind the answer."
+                      "description": "Where to check the numbers: the Chord pages and outside sources behind the answer. On a deep answer (`mode: \"deep\"`, or a question that asks for deep research) they are numbered: `[n]` in `text` is `citations[n-1]`."
                     },
                     "quote": {
                       "type": [
@@ -11455,8 +11486,67 @@
                       "items": {
                         "type": "object",
                         "additionalProperties": true,
-                        "description": "Price chips for the assets the answer names (symbol, label, price, 24h change), at most 8."
+                        "description": "Price chips for the assets the answer names (symbol, label, price, 24h change), at most 8. A chip of a token Chord checked in this answer carries `risk` `{ verdict, reasons }`: `avoid`, `caution` or `ok` from Chord's safety check (`GET /v1/security/token/{chain}/{address}`), its reasons worst first."
                       }
+                    },
+                    "revokes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "chainId": {
+                            "type": "integer",
+                            "description": "Chain id."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "erc20",
+                              "nft"
+                            ],
+                            "description": "`erc20` = `approve(spender, 0)`, `nft` = `setApprovalForAll(spender, false)`."
+                          },
+                          "token": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "spender": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "to": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "Where the revoke is sent: the token or the NFT collection."
+                          },
+                          "data": {
+                            "type": "string",
+                            "description": "The calldata, hex."
+                          },
+                          "value": {
+                            "type": "string",
+                            "const": "0"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "What the button says (`Revoke USDT for 0x… (1inch Aggregation Router v6)`)."
+                          }
+                        },
+                        "description": "One revoke.",
+                        "required": [
+                          "chainId",
+                          "kind",
+                          "token",
+                          "spender",
+                          "to",
+                          "data",
+                          "value",
+                          "label"
+                        ]
+                      },
+                      "description": "Only when the answer read a wallet's approvals: the unsigned transaction that revokes each risky one, for the wallet's owner to sign. At most 20."
                     },
                     "shape": {
                       "type": "string",
@@ -11649,6 +11739,88 @@
             "Session": []
           }
         ]
+      }
+    },
+    "/security/token/{chain}/{address}": {
+      "get": {
+        "tags": [
+          "Token safety"
+        ],
+        "operationId": "getTokenSecurity",
+        "summary": "Is a token safe",
+        "description": "Chord's safety report for one token: the same report the Ask analyst, the trade dock and the trade card read.\n\n**What runs**: on the EVM chains, Chord's own contract scan (proxy wiring and who can upgrade it, the owner and what the owner can do: mint, block wallets, pause, change taxes or limits), a $20 buy and its sell back through Chord's router simulated as a test wallet (nothing is sent), the transfer-tax probe, GoPlus, Sourcify and Chord's own tape screen (wash trading, buyer clusters, rugs, buyers who cannot sell, a copied ticker). On Solana: RugCheck, GoPlus, Jupiter and the screen of Chord's Solana tape (mint and freeze authority, Token-2022 extensions, LP lock, holders, the creator's history). A source that does not answer leaves its checks `unknown` and the report `partial`; it is never read as a pass.\n\n**Use it for**: \"is this token safe to buy\", a rug or honeypot check before a trade, an agent's pre-trade gate (refuse `avoid`, warn on `caution`).\n\n**Notes**\n- Cached 10 minutes (2 to 3 minutes when a source did not answer, seconds when nothing could test selling an unvetted token or the check was cut short on Chord's side; such a partial report is sent `Cache-Control: private, max-age=10`). A report built cold on an EVM chain can take up to about 20 seconds. An address with no contract answers 404 at once.\n- A report already cached answers anyone. Without an API key (or an Ask session), one IP builds at most 10 new reports every 10 minutes, and every such caller together a limited number a minute; past either the answer is 429 or 503 `BUSY` with `Retry-After`, and nothing is checked. Send an `X-API-Key` for more.\n- `verdict` is decided in code from `checks`. No verdict rests on GoPlus alone: when only GoPlus answered, the report is `partial` and says Chord's own checks did not run. A reading from GoPlus names it \"GoPlus (Powered by Go+ Security)\".\n- A Solana mint is used exactly as given (base58 is case-sensitive).",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Chain id or name: `1` / `ethereum`, `56` / `bnb`, `143` / `monad`, `4663` / `robinhood`, `5042` / `arc`, `8453` / `base`, `42161` / `arbitrum`, `43114` / `avalanche`, or `solana`."
+          },
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The token contract (0x followed by 40 hex characters), or the Solana mint exactly as written (base58, 32 bytes)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenRiskReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (a chain Chord does not check, or one not served yet) or `INVALID_ADDRESS`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`NOT_A_CONTRACT`: the chain answered and there is no contract at this address. `NOT_A_MINT`: no Solana source knows this address as a token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`RATE_LIMITED`: without an API key, this IP built its 10 new reports of the last 10 minutes (`Retry-After`); cached reports still answer. Or `RATE_LIMIT_EXCEEDED`, the per-minute limit of every route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`BUSY`: too many new reports are being built for callers without a key right now (`Retry-After`). `UNAVAILABLE`: the check could not run just now. Retry; do not treat either as a clean result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/ask/picks": {
@@ -27557,6 +27729,151 @@
           "error": "INVALID_PARAMS",
           "message": "amount must be an integer string in the token's smallest unit"
         }
+      },
+      "RiskCheck": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable id, snake_case: `honeypot`, `buy_tax`, `sell_tax`, `transfer_tax`, `round_trip`, `owner_can_mint`, `blacklist`, `pausable`, `owner_privileges`, `hidden_owner`, `proxy_upgradeable`, `unverified_source`, `lp_unlocked`, `top10_holders`, `creator_holds`, `creator_history`, `tape_screen`, `impostor_ticker`, `own_checks` …; Solana adds `freeze_authority`, `mint_authority`, `token2022_extensions`, `mutable_metadata`, `liquidity` …"
+          },
+          "label": {
+            "type": "string",
+            "description": "Short English label (`Sell tax`, `Owner can mint`)."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "warn",
+              "fail",
+              "unknown"
+            ],
+            "description": "`unknown` = the source that reads it did not answer, or nothing could test it. Never `pass` for a check that did not run."
+          },
+          "detail": {
+            "type": "string",
+            "description": "One sentence with the measured number (`Selling loses 40% to the token's own tax (Chord simulation 40%, GoPlus 40%).`)."
+          },
+          "source": {
+            "type": "string",
+            "description": "Who read it, in words, at most 60 characters (`Chord simulation`, `Chord contract scan`, `Chord tape`, `RugCheck`, `Sourcify`). A reading from GoPlus says `GoPlus (Powered by Go+ Security)`."
+          }
+        },
+        "description": "One check of the report.",
+        "required": [
+          "id",
+          "label",
+          "status",
+          "detail",
+          "source"
+        ]
+      },
+      "TokenRiskReport": {
+        "type": "object",
+        "properties": {
+          "chain": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string",
+                "const": "solana"
+              }
+            ],
+            "description": "The chain id, or `solana`."
+          },
+          "address": {
+            "type": "string",
+            "description": "The token (0x, lower-cased) or the Solana mint (case kept)."
+          },
+          "symbol": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "As the contract or the token list names it: chosen by whoever launched the token."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "avoid",
+              "caution",
+              "ok",
+              "unknown"
+            ],
+            "description": "Decided in code from the checks, never by a model. `avoid`: it cannot be sold, a sell tax of 30% or more, a scam verdict of Chord's tape screen, or a copy of a listed token's ticker. `caution`: a check that warns (taxes of 5 to 30%, an owner who can mint, block wallets or pause, code one wallet can upgrade, unverified source, unlocked liquidity one provider can pull, top 10 holders over 60% …). `ok`: none of that, with two independent sources answering and a sell test passing. `unknown`: too few sources, or nothing could test selling it. Never read `ok` as a guarantee."
+          },
+          "score": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "0 (worst) to 100, in the verdict's band; null when the verdict is `unknown`."
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RiskCheck"
+            },
+            "description": "Every check, in a fixed order."
+          },
+          "facts": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The numbers behind the checks: `buyTaxPct`, `sellTaxPct`, `transferTaxPct`, `honeypot`, `owner`, `ownerRenounced`, `proxy`, `implementation`, `upgrader`, `verifiedSource`, `mintable`, `blacklist`, `pausable`, `lpLockedPct`, `top10Pct`, `holders`, `creator`, `creatorPct`, `screenLevel`, `screenReasons`, `simulation` (Chord's $20 buy and sell back: status, taxes, round trip), `reasons` (the counted reasons, worst first), `answered` / `missing` (the sources), `goplusOnly` (only GoPlus answered: the report is partial). Solana adds `mintAuthority`, `freezeAuthority`, `token2022Extensions`, `permanentDelegate`, `liquidityUsd`, `pools`, `topHolders`, `jupiterVerified`, `rugcheckScore` …"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "description": ""
+                },
+                "href": {
+                  "type": "string",
+                  "description": ""
+                }
+              }
+            },
+            "description": "Where to read it yourself (explorer, GoPlus, RugCheck, Sourcify, Jupiter)."
+          },
+          "checkedAt": {
+            "type": "integer",
+            "description": "Unix time, milliseconds — when the server built this answer."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "True when at least one source did not answer, or when GoPlus was the only one that did."
+          },
+          "vetted": {
+            "type": "boolean",
+            "description": "On a list Chord trusts (stock / ETF / bridged list token, the bridge provider's list, Monad's verified list, a registry anchor; on Solana Jupiter-verified majors): the issuer's own powers (mint, freeze, pause, upgrades) are listed but do not raise the verdict. Taxes and the sell test still count."
+          }
+        },
+        "description": "Chord's safety report for one token.",
+        "required": [
+          "chain",
+          "address",
+          "verdict",
+          "score",
+          "checks",
+          "facts",
+          "sources",
+          "checkedAt",
+          "partial",
+          "vetted"
+        ]
       },
       "Coverage": {
         "type": "object",
