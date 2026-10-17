@@ -44,7 +44,10 @@ BASE=https://api.getchord.xyz/v1/chains/solana
   lower-case it (a lower-cased mint is another string: `400 BAD_ADDRESS` or `404 TOKEN_NOT_FOUND`).
   `0x` addresses are not Solana addresses.
 - **No numeric chain id.** The path segment is the literal `solana`. `/v1/candles`, `/v1/tokens/*`,
-  `/v1/quote`, `/v1/meta/*` and `/v1/portfolio/*` do not take Solana.
+  `/v1/quote`, `/v1/meta/*` and `/v1/portfolio/{wallet}/pnl`, `/trades`, `/pnl-calendar` do not take
+  Solana. `/v1/portfolio/{0x wallet}?sol=ADDRESS` does: it adds that Solana address's holdings and
+  24h / 7d / 30d PnL next to the EVM chains (`chains=solana` for Solana alone; its times are
+  milliseconds, not the seconds below).
 - **Units:** `tokenAmount`, `heldAmount`, `supply` are whole tokens (decimals applied); `quoteAmount`
   is whole units of the pool's quote (SOL, USDC, USDT or the other token); `*Usd` are dollars.
   **Every timestamp, `updatedAt` included, is Unix seconds** (elsewhere in Chord `updatedAt` is ms).

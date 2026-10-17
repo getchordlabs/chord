@@ -170,6 +170,60 @@ const PnlToken = obj({
   untrackedAmount: num("Balance that arrived by transfer (no cost basis)."), untrackedValue: num(""),
 });
 
+// Ask Portfolio (board #291): GET /portfolio/{wallet} and /portfolio/{wallet}/activity. Mirror of
+// packages/api/src/services/portfolio/types.ts. Every time in these shapes is Unix MILLISECONDS; pct is a percent.
+const PF_MS = (description) => int(`Unix time, milliseconds. ${description}`.trim());
+const PF_SOL = { type: "string", pattern: "^[1-9A-HJ-NP-Za-km-z]{32,44}$", description: "Solana address, base58, case-sensitive. Never lower-case it." };
+const PF_WINDOWS = (schema, description) => obj({ "24h": schema, "7d": schema, "30d": schema }, description, { required: ["24h", "7d", "30d"] });
+const PortfolioWindow = obj({
+  usd: nullable(num("PnL over the window, USD. Null when the window is not complete.")),
+  pct: nullable(num("Percent (1.5 = +1.5 %) of the base: the value held at the window's start plus the USD bought in it. Null when that base is under one cent, or when the window is not complete.")),
+  complete: bool("The swap tape covers the whole window with no known hole. False = `usd`, `pct` and `fromTs` are null: show a dash, never a number."),
+  fromTs: nullable(PF_MS("Where the number starts: the window's start, aligned down to the hour. On `totals`: the latest start of the chains.")),
+}, "PnL over one window by the window rule (see `GET /portfolio/{wallet}`).", { required: ["usd", "pct", "complete", "fromTs"] });
+const PortfolioHolding = obj({
+  address: nullable(str("EVM token, lower-case. Null for the chain's native coin and on a Solana row (which carries `mint`).")),
+  mint: str("Solana rows only: the mint, case kept."),
+  symbol: str(""), name: nullable(str("")), decimals: int("From the chain's list or the chain itself, never assumed."), logo: nullable(str("")),
+  native: bool("The chain's own coin (ETH, MON, AVAX, BNB, USDC on Arc, SOL)."), stable: bool("A dollar stablecoin: counted in `cashUsd`, left out of PnL."),
+  amount: str("Balance in whole tokens, as a decimal string."),
+  priceUsd: nullable(num("Null = no price Chord trusts (no measured liquidity, not on the chain's board): listed last, in no total.")),
+  valueUsd: nullable(num("amount × priceUsd.")), change24hPct: nullable(num("Percent.")),
+  pnl: PF_WINDOWS(nullable(num("")), "This token's part of each window's PnL, USD. Null = left out (a stablecoin, no price, no start price) or the chain's window is not complete."),
+}, "One token a wallet holds on one chain.");
+const PortfolioChain = obj({
+  chain: { type: ["integer", "string"], description: "EVM chain id, or `solana`." },
+  key: str("Registry key (`monad`, `base`, …) or `solana`."), name: str(""),
+  status: { type: "string", enum: ["ok", "partial", "unavailable"], description: "`ok` = read. `partial` = balances read, part of the rest (prices, the tape, some tokens) not, and `reason` says which. `unavailable` = not read at all: in no total, every window without a number." },
+  reason: str("Present unless `ok`. One plain sentence for a person."),
+  valueUsd: num("Sum of the priced holdings, small balances included."), cashUsd: num("The part of `valueUsd` held in stablecoins."),
+  pnl: PF_WINDOWS(ref("PortfolioWindow"), "The chain's PnL per window."),
+  coverage: obj({
+    tapeFromTs: nullable(PF_MS("First moment the chain's swap tape covers without a hole for this wallet. Null = no tape here.")),
+    source: { type: "string", enum: ["tape", "tape+lake", "box"], description: "`tape` = Chord's raw tape of the chain; `tape+lake` = older days joined from Chord's history lake; `box` = Chord's Solana index." },
+    ingestFloorUsd: nullable(num("Present on a chain whose tape does not record swaps under this many USD (BNB Chain: 100). Disclosed, not a hole: that chain's windows still count as complete, and a swap under the floor reads only as a price move or a transfer. Say so next to the numbers.")),
+  }),
+  holdings: arr(ref("PortfolioHolding"), "Priced holdings worth at least $0.01, largest first, then the unpriced ones."),
+  dust: obj({ count: int(""), valueUsd: num("") }, "Priced holdings under $0.01, counted here and not listed."),
+  unpriced: int("Holdings with `priceUsd: null` (listed at the end of `holdings`)."),
+}, "One chain of a portfolio.");
+const PortfolioAnswer = obj({
+  wallet: { ...ADDRESS, description: "EVM address, lower-case." }, sol: nullable({ ...PF_SOL, description: "The Solana address as given, or null." }),
+  asOf: PF_MS("When this answer was computed. A cached answer keeps its own `asOf`."),
+  totals: obj({
+    valueUsd: num("Sum of `valueUsd` over the chains that were read."), cashUsd: num(""),
+    pnl: PF_WINDOWS(ref("PortfolioWindow"), "Complete only when every chain in the answer is complete for that window, chains that could not be read included. `pct` is the sum of the chains' USD over the sum of their bases."),
+  }),
+  chains: arr(ref("PortfolioChain"), "In registry order, Solana last."),
+}, "One wallet on every chain in scope.");
+const PortfolioActivityItem = obj({
+  ts: PF_MS(""), chain: { type: ["integer", "string"], description: "EVM chain id, or `solana`." },
+  side: { type: "string", enum: ["buy", "sell"], description: "`buy` = the wallet received `token`; `sell` = it gave it." },
+  token: obj({ address: nullable(str("EVM token, lower-case. Null on a Solana row.")), mint: str("Solana only, case kept."), symbol: str(""), name: nullable(str("")), logo: nullable(str("")) }),
+  amount: str("Whole tokens, decimal string."), valueUsd: nullable(num("")), priceUsd: nullable(num("")),
+  tx: str("Transaction hash, or the Solana signature (case kept)."), explorer: nullable(str("The transaction on the chain's explorer.")), venue: nullable(str("Venue display name.")),
+}, "One side of one swap.");
+
 const LpEvent = obj({
   tx: TX_HASH, logIndex: int(""), pool: POOL_ID, dex: str(""), kind: { type: "string", enum: ["add", "remove", "collect"] }, wallet: nullable(ADDRESS), token: ADDRESS, tokenAmt: num(""), anchor: ADDRESS, anchorAmt: num(""),
   usd: num("Dollars that entered or left the pool."), priced: bool("False when the event could not be valued (no anchor side)."), tickLower: nullable(int("")), tickUpper: nullable(int("")), block: int(""), ts: UNIX_S, manager: nullable(ADDRESS), tokenId: nullable(str("Position NFT id, for managed positions.")),
@@ -289,7 +343,8 @@ const components = {
   schemas: {
     AgentCounts: obj({ calls: int("Requests answered 2xx."), reads: int(""), quotes: int(""), swapTx: int("Swap transactions built, not executed."), asks: int("Questions to the analyst."), callers: int("Distinct callers in the window.") }, "Counts for one surface or a sum of surfaces."),
     Error: obj({ error: str("Stable machine code, e.g. `INVALID_PARAMS`, `NOT_READY`, `RATE_LIMIT_EXCEEDED`."), message: str("For humans."), statusCode: int("HTTP status, when included.") }, "Every non-2xx body.", { required: ["error"], example: { error: "INVALID_PARAMS", message: "amount must be an integer string in the token's smallest unit" } }),
-    RiskCheck, TokenRiskReport, Coverage, TokenLite, ArcTokenRow, ArcTrendingRow, ArcGraduatedRow, RhTokenRow, RhStockRow, RouteLeg, QuoteResponse, SwapTx, MetaAttempt, MetaQuote, Candle, TradeRow, StatsWindow, SmartWallet, PnlToken, LpEvent, PoolListRow, LpPosition, LpLeaderRow, SimResult, LauncherStat, IngestFloor, ChainCoverage, ChainTokenRow, ChainVenueShare,
+    RiskCheck, TokenRiskReport, Coverage, TokenLite, ArcTokenRow, ArcTrendingRow, ArcGraduatedRow, RhTokenRow, RhStockRow, RouteLeg, QuoteResponse, SwapTx, MetaAttempt, MetaQuote, Candle, TradeRow, StatsWindow, SmartWallet, PnlToken,
+    PortfolioWindow, PortfolioHolding, PortfolioChain, Portfolio: PortfolioAnswer, PortfolioActivityItem, LpEvent, PoolListRow, LpPosition, LpLeaderRow, SimResult, LauncherStat, IngestFloor, ChainCoverage, ChainTokenRow, ChainVenueShare,
   },
 };
 
@@ -566,6 +621,49 @@ add("/smart-money/top", "get", op(T.wallets, "smartMoneyTop", "Wallets ranked by
     responses: withErr({ 200: ok("", obj({ wallets: arr(ref("SmartWallet")), totalWallets: int("Wallets that qualified after the bot passes."), window: str(""), category: str(""), chain: int(""), source: str(""), indexedToBlock: int("The chain block the tape had reached when this board was built."), updatedAt: UNIX_MS, live: loose("Arc only — the in-memory delta on top of the last roll."), botsRemoved: obj({ cadence: int(""), nonceOrDenylist: int(""), behavior: int("") }), note: str("") }), ex("/v1/smart-money/top?chain=5042&source=onchain&window=7d&limit=2")) }, [400, 503]) }));
 
 // Portfolio ────────────────────────────────────────────────────────────────────────────────────
+// Ask Portfolio (board #291, routes/portfolio.ts + services/portfolio). No example yet: the routes were written before their first
+// deploy, and examples are captured from the live API, never typed in (packages/docs-chord/CLAUDE.md "Pending capture").
+const PF_CHAINS = q("chains", { type: "string", default: "all" }, "`all` = the eight EVM chains, plus Solana when `sol` is given. Or a comma list of chain ids (`143`, `4663`, `5042`, `43114`, `8453`, `56`, `42161`, `1`) and `solana` (which needs `sol`). Answered in registry order, Solana last. This route does not read `chain`: `chain=5042` on its own still answers for every chain, so send `chains=5042` for Arc alone.");
+const PF_SOL_Q = q("sol", PF_SOL, "The wallet's Solana address. Adds Solana to the default scope.");
+add("/portfolio/{wallet}", "get", op(T.portfolio, "portfolio", "Holdings and PnL on every chain", `What one wallet holds on Chord's eight EVM chains, and on Solana when you pass its Solana address, with its PnL over the last 24 hours, 7 days and 30 days. One rule for every chain, per token and window: the USD from its sales minus the USD of its buys inside the window, plus what is held now at today's price, minus what was held at the window's start at that hour's close. No cost basis is involved, and transfers are neutral: a token that arrived by transfer only adds its price move, and a quantity bought in the window that left with no sale on the tape (sent, bridged out) counts as sold at the window's average buy price, neither a gain nor a loss. Stablecoins are left out of PnL and counted in \`cashUsd\`.
+
+**Use it for**: a wallet or portfolio page, "how did this wallet do this week", an agent sizing a trade against what the wallet already holds.
+
+**Notes**
+- **Coverage first.** A window is \`complete\` only when the chain's swap tape covers all of it. When it does not (the tape starts later, a hole in the history), \`usd\`, \`pct\` and \`fromTs\` are null: show a dash, never a partial number as a whole one. A total window is complete only when every chain in the answer is, chains that could not be read included. BNB Chain does not record swaps under $100: its windows still count as complete, and \`coverage.ingestFloorUsd\` says so.
+- **Holdings** = the chain's token list plus every token the wallet swapped in the last 30 days, read on-chain (Solana: its 50 largest holdings). A token with no price Chord trusts (no measured liquidity, not on the chain's board) has \`priceUsd: null\`, comes last and is in no total. Priced holdings under $0.01 are folded into \`dust\`.
+- **Each chain answers on its own deadline.** One that cannot be read is \`status: "unavailable"\` with a \`reason\` inside the 200 and is left out of the totals' value; \`partial\` = the balances were read, part of the rest was not.
+- **Times are milliseconds** in this answer (\`asOf\`, \`fromTs\`, \`tapeFromTs\`), unlike most of this API.
+- **Cache**: kept 45 seconds per wallet, Solana address and chain set (10 seconds when a chain could not be read); a copy up to 10 minutes old may be served once while a refresh runs (\`asOf\` says when it was computed). \`fresh=1\` recomputes, only for a request with an \`X-API-Key\` or an Ask session; otherwise it is ignored.
+- **Without an API key (or an Ask session)**: a cached answer is served to anyone. One IP may start at most 10 new reads every 10 minutes (this route and \`/activity\` together), and every such caller together a limited number a minute; past either the answer is 429 \`RATE_LIMITED\` or 503 \`BUSY\` with \`Retry-After\`, and nothing is read. Send an \`X-API-Key\` for more.`,
+  { params: [p("wallet", ADDRESS, ""), PF_SOL_Q, PF_CHAINS, q("fresh", { type: "string", enum: ["1"] }, "Recompute instead of serving the cached answer. Honoured only with an `X-API-Key` or an Ask session.")],
+    responses: {
+      200: ok("", ref("Portfolio")),
+      400: errRes("`INVALID_ADDRESS` (the wallet), `INVALID_SOL_ADDRESS`, `BAD_CHAINS`, or `SOL_REQUIRED` (`chains` names `solana` without `sol`)."),
+      429: errRes("`RATE_LIMITED`: without an API key, this IP started its 10 new portfolio reads of the last 10 minutes (`Retry-After`); a portfolio read in the last 10 minutes still answers. Or `RATE_LIMIT_EXCEEDED`, the per-minute limit of every route."),
+      503: errRes("`BUSY`: too many new portfolio reads are running for callers without a key right now (`Retry-After`). `UNAVAILABLE`: the answer itself could not be built. A chain that cannot be read is not a 503: it comes back `status: \"unavailable\"` inside a 200."),
+    } }));
+
+add("/portfolio/{wallet}/activity", "get", op(T.portfolio, "portfolioActivity", "Swaps on every chain", `The wallet's swaps on every chain in scope, merged newest first, one keyset page at a time. Each item is one side of a swap seen from the wallet: \`buy\` = it received \`token\`, \`sell\` = it gave it.
+
+**Notes**
+- Pass the page's \`cursor\` back as \`cursor\` for the next page; \`cursor: null\` = nothing older. One transaction's rows stay on one page, so a page can hold fewer than \`limit\` items.
+- A chain that could not be read for a page is listed in \`unavailable\` and keeps its place: the next page asks it again. \`items: []\` with \`unavailable\` set is an outage, not an empty history.
+- How far back: Monad, Robinhood Chain and Arc, their raw tape (45 days); Avalanche, Base, BNB Chain, Arbitrum One and Ethereum, their raw tape and then, where Chord's history lake holds older days, up to 5,000 older swaps; Solana, 45 days. EVM swaps under $0.10 are left out.
+- \`ts\` is in milliseconds.
+- Pages are not cached: without an API key (or an Ask session) each page counts against the budget it shares with \`GET /portfolio/{wallet}\` (10 new reads per IP every 10 minutes, a limited number a minute for every such caller together); past it 429 \`RATE_LIMITED\` or 503 \`BUSY\` with \`Retry-After\`.`,
+  { params: [p("wallet", ADDRESS, ""), PF_SOL_Q, PF_CHAINS, q("cursor", { type: "string" }, "The `cursor` of the previous page."), q("limit", { type: "integer", minimum: 1, maximum: 100, default: 50 }, "Items per page.")],
+    responses: {
+      200: ok("", obj({
+        items: arr(ref("PortfolioActivityItem"), "Newest first, every chain in scope merged."),
+        cursor: nullable(str("Opaque. Pass it back for the next page; null = nothing older.")),
+        unavailable: arr(obj({ chain: { type: ["integer", "string"], description: "EVM chain id, or `solana`." }, reason: str("") }), "Present only when a chain could not be read for this page."),
+      }, undefined, { required: ["items", "cursor"] })),
+      400: errRes("`INVALID_ADDRESS`, `INVALID_SOL_ADDRESS`, `BAD_CHAINS`, `SOL_REQUIRED`, `BAD_LIMIT` (1 to 100) or `BAD_CURSOR` (not a cursor of this route)."),
+      429: errRes("`RATE_LIMITED`: without an API key, this IP started its 10 new portfolio reads of the last 10 minutes, pages included (`Retry-After`). Or `RATE_LIMIT_EXCEEDED`, the per-minute limit of every route."),
+      503: errRes("`BUSY`: too many new portfolio reads are running for callers without a key right now (`Retry-After`). `UNAVAILABLE`: the page itself could not be built (a chain that cannot be read is listed in `unavailable` inside a 200)."),
+    } }));
+
 const PF_NOTE = "Portfolio routes answer an empty 200 shape rather than a 5xx when the tape read fails — treat an empty `tokens` list as \"nothing yet\" and retry later.";
 add("/portfolio/{wallet}/pnl", "get", op(T.portfolio, "walletPnl", "Realized and open PnL per token", `Average-cost PnL for one wallet from the tape: realized on sells, unrealized on what is still held at current prices, ROI, and the untracked balance that arrived by transfer (no cost basis, excluded from PnL). Cached with stale-while-revalidate (a day-old answer beats a $0 skeleton).\n\n${PF_NOTE}`,
   { params: [p("wallet", ADDRESS, ""), q("chain", { type: "string", enum: ["5042", "4663", "143", "all"], default: "all" }, "One chain, or `all` to merge chains with a `byChain` breakdown.")],
@@ -1403,7 +1501,7 @@ const doc = {
 - **Read**: every swap on the chain, rolled up by token, venue and hour, from Chord's own index — tokens, launches, holders, top wallets, portfolio PnL, liquidity positions and pools. No key needed. Avalanche, Base, BNB Chain, Arbitrum One and Ethereum have the same rollups under \`/chains/{chain}/*\`; Solana has its own data family under \`/chains/solana/*\` (base58 addresses, case-sensitive) and its swaps under \`/sol/trade/*\`.
 - **Agent**: the analyst (\`/ask\`) and the streams.
 
-Amounts are decimal strings in the token's smallest unit. Timestamps are Unix seconds unless the field is \`updatedAt\` (milliseconds). Reads answer anonymous callers at 60 requests a minute per IP; an \`X-API-Key\` header raises that to your plan. Every non-2xx body is \`{ error, message }\`.`,
+Amounts are decimal strings in the token's smallest unit. Timestamps are Unix seconds unless the field is \`updatedAt\` (milliseconds). \`GET /portfolio/{wallet}\` and \`/portfolio/{wallet}/activity\` differ on both: amounts there are in whole tokens and every time is in milliseconds. Reads answer anonymous callers at 60 requests a minute per IP; an \`X-API-Key\` header raises that to your plan. Every non-2xx body is \`{ error, message }\`.`,
     contact: { name: "Chord", url: "https://getchord.xyz/developer" },
     "x-logo": { url: "https://getchord.xyz/chord/pwa-192x192.png" },
   },
@@ -1415,7 +1513,7 @@ Amounts are decimal strings in the token's smallest unit. Timestamps are Unix se
     { name: T.arc, description: "Arc (chain 5042): chain totals, every token traded, launches, launchers, holders — from Chord's own rollup and index tables." },
     { name: T.tokens, description: "Curated lists, candles, trade tapes, windowed stats and logos. Address-keyed routes serve both chains." },
     { name: T.wallets, description: "Wallets ranked from the tape by a skill-adjusted score, with routers and bots removed." },
-    { name: T.portfolio, description: "Average-cost PnL, trade history and a daily calendar for any wallet." },
+    { name: T.portfolio, description: "One wallet's holdings and 24h / 7d / 30d PnL on every chain and Solana by one rule, its swaps across chains, and the older per-chain average-cost PnL, trade history and daily calendar." },
     { name: T.lp, description: "Liquidity: events, pools ranked for providers, positions valued live, LP leaderboard, range planning and backtests, alerts." },
     { name: T.points, description: "The Chord points program on Arc." },
     { name: T.ask, description: "The analyst agent over the Arc index, its picks and research notes." },

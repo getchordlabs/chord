@@ -4,7 +4,7 @@
     "title": "Chord API",
     "version": "2026-10-05",
     "summary": "Trade, data and agent endpoints for eight EVM chains (Ethereum 1, Arbitrum One 42161, Base 8453, BNB Chain 56, Avalanche 43114, Monad 143, Arc 5042, Robinhood Chain 4663) and Solana (data and swaps).",
-    "description": "Chord is a non-custodial trading app and on-chain data index. The API has three kinds of endpoint:\n\n- **Trade**: `/quote` finds the best route across every venue on the chain; `/swap` turns it into a transaction you sign yourself. Chord never holds funds or keys.\n- **Read**: every swap on the chain, rolled up by token, venue and hour, from Chord's own index — tokens, launches, holders, top wallets, portfolio PnL, liquidity positions and pools. No key needed. Avalanche, Base, BNB Chain, Arbitrum One and Ethereum have the same rollups under `/chains/{chain}/*`; Solana has its own data family under `/chains/solana/*` (base58 addresses, case-sensitive) and its swaps under `/sol/trade/*`.\n- **Agent**: the analyst (`/ask`) and the streams.\n\nAmounts are decimal strings in the token's smallest unit. Timestamps are Unix seconds unless the field is `updatedAt` (milliseconds). Reads answer anonymous callers at 60 requests a minute per IP; an `X-API-Key` header raises that to your plan. Every non-2xx body is `{ error, message }`.",
+    "description": "Chord is a non-custodial trading app and on-chain data index. The API has three kinds of endpoint:\n\n- **Trade**: `/quote` finds the best route across every venue on the chain; `/swap` turns it into a transaction you sign yourself. Chord never holds funds or keys.\n- **Read**: every swap on the chain, rolled up by token, venue and hour, from Chord's own index — tokens, launches, holders, top wallets, portfolio PnL, liquidity positions and pools. No key needed. Avalanche, Base, BNB Chain, Arbitrum One and Ethereum have the same rollups under `/chains/{chain}/*`; Solana has its own data family under `/chains/solana/*` (base58 addresses, case-sensitive) and its swaps under `/sol/trade/*`.\n- **Agent**: the analyst (`/ask`) and the streams.\n\nAmounts are decimal strings in the token's smallest unit. Timestamps are Unix seconds unless the field is `updatedAt` (milliseconds). `GET /portfolio/{wallet}` and `/portfolio/{wallet}/activity` differ on both: amounts there are in whole tokens and every time is in milliseconds. Reads answer anonymous callers at 60 requests a minute per IP; an `X-API-Key` header raises that to your plan. Every non-2xx body is `{ error, message }`.",
     "contact": {
       "name": "Chord",
       "url": "https://getchord.xyz/developer"
@@ -46,7 +46,7 @@
     },
     {
       "name": "Portfolio",
-      "description": "Average-cost PnL, trade history and a daily calendar for any wallet."
+      "description": "One wallet's holdings and 24h / 7d / 30d PnL on every chain and Solana by one rule, its swaps across chains, and the older per-chain average-cost PnL, trade history and daily calendar."
     },
     {
       "name": "Liquidity",
@@ -5215,6 +5215,251 @@
           },
           "503": {
             "description": "The lane behind this endpoint is not ready or not enabled here (`NOT_READY`, `CHAIN_NOT_ENABLED`, `NOT_ENABLED`, `*_UNAVAILABLE`). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/{wallet}": {
+      "get": {
+        "tags": [
+          "Portfolio"
+        ],
+        "operationId": "portfolio",
+        "summary": "Holdings and PnL on every chain",
+        "description": "What one wallet holds on Chord's eight EVM chains, and on Solana when you pass its Solana address, with its PnL over the last 24 hours, 7 days and 30 days. One rule for every chain, per token and window: the USD from its sales minus the USD of its buys inside the window, plus what is held now at today's price, minus what was held at the window's start at that hour's close. No cost basis is involved, and transfers are neutral: a token that arrived by transfer only adds its price move, and a quantity bought in the window that left with no sale on the tape (sent, bridged out) counts as sold at the window's average buy price, neither a gain nor a loss. Stablecoins are left out of PnL and counted in `cashUsd`.\n\n**Use it for**: a wallet or portfolio page, \"how did this wallet do this week\", an agent sizing a trade against what the wallet already holds.\n\n**Notes**\n- **Coverage first.** A window is `complete` only when the chain's swap tape covers all of it. When it does not (the tape starts later, a hole in the history), `usd`, `pct` and `fromTs` are null: show a dash, never a partial number as a whole one. A total window is complete only when every chain in the answer is, chains that could not be read included. BNB Chain does not record swaps under $100: its windows still count as complete, and `coverage.ingestFloorUsd` says so.\n- **Holdings** = the chain's token list plus every token the wallet swapped in the last 30 days, read on-chain (Solana: its 50 largest holdings). A token with no price Chord trusts (no measured liquidity, not on the chain's board) has `priceUsd: null`, comes last and is in no total. Priced holdings under $0.01 are folded into `dust`.\n- **Each chain answers on its own deadline.** One that cannot be read is `status: \"unavailable\"` with a `reason` inside the 200 and is left out of the totals' value; `partial` = the balances were read, part of the rest was not.\n- **Times are milliseconds** in this answer (`asOf`, `fromTs`, `tapeFromTs`), unlike most of this API.\n- **Cache**: kept 45 seconds per wallet, Solana address and chain set (10 seconds when a chain could not be read); a copy up to 10 minutes old may be served once while a refresh runs (`asOf` says when it was computed). `fresh=1` recomputes, only for a request with an `X-API-Key` or an Ask session; otherwise it is ignored.\n- **Without an API key (or an Ask session)**: a cached answer is served to anyone. One IP may start at most 10 new reads every 10 minutes (this route and `/activity` together), and every such caller together a limited number a minute; past either the answer is 429 `RATE_LIMITED` or 503 `BUSY` with `Retry-After`, and nothing is read. Send an `X-API-Key` for more.",
+        "parameters": [
+          {
+            "name": "wallet",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": ""
+          },
+          {
+            "name": "sol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "The wallet's Solana address. Adds Solana to the default scope."
+          },
+          {
+            "name": "chains",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "all"
+            },
+            "description": "`all` = the eight EVM chains, plus Solana when `sol` is given. Or a comma list of chain ids (`143`, `4663`, `5042`, `43114`, `8453`, `56`, `42161`, `1`) and `solana` (which needs `sol`). Answered in registry order, Solana last. This route does not read `chain`: `chain=5042` on its own still answers for every chain, so send `chains=5042` for Arc alone."
+          },
+          {
+            "name": "fresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Recompute instead of serving the cached answer. Honoured only with an `X-API-Key` or an Ask session."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Portfolio"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`INVALID_ADDRESS` (the wallet), `INVALID_SOL_ADDRESS`, `BAD_CHAINS`, or `SOL_REQUIRED` (`chains` names `solana` without `sol`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`RATE_LIMITED`: without an API key, this IP started its 10 new portfolio reads of the last 10 minutes (`Retry-After`); a portfolio read in the last 10 minutes still answers. Or `RATE_LIMIT_EXCEEDED`, the per-minute limit of every route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`BUSY`: too many new portfolio reads are running for callers without a key right now (`Retry-After`). `UNAVAILABLE`: the answer itself could not be built. A chain that cannot be read is not a 503: it comes back `status: \"unavailable\"` inside a 200.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/{wallet}/activity": {
+      "get": {
+        "tags": [
+          "Portfolio"
+        ],
+        "operationId": "portfolioActivity",
+        "summary": "Swaps on every chain",
+        "description": "The wallet's swaps on every chain in scope, merged newest first, one keyset page at a time. Each item is one side of a swap seen from the wallet: `buy` = it received `token`, `sell` = it gave it.\n\n**Notes**\n- Pass the page's `cursor` back as `cursor` for the next page; `cursor: null` = nothing older. One transaction's rows stay on one page, so a page can hold fewer than `limit` items.\n- A chain that could not be read for a page is listed in `unavailable` and keeps its place: the next page asks it again. `items: []` with `unavailable` set is an outage, not an empty history.\n- How far back: Monad, Robinhood Chain and Arc, their raw tape (45 days); Avalanche, Base, BNB Chain, Arbitrum One and Ethereum, their raw tape and then, where Chord's history lake holds older days, up to 5,000 older swaps; Solana, 45 days. EVM swaps under $0.10 are left out.\n- `ts` is in milliseconds.\n- Pages are not cached: without an API key (or an Ask session) each page counts against the budget it shares with `GET /portfolio/{wallet}` (10 new reads per IP every 10 minutes, a limited number a minute for every such caller together); past it 429 `RATE_LIMITED` or 503 `BUSY` with `Retry-After`.",
+        "parameters": [
+          {
+            "name": "wallet",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": ""
+          },
+          {
+            "name": "sol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+              "description": "Solana address, base58, case-sensitive. Never lower-case it."
+            },
+            "description": "The wallet's Solana address. Adds Solana to the default scope."
+          },
+          {
+            "name": "chains",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "all"
+            },
+            "description": "`all` = the eight EVM chains, plus Solana when `sol` is given. Or a comma list of chain ids (`143`, `4663`, `5042`, `43114`, `8453`, `56`, `42161`, `1`) and `solana` (which needs `sol`). Answered in registry order, Solana last. This route does not read `chain`: `chain=5042` on its own still answers for every chain, so send `chains=5042` for Arc alone."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The `cursor` of the previous page."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "description": "Items per page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PortfolioActivityItem"
+                      },
+                      "description": "Newest first, every chain in scope merged."
+                    },
+                    "cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Opaque. Pass it back for the next page; null = nothing older."
+                    },
+                    "unavailable": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "chain": {
+                            "type": [
+                              "integer",
+                              "string"
+                            ],
+                            "description": "EVM chain id, or `solana`."
+                          },
+                          "reason": {
+                            "type": "string",
+                            "description": ""
+                          }
+                        }
+                      },
+                      "description": "Present only when a chain could not be read for this page."
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "cursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`INVALID_ADDRESS`, `INVALID_SOL_ADDRESS`, `BAD_CHAINS`, `SOL_REQUIRED`, `BAD_LIMIT` (1 to 100) or `BAD_CURSOR` (not a cursor of this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`RATE_LIMITED`: without an API key, this IP started its 10 new portfolio reads of the last 10 minutes, pages included (`Retry-After`). Or `RATE_LIMIT_EXCEEDED`, the per-minute limit of every route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`BUSY`: too many new portfolio reads are running for callers without a key right now (`Retry-After`). `UNAVAILABLE`: the page itself could not be built (a chain that cannot be read is listed in `unavailable` inside a 200).",
             "content": {
               "application/json": {
                 "schema": {
@@ -29060,6 +29305,420 @@
             "description": ""
           }
         }
+      },
+      "PortfolioWindow": {
+        "type": "object",
+        "properties": {
+          "usd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "PnL over the window, USD. Null when the window is not complete."
+          },
+          "pct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Percent (1.5 = +1.5 %) of the base: the value held at the window's start plus the USD bought in it. Null when that base is under one cent, or when the window is not complete."
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "The swap tape covers the whole window with no known hole. False = `usd`, `pct` and `fromTs` are null: show a dash, never a number."
+          },
+          "fromTs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Unix time, milliseconds. Where the number starts: the window's start, aligned down to the hour. On `totals`: the latest start of the chains."
+          }
+        },
+        "description": "PnL over one window by the window rule (see `GET /portfolio/{wallet}`).",
+        "required": [
+          "usd",
+          "pct",
+          "complete",
+          "fromTs"
+        ]
+      },
+      "PortfolioHolding": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "EVM token, lower-case. Null for the chain's native coin and on a Solana row (which carries `mint`)."
+          },
+          "mint": {
+            "type": "string",
+            "description": "Solana rows only: the mint, case kept."
+          },
+          "symbol": {
+            "type": "string",
+            "description": ""
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
+          },
+          "decimals": {
+            "type": "integer",
+            "description": "From the chain's list or the chain itself, never assumed."
+          },
+          "logo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
+          },
+          "native": {
+            "type": "boolean",
+            "description": "The chain's own coin (ETH, MON, AVAX, BNB, USDC on Arc, SOL)."
+          },
+          "stable": {
+            "type": "boolean",
+            "description": "A dollar stablecoin: counted in `cashUsd`, left out of PnL."
+          },
+          "amount": {
+            "type": "string",
+            "description": "Balance in whole tokens, as a decimal string."
+          },
+          "priceUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Null = no price Chord trusts (no measured liquidity, not on the chain's board): listed last, in no total."
+          },
+          "valueUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "amount × priceUsd."
+          },
+          "change24hPct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Percent."
+          },
+          "pnl": {
+            "type": "object",
+            "properties": {
+              "24h": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": ""
+              },
+              "7d": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": ""
+              },
+              "30d": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": ""
+              }
+            },
+            "description": "This token's part of each window's PnL, USD. Null = left out (a stablecoin, no price, no start price) or the chain's window is not complete.",
+            "required": [
+              "24h",
+              "7d",
+              "30d"
+            ]
+          }
+        },
+        "description": "One token a wallet holds on one chain."
+      },
+      "PortfolioChain": {
+        "type": "object",
+        "properties": {
+          "chain": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "EVM chain id, or `solana`."
+          },
+          "key": {
+            "type": "string",
+            "description": "Registry key (`monad`, `base`, …) or `solana`."
+          },
+          "name": {
+            "type": "string",
+            "description": ""
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "partial",
+              "unavailable"
+            ],
+            "description": "`ok` = read. `partial` = balances read, part of the rest (prices, the tape, some tokens) not, and `reason` says which. `unavailable` = not read at all: in no total, every window without a number."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Present unless `ok`. One plain sentence for a person."
+          },
+          "valueUsd": {
+            "type": "number",
+            "description": "Sum of the priced holdings, small balances included."
+          },
+          "cashUsd": {
+            "type": "number",
+            "description": "The part of `valueUsd` held in stablecoins."
+          },
+          "pnl": {
+            "type": "object",
+            "properties": {
+              "24h": {
+                "$ref": "#/components/schemas/PortfolioWindow"
+              },
+              "7d": {
+                "$ref": "#/components/schemas/PortfolioWindow"
+              },
+              "30d": {
+                "$ref": "#/components/schemas/PortfolioWindow"
+              }
+            },
+            "description": "The chain's PnL per window.",
+            "required": [
+              "24h",
+              "7d",
+              "30d"
+            ]
+          },
+          "coverage": {
+            "type": "object",
+            "properties": {
+              "tapeFromTs": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Unix time, milliseconds. First moment the chain's swap tape covers without a hole for this wallet. Null = no tape here."
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "tape",
+                  "tape+lake",
+                  "box"
+                ],
+                "description": "`tape` = Chord's raw tape of the chain; `tape+lake` = older days joined from Chord's history lake; `box` = Chord's Solana index."
+              },
+              "ingestFloorUsd": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": "Present on a chain whose tape does not record swaps under this many USD (BNB Chain: 100). Disclosed, not a hole: that chain's windows still count as complete, and a swap under the floor reads only as a price move or a transfer. Say so next to the numbers."
+              }
+            }
+          },
+          "holdings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioHolding"
+            },
+            "description": "Priced holdings worth at least $0.01, largest first, then the unpriced ones."
+          },
+          "dust": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "description": ""
+              },
+              "valueUsd": {
+                "type": "number",
+                "description": ""
+              }
+            },
+            "description": "Priced holdings under $0.01, counted here and not listed."
+          },
+          "unpriced": {
+            "type": "integer",
+            "description": "Holdings with `priceUsd: null` (listed at the end of `holdings`)."
+          }
+        },
+        "description": "One chain of a portfolio."
+      },
+      "Portfolio": {
+        "type": "object",
+        "properties": {
+          "wallet": {
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{40}$",
+            "description": "EVM address, lower-case."
+          },
+          "sol": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+            "description": "The Solana address as given, or null."
+          },
+          "asOf": {
+            "type": "integer",
+            "description": "Unix time, milliseconds. When this answer was computed. A cached answer keeps its own `asOf`."
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "valueUsd": {
+                "type": "number",
+                "description": "Sum of `valueUsd` over the chains that were read."
+              },
+              "cashUsd": {
+                "type": "number",
+                "description": ""
+              },
+              "pnl": {
+                "type": "object",
+                "properties": {
+                  "24h": {
+                    "$ref": "#/components/schemas/PortfolioWindow"
+                  },
+                  "7d": {
+                    "$ref": "#/components/schemas/PortfolioWindow"
+                  },
+                  "30d": {
+                    "$ref": "#/components/schemas/PortfolioWindow"
+                  }
+                },
+                "description": "Complete only when every chain in the answer is complete for that window, chains that could not be read included. `pct` is the sum of the chains' USD over the sum of their bases.",
+                "required": [
+                  "24h",
+                  "7d",
+                  "30d"
+                ]
+              }
+            }
+          },
+          "chains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioChain"
+            },
+            "description": "In registry order, Solana last."
+          }
+        },
+        "description": "One wallet on every chain in scope."
+      },
+      "PortfolioActivityItem": {
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "integer",
+            "description": "Unix time, milliseconds."
+          },
+          "chain": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "EVM chain id, or `solana`."
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "description": "`buy` = the wallet received `token`; `sell` = it gave it."
+          },
+          "token": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "EVM token, lower-case. Null on a Solana row."
+              },
+              "mint": {
+                "type": "string",
+                "description": "Solana only, case kept."
+              },
+              "symbol": {
+                "type": "string",
+                "description": ""
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": ""
+              },
+              "logo": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": ""
+              }
+            }
+          },
+          "amount": {
+            "type": "string",
+            "description": "Whole tokens, decimal string."
+          },
+          "valueUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": ""
+          },
+          "priceUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": ""
+          },
+          "tx": {
+            "type": "string",
+            "description": "Transaction hash, or the Solana signature (case kept)."
+          },
+          "explorer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The transaction on the chain's explorer."
+          },
+          "venue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Venue display name."
+          }
+        },
+        "description": "One side of one swap."
       },
       "LpEvent": {
         "type": "object",
