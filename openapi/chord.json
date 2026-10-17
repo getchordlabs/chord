@@ -17940,6 +17940,305 @@
         }
       }
     },
+    "/chains/{chain}/token/{address}/liquidity": {
+      "get": {
+        "tags": [
+          "Avalanche, Base, BNB Chain"
+        ],
+        "operationId": "chainTokenLiquidity",
+        "summary": "Liquidity adds and removes",
+        "description": "Liquidity added to and removed from the token's busiest V2 / V3-style pools of the day (up to 8), newest first, read live from the chain's Mint and Burn logs: no LP indexer runs for these chains. A V4 pool's log carries no amounts, so V4 pools are not read, nor pools paired with no reference asset of the chain; `poolsLeftOut` counts the day's pools not read (past the 8 busiest, V4, or with no reference asset). The reads stop at 300 events or one day: on a token whose pools churn (just-in-time liquidity bots on majors) the list is the newest events, `since` says how far back it reaches and `summary` is null; `summary` holds the day's figures only when the reads covered the whole day. `wallet` is the transaction's sender (the pool's own owner field is the position manager). Cached 60 seconds per token.\n\nChain-keyed data for Avalanche C-Chain, Base and BNB Chain, served from Chord's rollup tables for the chain (every swap summed by hour, token and venue). Only the trade tape, the prints ticker and the wallet read raw rows, scoped to one token or one wallet and bounded.\n\n- **Access.** No key needed while the chain is public (all three are today). A chain whose tape is off, or that is not public yet, answers `400 UNSUPPORTED_CHAIN` (\"chain N is not served yet\") unless the request carries an `X-API-Key`; those answers are sent `Cache-Control: private`.\n- **Ingest floor.** Every count, volume and print covers trades at or above the chain's floor, returned as `ingestFloor`. BNB Chain runs at $100 today; Avalanche and Base at 0.\n- **Readiness.** `503 NOT_READY` until the chain's rollup has run on this deployment; `503 CHAIN_DATA_UNAVAILABLE` when the store cannot be read. Never treat either as \"no trades\".",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "avalanche",
+                "base",
+                "bnb",
+                "arbitrum",
+                "ethereum",
+                "43114",
+                "8453",
+                "56",
+                "42161",
+                "1"
+              ]
+            },
+            "description": "The chain, by key or id: `avalanche` or `43114`, `base` or `8453`, `bnb` or `56`, `arbitrum` or `42161`, `ethereum` or `1` (case-insensitive). Arc, Robinhood Chain and Monad are refused with `400 UNSUPPORTED_CHAIN` and a pointer to their own routes."
+          },
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$",
+              "description": "EVM address, hex, case-insensitive."
+            },
+            "description": "Token address. The zero address means the chain's wrapped native token (WAVAX, WETH, WBNB)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "token": {
+                      "type": "string",
+                      "pattern": "^0x[a-fA-F0-9]{40}$",
+                      "description": "EVM address, hex, case-insensitive."
+                    },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tx": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{64}$",
+                            "description": "Transaction hash."
+                          },
+                          "logIndex": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "pool": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "dex": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "add",
+                              "remove"
+                            ]
+                          },
+                          "wallet": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "token": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "tokenAmt": {
+                            "type": "number",
+                            "description": "Whole tokens."
+                          },
+                          "anchor": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "description": "EVM address, hex, case-insensitive."
+                          },
+                          "anchorAmt": {
+                            "type": "number",
+                            "description": "Whole units of the other side."
+                          },
+                          "usd": {
+                            "type": "number",
+                            "description": "0 when not priced."
+                          },
+                          "priced": {
+                            "type": "boolean"
+                          },
+                          "tickLower": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "tickUpper": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": ""
+                          },
+                          "block": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "ts": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          }
+                        }
+                      }
+                    },
+                    "summary": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "hours": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "adds": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "addUsd": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "removes": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "removeUsd": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "netUsd": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "tokenOnlyAdds": {
+                          "type": "integer",
+                          "description": "One-sided adds (no reference asset)."
+                        },
+                        "tokenOnlyRemoves": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "providers": {
+                          "type": "integer",
+                          "description": ""
+                        }
+                      }
+                    },
+                    "since": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Unix time, seconds, UTC."
+                    },
+                    "poolsRead": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "poolsLeftOut": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "Unix time, milliseconds — when the server built this answer."
+                    }
+                  }
+                },
+                "example": {
+                  "chain": 56,
+                  "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+                  "events": [
+                    {
+                      "tx": "0x38f96958ac89a53262ea616180cc8d84daa8564f555832be1c970b4fa214bd41",
+                      "logIndex": 165,
+                      "pool": "0xebe40e120bac0d8f9793c080b4ce1653961930c8",
+                      "dex": "thena_v3",
+                      "kind": "add",
+                      "wallet": "0xf44b7840453a4b4af43296cfeddb846859673981",
+                      "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+                      "tokenAmt": 0.12742343444336499,
+                      "anchor": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+                      "anchorAmt": 11.759212264586115,
+                      "usd": 18713.82190785021,
+                      "priced": true,
+                      "tickLower": 47100,
+                      "tickUpper": 47640,
+                      "block": 128245179,
+                      "ts": 1792273782,
+                      "manager": null,
+                      "tokenId": null
+                    },
+                    {
+                      "tx": "0xf7871108cc4be0005d64b18acd8d4ebbbfa09895a9d8aeb445a835e3f185f819",
+                      "logIndex": 113,
+                      "pool": "0x46cf1cf8c69595804ba91dfdd8d6b960c9b0a7c4",
+                      "dex": "pancake_v3",
+                      "kind": "remove",
+                      "wallet": "0x8aae761f70efb017078729e7c937fc811c6c5189",
+                      "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+                      "tokenAmt": 0.000890557413961423,
+                      "anchor": "0x55d398326f99059ff775485246999027b3197955",
+                      "anchorAmt": 55.360712157066914,
+                      "usd": 127.56026493163303,
+                      "priced": true,
+                      "tickLower": -113690,
+                      "tickUpper": -112540,
+                      "block": 128244191,
+                      "ts": 1792273337,
+                      "manager": null,
+                      "tokenId": null
+                    }
+                  ],
+                  "summary": null,
+                  "since": 1792254010,
+                  "poolsRead": 8,
+                  "poolsLeftOut": 16,
+                  "updatedAt": 1792273814517
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`UNSUPPORTED_CHAIN` (unknown chain, a chain with its own routes, or a chain not served to this caller yet), or `BAD_ADDRESS`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-minute limit (`RATE_LIMIT_EXCEEDED`). Read `X-RateLimit-Reset` and back off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`NOT_READY` (the chain's rollup has not run on this deployment yet) or `CHAIN_DATA_UNAVAILABLE` (the store could not be read). Retry later; do not treat it as an empty answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chains/{chain}/venues": {
       "get": {
         "tags": [

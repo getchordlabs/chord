@@ -5799,5 +5799,56 @@
     "volumeUsd": 53.52
    }
   ]
+ },
+ "/v1/chains/bnb/token/0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c/liquidity": {
+  "chain": 56,
+  "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+  "events": [
+   {
+    "tx": "0x38f96958ac89a53262ea616180cc8d84daa8564f555832be1c970b4fa214bd41",
+    "logIndex": 165,
+    "pool": "0xebe40e120bac0d8f9793c080b4ce1653961930c8",
+    "dex": "thena_v3",
+    "kind": "add",
+    "wallet": "0xf44b7840453a4b4af43296cfeddb846859673981",
+    "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+    "tokenAmt": 0.12742343444336499,
+    "anchor": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+    "anchorAmt": 11.759212264586115,
+    "usd": 18713.82190785021,
+    "priced": true,
+    "tickLower": 47100,
+    "tickUpper": 47640,
+    "block": 128245179,
+    "ts": 1792273782,
+    "manager": null,
+    "tokenId": null
+   },
+   {
+    "tx": "0xf7871108cc4be0005d64b18acd8d4ebbbfa09895a9d8aeb445a835e3f185f819",
+    "logIndex": 113,
+    "pool": "0x46cf1cf8c69595804ba91dfdd8d6b960c9b0a7c4",
+    "dex": "pancake_v3",
+    "kind": "remove",
+    "wallet": "0x8aae761f70efb017078729e7c937fc811c6c5189",
+    "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+    "tokenAmt": 0.000890557413961423,
+    "anchor": "0x55d398326f99059ff775485246999027b3197955",
+    "anchorAmt": 55.360712157066914,
+    "usd": 127.56026493163303,
+    "priced": true,
+    "tickLower": -113690,
+    "tickUpper": -112540,
+    "block": 128244191,
+    "ts": 1792273337,
+    "manager": null,
+    "tokenId": null
+   }
+  ],
+  "summary": null,
+  "since": 1792254010,
+  "poolsRead": 8,
+  "poolsLeftOut": 16,
+  "updatedAt": 1792273814517
  }
 }
