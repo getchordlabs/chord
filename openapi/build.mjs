@@ -569,9 +569,9 @@ For names, logos and honesty flags use \`/arc/tokens\` or \`/rh/tokens\`. Always
 const SEARCH_EXAMPLE = { chain: 4663, q: "NVDA", tokens: [{ address: "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC", symbol: "NVDA", name: "NVIDIA • Robinhood Token", decimals: 18, logoURI: "https://cdn.robinhood.com/ncw_assets/logos/0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec.png", verified: true, tags: ["stock"] }] };
 add("/tokens/search", "get", op(T.tokens, "searchTokens", "Search tokens on a chain", `Symbol, name or address. What it searches depends on \`chain\`:
 
-- \`4663\` Robinhood Chain: the curated list (\`verified: true\`, stocks tagged \`stock\`) plus tokens that traded in the last 24 hours and are not on it (\`verified: false\`, no logo).
+- \`4663\` Robinhood Chain: the curated list (\`verified: true\`, stocks tagged \`stock\`) plus every token that traded in the last 24 hours and is not on it (\`verified: false\`, no logo; named on-chain when no list knows it).
 - \`5042\` Arc: every token traded in the last 24 hours, the same index as \`/arc/tokens/search\`. \`verified\` is true for tokens on the curated Arc list.
-- \`43114\` / \`8453\` / \`56\` / \`42161\` / \`1\`: that chain's token list, all \`verified: true\`. A chain that is not public yet answers \`404 CHAIN_NOT_PUBLIC\` unless the request carries an \`X-API-Key\`.
+- \`43114\` / \`8453\` / \`56\` / \`42161\` / \`1\`: that chain's token list (\`verified: true\`) plus every token traded on it in the last 24 hours with at least $500 of volume, or any traded token by its address (\`verified: false\`, no logo; tokens the scam screen hides from boards are left out of a name search). A chain that is not public yet answers \`404 CHAIN_NOT_PUBLIC\` unless the request carries an \`X-API-Key\`.
 - no \`chain\`, or \`143\`: Monad off-list discovery. Tokens found through DexScreener that are **not** on the curated Monad list, with a logo and on-chain decimals, all \`verified: false\`. This mode answers \`{ tokens }\` only, returns up to 8 rows whatever \`limit\` says, and returns an empty list for a query under 2 characters.
 
 Ranking: the exact address, then the exact symbol, a symbol prefix, a name prefix, then any substring; verified rows first within a rank, one row per address. A leading \`$\` is ignored. Treat \`verified: false\` as unvetted and check the address before trading it.
