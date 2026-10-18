@@ -30944,6 +30944,15 @@
             "type": "number",
             "description": ""
           },
+          "shareModel": {
+            "type": "string",
+            "enum": [
+              "liquidity",
+              "bins",
+              "tvl"
+            ],
+            "description": "What that share was measured against: the pool's in-range liquidity at its price now (V3 / V4 / Raydium CLMM), its active bin (Meteora DLMM), or its TVL counted as if spread over every price when the pool's depth could not be read (narrow ranges then read high)."
+          },
           "note": {
             "type": "string",
             "description": ""

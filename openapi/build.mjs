@@ -259,7 +259,8 @@ const LpLeaderRow = obj({
 const SimResult = obj({
   pool: POOL_ID, dex: str(""), feeBps: nullable(num("")), tvlUsd: nullable(num("")), days: int(""), hours: int("Candles replayed."), hoursInRange: int(""), inRangePct: num(""), exits: int("Times the price left the range."),
   lower: num(""), upper: num(""), unreliable: nullable(str("Why the number should not be trusted, when it should not.")), entryPrice: num(""), exitPrice: num(""), priceChangePct: num(""),
-  feesUsd: num(""), lpValueEndUsd: num(""), holdValueEndUsd: num(""), ilUsd: num("Impermanent loss (negative = loss)."), netVsHoldUsd: num(""), totalReturnUsd: num(""), totalReturnPct: num(""), feeAprPct: num(""), capitalEfficiency: num("Versus full range."), shareOfPoolPct: num(""), note: str(""),
+  feesUsd: num(""), lpValueEndUsd: num(""), holdValueEndUsd: num(""), ilUsd: num("Impermanent loss (negative = loss)."), netVsHoldUsd: num(""), totalReturnUsd: num(""), totalReturnPct: num(""), feeAprPct: num(""), capitalEfficiency: num("Versus full range."), shareOfPoolPct: num("The position's share of the fees it competes for, in percent."),
+  shareModel: { type: "string", enum: ["liquidity", "bins", "tvl"], description: "What that share was measured against: the pool's in-range liquidity at its price now (V3 / V4 / Raydium CLMM), its active bin (Meteora DLMM), or its TVL counted as if spread over every price when the pool's depth could not be read (narrow ranges then read high)." }, shareOfPoolPct: num(""), note: str(""),
 }, "One range, backtested on Chord's own candles and the pool's real fee tier.");
 
 const LauncherStat = obj({
