@@ -573,6 +573,7 @@ add("/tokens/search", "get", op(T.tokens, "searchTokens", "Search tokens on a ch
 - \`5042\` Arc: every token traded in the last 24 hours, the same index as \`/arc/tokens/search\`. \`verified\` is true for tokens on the curated Arc list.
 - \`43114\` / \`8453\` / \`56\` / \`42161\` / \`1\`: that chain's token list (\`verified: true\`) plus every token traded on it in the last 24 hours with at least $500 of volume, or any traded token by its address (\`verified: false\`, no logo; tokens the scam screen hides from boards are left out of a name search). A chain that is not public yet answers \`404 CHAIN_NOT_PUBLIC\` unless the request carries an \`X-API-Key\`.
 - no \`chain\`, or \`143\`: Monad off-list discovery. Tokens found through DexScreener that are **not** on the curated Monad list, with a logo and on-chain decimals, all \`verified: false\`. This mode answers \`{ tokens }\` only, returns up to 8 rows whatever \`limit\` says, and returns an empty list for a query under 2 characters.
+- \`143\` (or no \`chain\`) with \`listed=1\`: Monad like the other chains, \`{ chain, q, tokens }\`: the curated Monad list first (\`verified: true\`), then the off-list discovery rows (\`verified: false\`, after every listed match whatever their rank), \`limit\` honoured. The off-list half waits at most 3 seconds.
 
 Ranking: the exact address, then the exact symbol, a symbol prefix, a name prefix, then any substring; verified rows first within a rank, one row per address. A leading \`$\` is ignored. Treat \`verified: false\` as unvetted and check the address before trading it.
 
@@ -580,20 +581,21 @@ Ranking: the exact address, then the exact symbol, a symbol prefix, a name prefi
   { params: [
       q("q", { type: "string", minLength: 1, maxLength: 64 }, "Symbol, name or address fragment.", true),
       chainQ([4663, 5042, 43114, 8453, 56, 42161, 1, 143], { def: 143, note: "Pass the chain you want: the default is Monad off-list discovery." }),
-      q("limit", { type: "integer", minimum: 1, maximum: 25, default: 8 }, "Rows to return, clamped to 1–25. Ignored in Monad mode."),
+      q("limit", { type: "integer", minimum: 1, maximum: 25, default: 8 }, "Rows to return, clamped to 1–25. Ignored in Monad off-list mode."),
+      q("listed", { type: "integer", enum: [0, 1], default: 0 }, "Monad only: 1 = the curated list first, then the off-list tokens."),
     ],
     responses: {
       200: ok("Matches, best first. An empty `tokens` is a real answer.", obj({
-        chain: int("The chain searched. Absent in Monad mode."), q: str("The query as received. Absent in Monad mode."),
+        chain: int("The chain searched. Absent in Monad off-list mode."), q: str("The query as received. Absent in Monad off-list mode."),
         tokens: arr(obj({
           address: ADDRESS, symbol: str(""), name: str(""), decimals: nullable(int("ERC-20 decimals. Null for an off-list token whose decimals are not resolved yet.")),
           logoURI: nullable(str("Logo URL when known. Absent on off-list Robinhood Chain rows.")),
           verified: bool("On the chain's curated list. False = found by the index or by discovery, not vetted."),
           tags: arr({ type: "string" }, "`stock`, `stablecoin`, … from the curated list (Robinhood Chain); `meme` in Monad mode. Absent when empty."),
-          liquidityUsd: nullable(num("Monad mode only: liquidity of the deepest DexScreener pair.")),
+          liquidityUsd: nullable(num("Monad off-list rows only: liquidity of the deepest DexScreener pair.")),
         }, undefined, { required: ["address", "symbol", "name", "decimals", "verified"] })),
       }, undefined, { required: ["tokens"] }), SEARCH_EXAMPLE),
-      400: errRes("`BAD_CHAIN` (a chain this route does not search) or `BAD_QUERY` (`q` empty or longer than 64 characters). Monad mode does not validate `q`."),
+      400: errRes("`BAD_CHAIN` (a chain this route does not search) or `BAD_QUERY` (`q` empty or longer than 64 characters). Monad off-list mode does not validate `q`."),
       404: errRes("`CHAIN_NOT_PUBLIC`: the chain is not public yet and the request has no `X-API-Key`."),
     } }));
 

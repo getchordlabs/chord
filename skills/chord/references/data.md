@@ -31,7 +31,9 @@ curl -s "$BASE/arc/tokens/search?q=argus&limit=5"   # Arc: every token traded in
   `0x3600000000000000000000000000000000000000` from the curated list).
 - On Robinhood Chain several memecoins reuse stock tickers. The tokenized share has the tag `stock`
   and a name ending in "Robinhood Token".
-- `/v1/tokens/search` is NOT a per-chain search (it ignores `chain`); do not use it to resolve symbols.
+- `/v1/tokens/search?q=&chain=ID` searches one chain: the curated list (`verified: true`) plus tokens traded there in 24 h
+  (`verified: false`). On Monad pass `chain=143&listed=1`: without `listed` it returns only tokens OFF the curated list (the
+  swap picker's fallback), so `USDC` comes back empty.
 
 ## 2. Price and 24h stats
 
