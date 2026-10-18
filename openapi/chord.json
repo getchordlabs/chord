@@ -6911,7 +6911,7 @@
         ],
         "operationId": "lpPool",
         "summary": "One pool",
-        "description": "The pool row plus its hourly series (the last 168 hours by default; `hours` up to 720), the top providers over 7 days, the health score with its parts and reasons, launch facts (who launched it, how much of the liquidity the launcher holds and has pulled), and `mint` — what a wallet needs to add liquidity here (the position manager, the pool key, Permit2, tick spacing).",
+        "description": "The pool row plus its hourly series (the last 168 hours by default; `hours` up to 720), the top providers over 7 days, the health score with its parts and reasons, launch facts (who launched it, how much of the liquidity the launcher holds and has pulled), and `mint` — what a wallet needs to add liquidity here (the position manager, the pool key, Permit2, tick spacing).\n\n**Candles** (`open` / `high` / `low` / `close` of each hour, in dollars per token like `price`): built from this pool's own swaps in block order, swaps under $0.10 left out. A swap whose price is more than 10× away from at least half of the five swaps before it AND half of the five after it in the same pool is a misprint and is not part of the candle (a launch, a rug or a pump that holds keeps its prices: the swaps after it agree with it). A candle whose open or close is still 10× away from the candles around it is dropped (its hour keeps `vol` and `trades`) and counted in `candlesDropped`. An hour without a candle has the four fields `null`: no priced swap, two tokens in the hour, or an hour rolled before candles existed (2026-10-19) whose swaps are no longer kept. `price` is the hour's last swap of any size, unfiltered.",
         "parameters": [
           {
             "name": "pool",
@@ -6988,10 +6988,43 @@
                                   "number",
                                   "null"
                                 ],
+                                "description": "The hour's last swap, any size."
+                              },
+                              "open": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": "The candle's first price (see Candles above)."
+                              },
+                              "high": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": ""
+                              },
+                              "low": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": ""
+                              },
+                              "close": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
                                 "description": ""
                               }
                             }
-                          }
+                          },
+                          "description": "Oldest first; hours with no swap are absent."
+                        },
+                        "candlesDropped": {
+                          "type": "integer",
+                          "description": "Candles of the series left out as misprints (their hours keep volume and trades)."
                         },
                         "topLps": {
                           "type": "array",
@@ -22966,6 +22999,130 @@
                             "type": "integer",
                             "description": ""
                           }
+                        }
+                      }
+                    },
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "wallet": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+                            "description": "Solana address, base58, case-sensitive. Never lower-case it."
+                          },
+                          "depositsUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "withdrawalsUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "netUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "feesClaimedUsd": {
+                            "type": "number",
+                            "description": ""
+                          },
+                          "events": {
+                            "type": "integer",
+                            "description": ""
+                          },
+                          "lastTs": {
+                            "type": "integer",
+                            "description": "Unix time, seconds, UTC."
+                          }
+                        }
+                      },
+                      "description": "Who added and removed in the window, most active first (up to 50)."
+                    },
+                    "market": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "hourly": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "hour": {
+                                "type": "integer",
+                                "description": "Unix time, seconds, UTC."
+                              },
+                              "vol": {
+                                "type": "number",
+                                "description": "Swap volume, dollars."
+                              },
+                              "trades": {
+                                "type": "integer",
+                                "description": ""
+                              },
+                              "price": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": "Close of the hour's last priced minute, dollars per token."
+                              },
+                              "open": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": "The hour's candle, from its one-minute candles: a minute price more than 10× away from at least half of the five minutes before it AND half of the five after it is left out; a candle whose open or close is still 10× away from the candles around it is dropped. Null = no candle that hour."
+                              },
+                              "high": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": ""
+                              },
+                              "low": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": ""
+                              },
+                              "close": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": ""
+                              }
+                            }
+                          },
+                          "description": "The last 7 days, oldest first; hours with no swap are absent."
+                        },
+                        "volume24hUsd": {
+                          "type": "number",
+                          "description": ""
+                        },
+                        "trades24h": {
+                          "type": "integer",
+                          "description": ""
+                        },
+                        "wallets24h": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Null until counted (ask again in a few seconds when `walletsPending`)."
+                        },
+                        "candlesDropped": {
+                          "type": "integer",
+                          "description": "Candles of the series left out as misprints."
                         }
                       }
                     },
