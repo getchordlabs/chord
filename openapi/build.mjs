@@ -1524,7 +1524,7 @@ const doc = {
 
 Amounts are decimal strings in the token's smallest unit. Timestamps are Unix seconds unless the field is \`updatedAt\` (milliseconds). \`GET /portfolio/{wallet}\` and \`/portfolio/{wallet}/activity\` differ on both: amounts there are in whole tokens and every time is in milliseconds. Reads answer anonymous callers at 60 requests a minute per IP; an \`X-API-Key\` header raises that to your plan. Every non-2xx body is \`{ error, message }\`.`,
     contact: { name: "Chord", url: "https://getchord.xyz/developer" },
-    "x-logo": { url: "https://getchord.xyz/chord/pwa-192x192.png" },
+    "x-logo": { url: "https://getchord.xyz/chord/pwa-192x192.png?v=20261019" },
   },
   servers: [{ url: "https://api.getchord.xyz/v1", description: "Production" }],
   tags: [

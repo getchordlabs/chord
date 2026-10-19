@@ -37,7 +37,7 @@ const CARD = JSON.stringify({
   version: VERSION,
   websiteUrl: "https://getchord.xyz/docs/agents/docs-mcp/",
   repository: { url: "https://github.com/getchordlabs/chord", source: "github", subfolder: "docs-mcp" },
-  icons: [{ src: "https://getchord.xyz/chord/pwa-512x512.png", mimeType: "image/png", sizes: ["512x512"] }],
+  icons: [{ src: "https://getchord.xyz/chord/pwa-512x512.png?v=20261019", mimeType: "image/png", sizes: ["512x512"] }],
   remotes: [{ type: "streamable-http", url: PUBLIC_URL, supportedProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS }],
 }, null, 2);
 const CARD_ETAG = `"${createHash("sha256").update(CARD).digest("hex").slice(0, 32)}"`;
