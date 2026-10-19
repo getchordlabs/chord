@@ -48,8 +48,15 @@ function prepare(raw, source) {
 }
 
 // ── search ────────────────────────────────────────────────────────────────────────────────────
+// Words that say nothing about a page. Counted as terms they decided rankings on their own: "subscribe to Arc prices over
+// websocket" put three sections that happen to contain "to" and "over" (the every-term bonus) above the streaming page's
+// Subscribe section, which holds every word that matters (smoke check, 19/10). A query of nothing else keeps them.
+const STOP = new Set(["an", "the", "to", "of", "in", "on", "at", "by", "for", "from", "with", "over", "into", "via", "and", "or", "is", "are", "be", "do", "does", "how", "what", "which", "can", "my", "me", "it", "its", "this", "that"]);
+
 export function search(index, query, limit = 6, kinds = null) {
-  const terms = [...new Set(tokenize(query))];
+  const all = [...new Set(tokenize(query))];
+  const content = all.filter((t) => !STOP.has(t));
+  const terms = content.length ? content : all;
   const phrase = query.trim().toLowerCase();
   const N = index.docs.length;
   const scored = [];
