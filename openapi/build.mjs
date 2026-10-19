@@ -1469,7 +1469,7 @@ add("/agent/stats", "get", op(T.agents, "agentStats", "Agent traffic per chain",
   ], responses: withErr({ 200: ok("", obj({
     chain: str(""), days: int(""), from: str("UTC day."), to: str("UTC day."),
     agents: ref("AgentCounts"), web: ref("AgentCounts"),
-    bySource: obj(Object.fromEntries(["mcp", "x402", "wallet", "api", "anon", "web"].map((k) => [k, ref("AgentCounts")]))),
+    bySource: obj(Object.fromEntries(["mcp", "x402", "wallet", "cash", "api", "anon", "web"].map((k) => [k, ref("AgentCounts")]))),
     daily: arr(obj({ day: str(""), calls: int(""), reads: int(""), quotes: int(""), swapTx: int(""), asks: int("") }), "Oldest first; programmatic callers only."),
     since: nullable(str("")),
     onchain: nullable(obj({

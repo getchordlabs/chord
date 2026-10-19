@@ -27634,6 +27634,9 @@
                         "wallet": {
                           "$ref": "#/components/schemas/AgentCounts"
                         },
+                        "cash": {
+                          "$ref": "#/components/schemas/AgentCounts"
+                        },
                         "api": {
                           "$ref": "#/components/schemas/AgentCounts"
                         },
