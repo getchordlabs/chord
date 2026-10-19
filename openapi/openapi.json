@@ -11647,6 +11647,52 @@
                     ],
                     "description": "How long an answer to write. `quick`: the shortest form (the verdict, its claim, at most three rows of evidence, 120 words at most), faster. `deep`: a judgement or an explanation comes back as a full research note (`shape: \"report\"`), any other answer with a longer folded `details`. Omitted: the length the question calls for. Any other value is ignored."
                   },
+                  "copilot": {
+                    "type": "object",
+                    "properties": {
+                      "chain": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "arc",
+                              "robinhood",
+                              "monad",
+                              "avalanche",
+                              "base",
+                              "bnb",
+                              "arbitrum",
+                              "ethereum",
+                              "solana"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              5042,
+                              4663,
+                              143,
+                              43114,
+                              8453,
+                              56,
+                              42161,
+                              1
+                            ]
+                          }
+                        ],
+                        "description": "The token's chain: its key, or its chain id."
+                      },
+                      "token": {
+                        "type": "string",
+                        "description": "The token: its 0x contract (any case), or a Solana mint exactly as written (base58 is case-sensitive)."
+                      }
+                    },
+                    "description": "AI Copilot: the token whose trading screen the chat sits beside. The answer is about that token whatever the question names (\"is it a buy?\"): Chord reads the token's name itself, checks it, and points a question about something else to the main chat in one line. A value it cannot read (an unknown chain, no token, a 0x contract on Solana or a mint on an EVM chain) is ignored, and the question is answered as any other.",
+                    "required": [
+                      "chain",
+                      "token"
+                    ]
+                  },
                   "images": {
                     "type": "array",
                     "items": {

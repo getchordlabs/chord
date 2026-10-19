@@ -43,6 +43,7 @@ Body:
 | `history` | no | earlier turns `[{ "role": "user" or "assistant", "content": "..." }]`, last 12 kept |
 | `wallet` | no | a 0x address so "my PnL", "my balances" resolve to it |
 | `mode` | no | `"quick"` = the shortest answer (verdict, claim, three rows, 120 words at most), faster; `"deep"` = a judgement or an explanation as a full research note (`shape: "report"`). Omitted = the length the question calls for; other values are ignored |
+| `copilot` | no | `{ "chain": "base", "token": "0x..." }` = answer about this one token, whatever the question names (the AI Copilot beside a token's trading screen). `chain` = a chain key (`arc`, `robinhood`, `monad`, `avalanche`, `base`, `bnb`, `arbitrum`, `ethereum`, `solana`) or its chain id; `token` = the 0x contract, or a Solana mint exactly as written. A value it cannot read is ignored |
 
 ## Auth
 
