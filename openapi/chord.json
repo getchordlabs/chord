@@ -8681,7 +8681,7 @@
         ],
         "operationId": "lpLeaderboard",
         "summary": "Best liquidity providers",
-        "description": "LP wallets from the ledger: win rate, fees, pools, expected value per position, average age / invested / monthly profit, profit over 7 / 30 days / all time, the last seven days of profit and what they provide to. Every filter bound is inclusive. A bound left out takes the chain's default (every chain: `minPositions` 3 and `minAgeHours` 1; Arc 5042: `minPositions` 1, `minAgeHours` 1, `minFees` 50): the answer names those defaults (`defaults`) and every bound the board ran with (`applied`), both under the query-parameter names. Send 0 to switch a default off.\n\nThe board is **fee-checked**: a wallet whose profit is positive while the fees it collected are under a tenth of that profit made it on the token's price (liquidity on a launch pulled into the buyers), not by providing, and is left out; `hidden` counts them and `all=1` keeps them in. The check reads the window the board ranks by (`profit_7d` → 7 days, `profit_30d` → 30 days, every other sort → all time). Every sort ranks inside the 400 most profitable wallets of its window that pass the filters; `total` is that count and `scored` the wallets that passed before the cut to 400. A window sort lists only wallets with a position that ended or was touched in the window.",
+        "description": "LP wallets from the ledger: win rate, fees, pools, expected value per position, average age / invested / monthly profit, profit over 7 / 30 days / all time, the last seven days of profit and what they provide to. Every filter bound is inclusive. A bound left out takes the chain's default (every chain: `minPositions` 3 and `minAgeHours` 1; Arc 5042: `minPositions` 1, `minAgeHours` 1, `minFees` 50): the answer names those defaults (`defaults`) and every bound the board ran with (`applied`), both under the query-parameter names. Send 0 to switch a default off.\n\nThe board is **fee-checked**: a wallet whose profit is positive while the fees it collected are under a tenth of that profit made it on the token's price (liquidity on a launch pulled into the buyers), not by providing, and is left out; `hidden` counts them and `all=1` keeps them in. The check reads the window the board ranks by (`profit_7d` → 7 days, `profit_30d` → 30 days, every other sort → all time). Every sort ranks inside the 400 most profitable wallets of its window that pass the filters; `total` is that count and `scored` the wallets that passed before the cut to 400. A window sort lists only wallets with a position that ended or was touched in the window.\n\n`coverage` says where the chain's ledger starts (`fromTs`, the first add it saw; null while that is first read): when it starts inside a window, that window and every longer one cover the same days.",
         "parameters": [
           {
             "name": "chain",
@@ -8903,6 +8903,25 @@
                     "scored": {
                       "type": "integer",
                       "description": "Wallets that passed the filters and the fee check, before the cut to the top 400."
+                    },
+                    "coverage": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "fromTs": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Unix time, seconds, UTC."
+                        },
+                        "partialExcluded": {
+                          "type": "integer",
+                          "description": "Positions opened before the ledger starts (their first event is a remove), left out of the board."
+                        }
+                      }
                     },
                     "rows": {
                       "type": "array",
