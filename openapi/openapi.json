@@ -8681,7 +8681,7 @@
         ],
         "operationId": "lpLeaderboard",
         "summary": "Best liquidity providers",
-        "description": "LP wallets from the ledger: win rate, fees, pools, expected value per position, average age / invested / monthly profit, profit over 7 / 30 days / all time, the last seven days of profit and what they provide to. Every filter bound is inclusive. A bound left out takes the chain's default (every chain: `minPositions` 3 and `minAgeHours` 1; Arc 5042: `minPositions` 1, `minAgeHours` 1, `minFees` 50): the answer names those defaults (`defaults`) and every bound the board ran with (`applied`), both under the query-parameter names. Send 0 to switch a default off.\n\nThe board is **fee-checked**: a wallet whose profit is positive while the fees it collected are under a tenth of that profit made it on the token's price (liquidity on a launch pulled into the buyers), not by providing, and is left out; `hidden` counts them and `all=1` keeps them in. The check reads the window the board ranks by (`profit_7d` → 7 days, `profit_30d` → 30 days, every other sort → all time). Every sort ranks inside the 400 most profitable wallets of its window that pass the filters; `total` is that count and `scored` the wallets that passed before the cut to 400. A window sort lists only wallets with a position that ended or was touched in the window.\n\n`coverage` says where the chain's ledger starts (`fromTs`, the first add it saw; null while that is first read): when it starts inside a window, that window and every longer one cover the same days.",
+        "description": "LP wallets from the ledger: win rate, fees, pools, expected value per position, average age / invested / monthly profit, profit over 7 / 30 days / all time, the last seven days of profit and what they provide to. Every filter bound is inclusive. A bound left out takes the chain's default (every chain: `minPositions` 3 and `minAgeHours` 1; Arc 5042: `minPositions` 1, `minAgeHours` 1, `minFees` 50): the answer names those defaults (`defaults`) and every bound the board ran with (`applied`), both under the query-parameter names. Send 0 to switch a default off.\n\nThe board is **fee-checked**: a wallet whose profit is positive while the fees it collected are under a tenth of that profit made it on the token's price (liquidity on a launch pulled into the buyers), not by providing, and is left out; `hidden` counts them and `all=1` keeps them in. The check reads the window the board ranks by (`profit_7d` → 7 days, `profit_30d` → 30 days, every other sort → all time). Every sort ranks inside the 400 most profitable wallets of its window that pass the filters; `total` is that count and `scored` the wallets that passed before the cut to 400. A window sort lists only wallets with a position that ended or was touched in the window.\n\nAn open position counts the fees it collected plus the fees still waiting in it, read on the chain at most two hours ago with no event of the position after the read; its 7 / 30-day fees are what it collected in the window plus how much more is waiting at the end of the window than at its start. `unrealizedUsd` marks the open positions to the chain and `totalPnlUsd` adds the closed result (sort `total_pnl`): both are null while one open position has no such read.\n\n`coverage` says where the chain's ledger starts (`fromTs`, the first add it saw; null while that is first read): when it starts inside a window, that window and every longer one cover the same days.",
         "parameters": [
           {
             "name": "chain",
@@ -8721,6 +8721,7 @@
                 "profit",
                 "profit_7d",
                 "profit_30d",
+                "total_pnl",
                 "win_rate",
                 "avg_age",
                 "positions",
@@ -8733,7 +8734,7 @@
               ],
               "default": "profit"
             },
-            "description": "`profit` = all time. An unknown value is `400 BAD_SORT`."
+            "description": "`profit` = all time. `total_pnl` = `totalPnlUsd` (null rows last). An unknown value is `400 BAD_SORT`."
           },
           {
             "name": "limit",
@@ -8922,6 +8923,27 @@
                           "description": "Positions opened before the ledger starts (their first event is a remove), left out of the board."
                         }
                       }
+                    },
+                    "unrealizedCoverage": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "valuedAt": {
+                          "type": "integer",
+                          "description": "Unix time, seconds, UTC."
+                        },
+                        "positions": {
+                          "type": "integer",
+                          "description": "Open positions the last full read covered."
+                        },
+                        "valued": {
+                          "type": "integer",
+                          "description": "Of those, the ones the chain answered for."
+                        }
+                      },
+                      "description": "The last full read of the chain's open positions (an hour apart; positions with an event since are read again every ten minutes). Null = never read."
                     },
                     "rows": {
                       "type": "array",
@@ -31092,6 +31114,20 @@
               }
             },
             "description": "What the wallet provides to, by dollars in."
+          },
+          "unrealizedUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The open positions marked to the chain: value now + every fee (collected and still waiting) + what came out − what went in. Null while one of them has no read of the chain under two hours old, or an event came after its read."
+          },
+          "totalPnlUsd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The closed positions' profit plus `unrealizedUsd`; null with it."
           }
         }
       },
