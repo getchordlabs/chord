@@ -2069,7 +2069,7 @@
         ],
         "operationId": "arcSearch",
         "summary": "Search tokens",
-        "description": "Symbol, name or address over every token traded in the last 24 hours. Exact symbol first, then prefix, then name, then substring; listed tokens and volume break ties so the real ARGUS outranks a same-named copy. A pasted contract address always returns that token, even with no 24-hour row. `coverage` says how many tokens have a resolved name yet (about a minute after a boot).",
+        "description": "Symbol, name or address over every token traded in the last 24 hours. Exact symbol first, then prefix, then name, then substring; listed tokens and volume break ties so the real ARGUS outranks a same-named copy. Rows carry the board's `flags`, and a row flagged `wash` or `impostor` sorts below every clean row. A name search leaves out tokens with no symbol. A pasted contract address always returns that token, even with no 24-hour row. `coverage` says how many tokens have a resolved name yet (about a minute after a boot).",
         "parameters": [
           {
             "name": "q",
