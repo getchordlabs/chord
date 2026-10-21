@@ -17658,6 +17658,10 @@
                       "type": "integer",
                       "description": ""
                     },
+                    "marketCapUsd": {
+                      "type": "number",
+                      "description": "Market cap, USD: the coin's for the chain's wrapped coin, else CoinGecko's when it lists the token, else price × total supply on the chain. Absent while not known."
+                    },
                     "stats24h": {
                       "type": "object",
                       "properties": {
@@ -29295,6 +29299,10 @@
           "lastTradeTs": {
             "type": "integer",
             "description": "Unix time, seconds, UTC."
+          },
+          "marketCapUsd": {
+            "type": "number",
+            "description": "Market cap, USD. A stock token: the company's (Robinhood's figure). The chain's wrapped coin: the coin's. Else CoinGecko's when it lists the token, else price × total supply on the chain. Absent while not known."
           }
         },
         "description": "One token on Robinhood Chain with its 24-hour tape."
@@ -31621,6 +31629,10 @@
           "lastTradeTs": {
             "type": "integer",
             "description": "Unix time, seconds, UTC."
+          },
+          "marketCapUsd": {
+            "type": "number",
+            "description": "Market cap, USD: the coin's for the chain's wrapped coin, else CoinGecko's when it lists the token, else price × total supply on the chain. Absent while not known."
           }
         },
         "description": "One token on a chain-keyed chain with its 24-hour tape. No curated list, no honesty flags, no trader counts yet."

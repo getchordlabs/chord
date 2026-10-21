@@ -124,6 +124,7 @@ const RhTokenRow = obj({
   address: ADDRESS, symbol: str(""), name: str(""), decimals: int(""), logoURI: nullable(str("")), tags: arr({ type: "string" }, "`stock`, `bridged`, `stablecoin`, …"), listed: bool(""),
   priceUsd: nullable(num("")), change24hPct: nullable(num("")), liquidityUsd: nullable(num("")),
   volume24h: num(""), buyVolume24h: num(""), sellVolume24h: num(""), trades24h: int(""), buys24h: int(""), sells24h: int(""), traders: int("Attributed wallets only."), lastTradeTs: UNIX_S,
+  marketCapUsd: num("Market cap, USD. A stock token: the company's (Robinhood's figure). The chain's wrapped coin: the coin's. Else CoinGecko's when it lists the token, else price × total supply on the chain. Absent while not known."),
 }, "One token on Robinhood Chain with its 24-hour tape.");
 const RhStockRow = { allOf: [ref("RhTokenRow"), obj({
   navUsd: nullable(num("The issuer's published exchange rate at last refresh; null when none is published.")),
@@ -288,6 +289,7 @@ const ChainTokenRow = obj({
   volume24h: num("USD, every venue, trades at or above the ingest floor."), buyVolume24h: num(""), sellVolume24h: num(""),
   trades24h: int(""), buys24h: int(""), sells24h: int(""),
   dominantDex: nullable(str("Venue id with the most 24-hour volume.")), lastTradeTs: UNIX_S,
+  marketCapUsd: num("Market cap, USD: the coin's for the chain's wrapped coin, else CoinGecko's when it lists the token, else price × total supply on the chain. Absent while not known."),
 }, "One token on a chain-keyed chain with its 24-hour tape. No curated list, no honesty flags, no trader counts yet.");
 
 const META_CHAINS = [143, 4663, 5042, 43114, 8453, 56, 42161, 1];
@@ -952,6 +954,7 @@ add("/chains/{chain}/token/{address}", "get", op(T.chains, "chainToken", "One to
   { params: [CHAIN_P, CH_ADDR_P, q("hours", { type: "integer", minimum: 1, maximum: 720, default: 168 }, "Hourly buckets to return.")],
     responses: chErr({ 200: ok("", obj({
       chain: int(""), token: obj({ address: ADDRESS, symbol: nullable(str("")), name: nullable(str("")), decimals: nullable(int("")), logoURI: { type: "null" } }), hours: int(""),
+      marketCapUsd: num("Market cap, USD: the coin's for the chain's wrapped coin, else CoinGecko's when it lists the token, else price × total supply on the chain. Absent while not known."),
       stats24h: obj({ volUsd: num(""), buyUsd: num(""), sellUsd: num(""), trades: int(""), buys: int(""), sells: int(""), lastTs: UNIX_S, dominantDex: nullable(str("")), priceUsd: nullable(num("Last print on the dominant venue.")), priceThen: nullable(num("Price 24 hours ago, same rule.")), change24hPct: nullable(num("")), sinceHour: int("") }),
       series: arr(obj({ hour: int(""), volUsd: num(""), buyUsd: num(""), sellUsd: num(""), trades: int(""), buys: int(""), sells: int(""), priceLast: nullable(num("The busiest venue's last print in the hour.")) }), "Oldest first. Hours without a trade are absent."),
       byDex: arr(obj({ dex: str(""), volUsd: num(""), trades: int(""), sharePct: num("") }), "Over the requested window, biggest first."),
