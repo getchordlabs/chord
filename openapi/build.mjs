@@ -283,7 +283,7 @@ const ChainVenueShare = obj({ dex: str("Venue id."), volUsd: num(""), trades: in
 
 const ChainTokenRow = obj({
   address: ADDRESS, symbol: nullable(str("Read from the contract. Null while unresolved.")), name: nullable(str("")), decimals: nullable(int("")),
-  logoURI: { type: "null", description: "Always null on these chains for now." },
+  logoURI: nullable(str("The token's art: its row on the chain's LI.FI list, else its DexScreener profile once Chord has looked it up. Null = none known yet.")),
   priceUsd: nullable(num("Last print on the token's busiest venue, USD.")), change24hPct: nullable(num("")),
   volume24h: num("USD, every venue, trades at or above the ingest floor."), buyVolume24h: num(""), sellVolume24h: num(""),
   trades24h: int(""), buys24h: int(""), sells24h: int(""),
