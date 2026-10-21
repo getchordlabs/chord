@@ -16561,6 +16561,31 @@
                             "null"
                           ],
                           "description": "Chord's fee on a buy of this token in basis points, read from the FeeCollector on chain 4663 (what a quote applies); null = the chain did not answer."
+                        },
+                        "earnings": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "date": {
+                              "type": "string",
+                              "description": "New York date of the report, `YYYY-MM-DD`."
+                            },
+                            "time": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "before open",
+                                "after close",
+                                null
+                              ],
+                              "description": "Nasdaq's time of the report; null when Nasdaq gives none (an estimated date)."
+                            }
+                          },
+                          "description": "The next earnings report within 30 days, from Nasdaq's earnings calendar; null = none in that window, or the calendar was not read in time."
                         }
                       },
                       "description": "Present only for Robinhood's own stock tokens. Robinhood's facts, refreshed every few seconds; the reference prices are null when Robinhood's quote is older than 10 minutes. Absent = not a Robinhood stock token, or Robinhood did not answer in time."
