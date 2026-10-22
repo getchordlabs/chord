@@ -229,7 +229,7 @@ const PortfolioActivityItem = obj({
 const PF_CHAIN_ID = { type: ["integer", "string"], description: "EVM chain id, or `solana`." };
 const PositionsChain = obj({
   chain: PF_CHAIN_ID,
-  status: { type: "string", enum: ["ok", "partial", "unavailable"], description: "`ok` = every swap Chord's index holds for the wallet on this chain was read. `partial` = some were cut, and `reason` says which. `unavailable` = nothing read: no open or closed rows for this chain (Solana: not yet)." },
+  status: { type: "string", enum: ["ok", "partial", "unavailable"], description: "`ok` = every swap Chord's index holds for the wallet on this chain, and its token transfers, were read. `partial` = some were cut, and `reason` says which (for example `Transfers not read.` or `Transfers partial.`: the numbers stand on the swaps and the transfers that were read). `unavailable` = nothing read: no open or closed rows for this chain (Solana: not yet)." },
   reason: str("Present unless `ok`. One plain sentence for a person."),
   fromTs: nullable(PF_MS("Swaps from here on are in the index for this chain: a buy before it reads as received. Null = no swap history read.")),
 }, "One chain of a positions answer.", { required: ["chain", "status", "fromTs"] });
@@ -239,14 +239,17 @@ const OpenCost = obj({
   symbol: str(""), logo: nullable(str("")),
   amount: str("Balance in whole tokens, decimal string (the portfolio's)."),
   priceUsd: nullable(num("")), valueUsd: nullable(num("")),
-  avgBuyUsd: nullable(num("boughtUsd / boughtQty: one average over every buy the index holds. Null = no buy.")),
-  investedUsd: nullable(num("heldBoughtQty × avgBuyUsd. Null = no buy.")),
-  pnlUsd: nullable(num("heldBoughtQty × priceUsd − investedUsd. Null = no buy behind the holding, or no price.")),
+  avgBuyUsd: nullable(num("investedUsd / (heldBoughtQty + arrivedQty): the cost per token of the part of the holding that has one. Null = no part has a cost.")),
+  investedUsd: nullable(num("What the held part with a cost cost: the bought part at what was paid, the arrived part at its price on arrival. Null = none.")),
+  pnlUsd: nullable(num("(heldBoughtQty + arrivedQty) × priceUsd − investedUsd. Null = no cost behind the holding, or no price.")),
   pnlPct: nullable(num("pnlUsd over investedUsd, a percent.")),
-  heldBoughtQty: num("The part of the holding the index's buys explain: boughtQty − soldQty, at least 0, at most the holding."),
-  receivedQty: num("The rest of the holding: received from another wallet, or bought before `fromTs`. No cost is known for it and it is in no PnL."),
-  realizedUsd: nullable(num("Profit on what was sold, by the closed rule. Null = nothing sold, or nothing bought to set against it.")),
-  boughtQty: num(""), boughtUsd: num(""), soldQty: num(""), soldUsd: num(""), buys: int(""), sells: int(""),
+  heldBoughtQty: num("The part of the holding bought by swap, after what later sales and transfers out took from it."),
+  arrivedQty: num("The part that arrived by token transfer with a price on record at the hour it arrived; that price is its cost."),
+  arrivedUsd: nullable(num("The cost of `arrivedQty` (quantity × price at arrival, after what later left). Null when arrivedQty is 0.")),
+  lastArrivalTs: nullable(PF_MS("The newest priced arrival. Null when arrivedQty is 0.")),
+  receivedQty: num("The part with no cost known: arrived with no price on record, held before the history read, or a native coin received (no log). In no PnL. heldBoughtQty + arrivedQty + receivedQty = the holding."),
+  realizedUsd: nullable(num("Profit on what was sold, by the closed rule. Null = nothing sold, or no sale took from a part with a cost.")),
+  boughtQty: num("Swap totals (transfers are not buys or sells)."), boughtUsd: num(""), soldQty: num(""), soldUsd: num(""), buys: int(""), sells: int(""),
   firstBuyTs: nullable(PF_MS("")), lastTradeTs: nullable(PF_MS("")),
 }, "What one held token cost.");
 const ClosedTrade = obj({
@@ -255,10 +258,11 @@ const ClosedTrade = obj({
   symbol: str(""), name: nullable(str("")), logo: nullable(str("")),
   soldAll: bool("Nothing held now, or less than $1 of it."),
   soldQty: num(""), boughtQty: num(""),
-  unmatchedSoldQty: num("Sold beyond what the index saw bought (tokens that arrived by transfer, or were bought before `fromTs`): no profit is counted on it."),
-  avgBuyUsd: nullable(num("")), avgSellUsd: nullable(num("")),
-  realizedUsd: nullable(num("soldUsd × matched / soldQty − matched × avgBuyUsd, with matched = min(soldQty, boughtQty). Null = no buy to set against.")),
-  realizedPct: nullable(num("realizedUsd over matched × avgBuyUsd, a percent.")),
+  unmatchedSoldQty: num("Sold out of the part with no cost known, or beyond what was held on record at the time (a sale before the first buy): no profit is counted on it."),
+  avgBuyUsd: nullable(num("Cost per token of what the sales took from the parts with a cost; (soldQty − unmatchedSoldQty) × avgBuyUsd is the cost `realizedPct` is a percent of.")),
+  avgSellUsd: nullable(num("")),
+  realizedUsd: nullable(num("Per sale, its proceeds on the part with a cost minus that part's cost, summed. Null = no sale took from a part with a cost.")),
+  realizedPct: nullable(num("realizedUsd over (soldQty − unmatchedSoldQty) × avgBuyUsd, a percent.")),
   firstBuyTs: nullable(PF_MS("")), lastSellTs: PF_MS(""),
 }, "What one exit made: a token sold in part or in full.");
 const PositionsAnswer = obj({
@@ -721,19 +725,24 @@ add("/portfolio/{wallet}/activity", "get", op(T.portfolio, "portfolioActivity", 
       503: errRes("`BUSY`: too many new portfolio reads are running for callers without a key right now (`Retry-After`). `UNAVAILABLE`: the page itself could not be built (a chain that cannot be read is listed in `unavailable` inside a 200)."),
     } }));
 
-add("/portfolio/{wallet}/positions", "get", op(T.portfolio, "portfolioPositions", "Average buy and exits per token", `What each token a wallet holds cost it, and what each token it sold made, over all the swap history Chord's index holds for the wallet (not a 30-day window). One average per token over every buy:
+add("/portfolio/{wallet}/positions", "get", op(T.portfolio, "portfolioPositions", "Average buy and exits per token", `What each token a wallet holds cost it, and what each token it sold made, over all the swap history Chord's index holds for the wallet (not a 30-day window), with the wallet's token transfers. Per token, in time order, three parts of the holding:
 
-- \`avgBuyUsd\` = boughtUsd / boughtQty
-- \`heldBoughtQty\` = boughtQty − soldQty, at least 0 and at most the holding; the rest of the holding is \`receivedQty\` (a transfer in, or bought before \`fromTs\`): no cost known, in no PnL
-- \`investedUsd\` = heldBoughtQty × avgBuyUsd, \`pnlUsd\` = heldBoughtQty × price − investedUsd
-- an exit's \`realizedUsd\` = soldUsd × matched / soldQty − matched × avgBuyUsd, matched = min(soldQty, boughtQty); \`unmatchedSoldQty\` = what was sold beyond what was seen bought, with no profit counted on it
+- **bought** by swap, at what was paid
+- **arrived** by token transfer with a price on record at the hour it arrived (the median of the newest three hourly closes in the 24 hours before it), at that price
+- **unknown**: arrived with no price, held before the history read, or a native coin received (no log)
+
+A sale or a transfer out takes from the three parts in proportion to what each holds at that moment, so a sale is set only against what was held before it: a sale before the first buy is \`unmatchedSoldQty\`, and the average moves with each buy. A sale's profit = its proceeds on the bought and arrived share minus that share's cost; a transfer out makes no profit, its cost leaves with it. A wallet that holds more now than its flows explain held the rest from the start (unknown). At the end the parts are matched to the holding now.
+
+- \`heldBoughtQty\` + \`arrivedQty\` + \`receivedQty\` = the holding; \`investedUsd\` = the cost of the bought and arrived parts, \`avgBuyUsd\` = investedUsd / (heldBoughtQty + arrivedQty), \`pnlUsd\` = (heldBoughtQty + arrivedQty) × price − investedUsd
+- an exit's \`avgBuyUsd\` = the cost per token of what its sales took from the bought and arrived parts; (soldQty − unmatchedSoldQty) × avgBuyUsd is the cost \`realizedPct\` is a percent of
 
 **Use it for**: "what did I pay for this", "what did my exits make", a positions tab next to \`GET /portfolio/{wallet}\`.
 
 **Notes**
 - **History read**: Monad, Robinhood Chain and Arc, the daily rollup of every day since the index started on the chain plus the raw tape of the recent days (never both for one day); Avalanche, Base, BNB Chain, Arbitrum One and Ethereum, the raw tape only (3 to 35 days; older days are not read yet, so a token bought before \`fromTs\` reads as received). Each chain says where its history starts in \`chains[].fromTs\`. Solana: not yet (\`status: "unavailable"\`). EVM swaps under $0.10 are left out.
 - **Limits**: the newest 20,000 swaps of the raw tape and the 500 most traded tokens per chain; a chain that hits either is \`partial\` with a \`reason\`.
-- The native coin and its wrapped token are one asset to the tape: their history is split between the two rows by what each holds now, and an exit carries the coin's name. Stablecoins have no row. A token with a transfer tax can read off.
+- **Transfers**: ERC-20 Transfer logs in and out of the wallet, read from the chain itself since the index start on Monad, Robinhood Chain and Arc, and since the first hourly price elsewhere; a transfer inside a swap the index holds is not counted twice. A wallet's first reads on Arc are \`partial\` (\`Transfers partial.\`) while the history is read in steps; at most 400 transfers per token and 4,000 per chain are counted, the newest first.
+- The native coin and its wrapped token are one asset to the tape: their history is split between the two rows by what each holds now, and an exit carries the coin's name. Stablecoins have no row. A token with a transfer tax can read off. A day of Monad, Robinhood Chain or Arc older than the raw tape is one row per token: its buys count at its first buying swap, its sales at its last selling swap.
 - **Times are milliseconds**, quantities are numbers in whole tokens, and \`amount\` is the portfolio's decimal string.
 - **Cache**: kept 60 seconds per wallet, Solana address and chain set (15 seconds when a chain could not be read); a copy up to 5 minutes old may be served once while a refresh runs. \`fresh=1\` recomputes, only with an \`X-API-Key\` or an Ask session.
 - **Without an API key (or an Ask session)**: a new read counts against the same budget as \`GET /portfolio/{wallet}\` (10 new reads per IP every 10 minutes, a limited number a minute for every such caller together); past it 429 \`RATE_LIMITED\` or 503 \`BUSY\` with \`Retry-After\`.`,
