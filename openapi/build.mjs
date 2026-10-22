@@ -224,6 +224,56 @@ const PortfolioActivityItem = obj({
   amount: str("Whole tokens, decimal string."), valueUsd: nullable(num("")), priceUsd: nullable(num("")),
   tx: str("Transaction hash, or the Solana signature (case kept)."), explorer: nullable(str("The transaction on the chain's explorer.")), venue: nullable(str("Venue display name.")),
 }, "One side of one swap.");
+// Profile positions: GET /portfolio/{wallet}/positions (services/portfolio/positions.ts, types.ts PositionsAnswer). Quantities are
+// the tape's whole-token numbers (not decimal strings); `amount` is the portfolio's decimal string.
+const PF_CHAIN_ID = { type: ["integer", "string"], description: "EVM chain id, or `solana`." };
+const PositionsChain = obj({
+  chain: PF_CHAIN_ID,
+  status: { type: "string", enum: ["ok", "partial", "unavailable"], description: "`ok` = every swap Chord's index holds for the wallet on this chain was read. `partial` = some were cut, and `reason` says which. `unavailable` = nothing read: no open or closed rows for this chain (Solana: not yet)." },
+  reason: str("Present unless `ok`. One plain sentence for a person."),
+  fromTs: nullable(PF_MS("Swaps from here on are in the index for this chain: a buy before it reads as received. Null = no swap history read.")),
+}, "One chain of a positions answer.", { required: ["chain", "status", "fromTs"] });
+const OpenCost = obj({
+  chain: PF_CHAIN_ID,
+  address: nullable(str("EVM token, lower-case. Null for the chain's native coin.")),
+  symbol: str(""), logo: nullable(str("")),
+  amount: str("Balance in whole tokens, decimal string (the portfolio's)."),
+  priceUsd: nullable(num("")), valueUsd: nullable(num("")),
+  avgBuyUsd: nullable(num("boughtUsd / boughtQty: one average over every buy the index holds. Null = no buy.")),
+  investedUsd: nullable(num("heldBoughtQty × avgBuyUsd. Null = no buy.")),
+  pnlUsd: nullable(num("heldBoughtQty × priceUsd − investedUsd. Null = no buy behind the holding, or no price.")),
+  pnlPct: nullable(num("pnlUsd over investedUsd, a percent.")),
+  heldBoughtQty: num("The part of the holding the index's buys explain: boughtQty − soldQty, at least 0, at most the holding."),
+  receivedQty: num("The rest of the holding: received from another wallet, or bought before `fromTs`. No cost is known for it and it is in no PnL."),
+  realizedUsd: nullable(num("Profit on what was sold, by the closed rule. Null = nothing sold, or nothing bought to set against it.")),
+  boughtQty: num(""), boughtUsd: num(""), soldQty: num(""), soldUsd: num(""), buys: int(""), sells: int(""),
+  firstBuyTs: nullable(PF_MS("")), lastTradeTs: nullable(PF_MS("")),
+}, "What one held token cost.");
+const ClosedTrade = obj({
+  chain: PF_CHAIN_ID,
+  address: nullable(str("EVM token, lower-case. Null for the chain's native coin (its wrapped twin is the same asset).")),
+  symbol: str(""), name: nullable(str("")), logo: nullable(str("")),
+  soldAll: bool("Nothing held now, or less than $1 of it."),
+  soldQty: num(""), boughtQty: num(""),
+  unmatchedSoldQty: num("Sold beyond what the index saw bought (tokens that arrived by transfer, or were bought before `fromTs`): no profit is counted on it."),
+  avgBuyUsd: nullable(num("")), avgSellUsd: nullable(num("")),
+  realizedUsd: nullable(num("soldUsd × matched / soldQty − matched × avgBuyUsd, with matched = min(soldQty, boughtQty). Null = no buy to set against.")),
+  realizedPct: nullable(num("realizedUsd over matched × avgBuyUsd, a percent.")),
+  firstBuyTs: nullable(PF_MS("")), lastSellTs: PF_MS(""),
+}, "What one exit made: a token sold in part or in full.");
+const PositionsAnswer = obj({
+  wallet: { ...ADDRESS, description: "EVM address, lower-case." }, sol: nullable({ ...PF_SOL, description: "The Solana address as given, or null." }),
+  asOf: PF_MS("When this answer was computed. A cached answer keeps its own `asOf`."),
+  open: arr(ref("OpenCost"), "Every held token that is not a stablecoin, on a chain whose history was read, largest value first (unpriced last)."),
+  closed: arr(ref("ClosedTrade"), "Every token that is not a stablecoin sold in part or in full, newest last sale first, at most 100."),
+  totals: obj({
+    openPnlUsd: nullable(num("Sum of the open rows' pnlUsd. Null when a chain in scope could not be read (its holdings, or their history while it holds a priced token).")),
+    closedPnlUsd: num("Sum of realizedUsd over every exit, the ones past the first 100 included."),
+    investedUsd: num("Sum of the open rows' investedUsd."),
+    won: int("Exits with realizedUsd above zero."), lost: int("Exits with realizedUsd below zero."),
+  }),
+  chains: arr(ref("PositionsChain"), "In registry order, Solana last."),
+}, "What each held token cost and what each exit made, on every chain in scope.");
 
 const LpEvent = obj({
   tx: TX_HASH, logIndex: int(""), pool: POOL_ID, dex: str(""), kind: { type: "string", enum: ["add", "remove", "collect"] }, wallet: nullable(ADDRESS), token: ADDRESS, tokenAmt: num(""), anchor: ADDRESS, anchorAmt: num(""),
@@ -349,7 +399,7 @@ const components = {
     AgentCounts: obj({ calls: int("Requests answered 2xx."), reads: int(""), quotes: int(""), swapTx: int("Swap transactions built, not executed."), asks: int("Questions to the analyst."), callers: int("Distinct callers in the window.") }, "Counts for one surface or a sum of surfaces."),
     Error: obj({ error: str("Stable machine code, e.g. `INVALID_PARAMS`, `NOT_READY`, `RATE_LIMIT_EXCEEDED`."), message: str("For humans."), statusCode: int("HTTP status, when included.") }, "Every non-2xx body.", { required: ["error"], example: { error: "INVALID_PARAMS", message: "amount must be an integer string in the token's smallest unit" } }),
     RiskCheck, TokenRiskReport, Coverage, TokenLite, ArcTokenRow, ArcTrendingRow, ArcGraduatedRow, RhTokenRow, RhStockRow, RouteLeg, QuoteResponse, SwapTx, MetaAttempt, MetaQuote, Candle, TradeRow, StatsWindow, SmartWallet, PnlToken,
-    PortfolioWindow, PortfolioHolding, PortfolioChain, Portfolio: PortfolioAnswer, PortfolioActivityItem, LpEvent, PoolListRow, LpPosition, LpLeaderRow, SimResult, LauncherStat, IngestFloor, ChainCoverage, ChainTokenRow, ChainVenueShare,
+    PortfolioWindow, PortfolioHolding, PortfolioChain, Portfolio: PortfolioAnswer, PortfolioActivityItem, PositionsAnswer, PositionsChain, OpenCost, ClosedTrade, LpEvent, PoolListRow, LpPosition, LpLeaderRow, SimResult, LauncherStat, IngestFloor, ChainCoverage, ChainTokenRow, ChainVenueShare,
   },
 };
 
@@ -669,6 +719,30 @@ add("/portfolio/{wallet}/activity", "get", op(T.portfolio, "portfolioActivity", 
       400: errRes("`INVALID_ADDRESS`, `INVALID_SOL_ADDRESS`, `BAD_CHAINS`, `SOL_REQUIRED`, `BAD_LIMIT` (1 to 100) or `BAD_CURSOR` (not a cursor of this route)."),
       429: errRes("`RATE_LIMITED`: without an API key, this IP started its 10 new portfolio reads of the last 10 minutes, pages included (`Retry-After`). Or `RATE_LIMIT_EXCEEDED`, the per-minute limit of every route."),
       503: errRes("`BUSY`: too many new portfolio reads are running for callers without a key right now (`Retry-After`). `UNAVAILABLE`: the page itself could not be built (a chain that cannot be read is listed in `unavailable` inside a 200)."),
+    } }));
+
+add("/portfolio/{wallet}/positions", "get", op(T.portfolio, "portfolioPositions", "Average buy and exits per token", `What each token a wallet holds cost it, and what each token it sold made, over all the swap history Chord's index holds for the wallet (not a 30-day window). One average per token over every buy:
+
+- \`avgBuyUsd\` = boughtUsd / boughtQty
+- \`heldBoughtQty\` = boughtQty − soldQty, at least 0 and at most the holding; the rest of the holding is \`receivedQty\` (a transfer in, or bought before \`fromTs\`): no cost known, in no PnL
+- \`investedUsd\` = heldBoughtQty × avgBuyUsd, \`pnlUsd\` = heldBoughtQty × price − investedUsd
+- an exit's \`realizedUsd\` = soldUsd × matched / soldQty − matched × avgBuyUsd, matched = min(soldQty, boughtQty); \`unmatchedSoldQty\` = what was sold beyond what was seen bought, with no profit counted on it
+
+**Use it for**: "what did I pay for this", "what did my exits make", a positions tab next to \`GET /portfolio/{wallet}\`.
+
+**Notes**
+- **History read**: Monad, Robinhood Chain and Arc, the daily rollup of every day since the index started on the chain plus the raw tape of the recent days (never both for one day); Avalanche, Base, BNB Chain, Arbitrum One and Ethereum, the raw tape only (3 to 35 days; older days are not read yet, so a token bought before \`fromTs\` reads as received). Each chain says where its history starts in \`chains[].fromTs\`. Solana: not yet (\`status: "unavailable"\`). EVM swaps under $0.10 are left out.
+- **Limits**: the newest 20,000 swaps of the raw tape and the 500 most traded tokens per chain; a chain that hits either is \`partial\` with a \`reason\`.
+- The native coin and its wrapped token are one asset to the tape: their history is split between the two rows by what each holds now, and an exit carries the coin's name. Stablecoins have no row. A token with a transfer tax can read off.
+- **Times are milliseconds**, quantities are numbers in whole tokens, and \`amount\` is the portfolio's decimal string.
+- **Cache**: kept 60 seconds per wallet, Solana address and chain set (15 seconds when a chain could not be read); a copy up to 5 minutes old may be served once while a refresh runs. \`fresh=1\` recomputes, only with an \`X-API-Key\` or an Ask session.
+- **Without an API key (or an Ask session)**: a new read counts against the same budget as \`GET /portfolio/{wallet}\` (10 new reads per IP every 10 minutes, a limited number a minute for every such caller together); past it 429 \`RATE_LIMITED\` or 503 \`BUSY\` with \`Retry-After\`.`,
+  { params: [p("wallet", ADDRESS, ""), PF_SOL_Q, PF_CHAINS, q("fresh", { type: "string", enum: ["1"] }, "Recompute instead of serving the cached answer. Honoured only with an `X-API-Key` or an Ask session.")],
+    responses: {
+      200: ok("", ref("PositionsAnswer")),
+      400: errRes("`INVALID_ADDRESS` (the wallet), `INVALID_SOL_ADDRESS`, `BAD_CHAINS`, or `SOL_REQUIRED` (`chains` names `solana` without `sol`)."),
+      429: errRes("`RATE_LIMITED`: without an API key, this IP started its 10 new portfolio reads of the last 10 minutes (`Retry-After`); a positions read in the last 5 minutes still answers. Or `RATE_LIMIT_EXCEEDED`, the per-minute limit of every route."),
+      503: errRes("`BUSY`: too many new portfolio reads are running for callers without a key right now (`Retry-After`). `UNAVAILABLE`: the answer itself could not be built. A chain that cannot be read is not a 503: it comes back `status: \"unavailable\"` inside a 200."),
     } }));
 
 const PF_NOTE = "Portfolio routes answer an empty 200 shape rather than a 5xx when the tape read fails — treat an empty `tokens` list as \"nothing yet\" and retry later.";
