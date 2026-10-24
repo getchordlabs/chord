@@ -6,7 +6,7 @@ it in a single transaction. On Solana, Chord quotes swaps through its own Solana
 unsigned transaction for the user's wallet. Next to trading, Chord keeps a live index of swaps, holders, LP positions and
 wallet PnL on all nine chains, which apps and AI agents can query.
 
-- App (Ask, AI trading agent + wallet): https://getchord.xyz/ask
+- App (Cash, stocks, perps, Earn and the AI Copilot), on iOS (TestFlight) and the web: https://getchord.xyz
 - Docs and API reference: https://getchord.xyz/docs
 - API: https://api.getchord.xyz/v1 (what each chain serves: https://api.getchord.xyz/v1/chains)
 - Status, measured every minute from Cloudflare: https://getchord.xyz/status
@@ -14,6 +14,21 @@ wallet PnL on all nine chains, which apps and AI agents can query.
 
 Chord started as NullTerminal, a DEX aggregator on Monad. Contract and package names that start with `Null` come
 from that period; the `Chord*` contracts in `contracts/src/chord/` are the current builds of the same code.
+
+## The app
+
+Chord is also a trading app, live on iOS (TestFlight) and the web at https://getchord.xyz. The app's code is closed;
+it trades through the same API and contracts as everything in this repository.
+
+- **Cash**: one dollar balance, held as USDG on Robinhood Chain. USDC or USDG can be added from other networks; from
+  Arbitrum it takes one signature.
+- **Stocks**: 192 of the 195 tokenized stocks on Robinhood Chain, bought and sold from Cash with no gas and no wallet
+  pop-up.
+- **Cross-chain trading**: the same Cash buys tokens on Arbitrum. The app moves the money; the user never bridges.
+- **Perps**: long or short from Cash on Lighter's Robinhood Chain exchange, up to 10x, where Lighter offers perps.
+- **Earn**: Cash into the Morpho USDG vault on Robinhood Chain. Chord takes no fee on it.
+- **AI Copilot**: a chat pinned to the token on the trading screen. It reads the news, X and on-chain trades, and
+  answers with dated sources (`copilot` on `POST /v1/ask`).
 
 ## Use it from an AI agent
 
@@ -62,8 +77,8 @@ function-calling manifest at https://api.getchord.xyz/v1/mcp/tools.json.
 | `openapi/` | OpenAPI spec of the public API (`openapi.json`) and the script that builds it |
 | `sdk/` | The original TypeScript SDK from the Monad period |
 
-The routing engine (Rust) and the API server (TypeScript) are not in this repository. They run behind
-`api.getchord.xyz`.
+The iOS app, the web app, the API server (TypeScript) and the routing engine (Rust) are not in this repository. They
+run behind `getchord.xyz` and `api.getchord.xyz`.
 
 ## Contracts
 
@@ -128,6 +143,22 @@ cd contracts
 forge build
 forge test --no-match-contract 'ForkTest$'
 ```
+
+## Since Oct 16, 2026
+
+- **Ask Portfolio**: one wallet page over the eight EVM chains and Solana, with 24h / 7d / 30d PnL on one rule and the
+  wallet's activity: `GET /v1/portfolio/{wallet}` and `/activity` (`a50ab85`); the average buy and past exits of every
+  token held, over all indexed history: `/positions` (`38c7020`, `4d0d6de`).
+- **Safety**: `GET /v1/security/token/{chain}/{address}` answers whether a token is safe, and Ask research cites
+  numbered sources (`88775a8`).
+- **AI Copilot**: `POST /v1/ask` takes `copilot {chain, token}`, a turn about the token on the trading screen
+  (`e5a52cb`); Robinhood's own stock facts on `GET /v1/rh/token/{address}` (multiplier, halts, market hours, reference
+  bid and ask, fee) (`002c6e5`) and the next earnings date (`f639c56`).
+- **Data**: one top-traders PnL rule on every chain and a token's LP adds and removes (`59f0c87`), Markets search over
+  every token traded in 24 h (`2911041`), hourly candles of a pool's own swaps on every LP chain (`5f8e575`), open LP
+  positions valued from the chain (`584a063`), market caps (`baad4a3`), one wallet's swaps through the router
+  (`a4b8811`).
+- **Docs MCP**: words like "to" and "over" no longer decide a search (`c8cffad`).
 
 ## Since the buildathon (Oct 5 to Oct 15, 2026)
 
