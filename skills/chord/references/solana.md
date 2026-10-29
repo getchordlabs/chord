@@ -13,7 +13,8 @@ wallet, simulating each, and keeping the one that leaves the wallet with more. A
    base64). Show the confirmation summary and wait for an explicit yes.
 2. The user's wallet signs `quote.tx` UNCHANGED (on `jupiter_meta` the wallet may be the second signer).
    Chord and this skill never sign.
-3. `POST https://api.getchord.xyz/v1/sol/trade/send` with `{"tx": "<signed base64>"}` (only a
+3. You relay, Chord's API broadcasts: `POST https://api.getchord.xyz/v1/sol/trade/send` with
+   `{"tx": "<signed base64>"}`, the bytes the wallet returned, unchanged (only a
    transaction Chord quoted in the last three minutes, signed by that wallet), then poll
    `GET /v1/sol/trade/tx/{signature}` until `confirmed` / `finalized` (`receivedOut`), `failed` or `expired`.
 

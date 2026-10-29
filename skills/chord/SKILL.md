@@ -24,7 +24,9 @@ metadata:
 
 Chord indexes every DEX swap on eight EVM chains from its own tape, prices tokens from those trades,
 and routes a swap across every venue on a chain through one router contract. With this skill you
-read that data and prepare swaps carefully. **You never sign, never broadcast, never hold funds.**
+read that data and prepare swaps carefully. **You never sign and never hold funds.** On EVM chains the
+user's wallet signs and broadcasts. On Solana the user's wallet signs, and you only hand those signed bytes
+to `POST /v1/sol/trade/send`, where Chord's API broadcasts them.
 
 - API: `https://api.getchord.xyz` (REST, JSON; every path below starts with `/v1`). Reference:
   https://getchord.xyz/docs , OpenAPI https://getchord.xyz/docs/openapi.json , docs as MCP
@@ -103,7 +105,9 @@ Worked calls with real responses: `references/examples.md`.
 - **Fund-moving, needs the user's confirmation first:** `POST /v1/meta/swap`, `/v1/meta/quote` with
   `taker` (it returns a transaction), `chord.py meta-swap`, `chord_swap_tx`, `chord_quote` with a
   `taker`, `POST /v1/swap`, `chord.py swap-tx`, and every token approval.
-- **Never:** sign or broadcast anything; ask for, accept or store a private key or seed phrase;
+- **Relay only, after the user's yes:** `POST /v1/sol/trade/send` with a Solana transaction the user's
+  wallet already signed. Chord's API broadcasts it; you pass the bytes unchanged.
+- **Never:** sign anything; broadcast anything yourself; ask for, accept or store a private key or seed phrase;
   build the swap in the same response that shows the quote; pass `--user-confirmed` unless the user
   said yes in a later message; write or imagine the user's yes yourself; propose an unlimited approval.
 
